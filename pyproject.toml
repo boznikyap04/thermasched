@@ -1,0 +1,22 @@
+[project]
+name = "thermasched"
+version = "0.1.0"
+description = "ThermaSched: integrated thermal-aware workload scheduling and air-liquid cooling control for heterogeneous data centers"
+requires-python = ">=3.11"
+dependencies = [
+    "duckdb>=1.1",
+    "highspy>=1.15.1",
+    "numpy>=2.0",
+]
+
+[dependency-groups]
+dev = [
+    "ipykernel>=7.4.0",
+    "nbclient>=0.11.0",
+    "nbformat>=5.11.1",
+    "pytest>=9.1.1",
+]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]

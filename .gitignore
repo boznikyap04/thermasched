@@ -1,0 +1,13 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+.ipynb_checkpoints/
+
+# macOS
+.DS_Store
+
+# Raw datasets (too large for GitHub; see PROJECT_CONTEXT.md section 9)
+Data/UniMelb.csv
+UFCG/*.csv

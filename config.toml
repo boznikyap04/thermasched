@@ -1,0 +1,159 @@
+# Every data-alignment decision lives here. Section and equation numbers refer to
+# PROJECT_CONTEXT.md. Change a value and re-run data_prep.ipynb.
+
+[paths]
+unimelb = "Data/UniMelb.csv"
+ufcg = "UFCG"
+clean = "Data/clean"
+scenarios = "scenarios"
+
+[servers]
+# UniMelb reports 64 cores until this instant and 128 afterwards (hyper-threads), with a
+# different load scale and idle power. Only the 64-core period is used.
+regime_end = "2019-03-14 11:40:00"
+cores = 64
+# `Ram` is in units of 8 GB: 64.488 x 8 x 75 hosts = 38,692 GB, the fleet total in
+# Ilager et al. (2021), Table III.
+ram_unit_gb = 8.0
+# CPU_Load is on a 0-100 scale, so the 0.01 threshold of Eq. (17) is 1.0 here.
+idle_cpu_load = 1.0
+# Inlet 4.0 degC with fan 280 rpm is a failed-sensor reading.
+inlet_sentinel = 4.0
+fan_sentinel = 280.0
+# Gates for a server to have a usable power curve, Eq. (17)-(20).
+min_completeness = 0.90
+min_peak_load = 30.0
+min_power_load_corr = 0.80
+min_idle_rows = 30
+
+[workloads]
+slot_seconds = 300
+# UFCG reports percent of one vCPU, not MHz. One vCPU at 100% is taken as f_ref MHz so
+# that Eq. (14), (15), (39) keep their MHz units.
+f_ref_mhz = 2400.0
+drop_flavors = ["amphora"]        # load-balancer appliances, not user workloads
+min_flavor_ram_mb = 1024          # removes the flavor with ram = 4
+min_snapshots = 3
+min_usage_coverage = 0.90
+max_fill_slots = 3                # longer gaps are left out of the work window T^W_i
+edge_slots = 2                    # alive this close to trace start/end = censored
+utc_offset_hours = -3             # Campina Grande; used for time-of-day only
+# 26 hosts never report usage, so their VMs have no work content. Off: those VMs are
+# dropped. On: each gets the mean usage of a measured VM of the same flavor, drawn from
+# the `impute_donor_pool` nearest in lifetime, and is flagged `usage_imputed`.
+impute_unmonitored = false
+impute_donor_pool = 5
+impute_seed = 42
+
+# ---------------------------------------------------------------------------------
+# Scenarios.
+#   base      tuned so the model's trade-offs are visible (see sizing note below)
+#   thesis10  the same workloads on the 10-server, 4/3/3 fleet of the Eq. (15) text
+#   small     the base construction at a size suited to debugging a solver
+#
+# Sizing note: pooled into one day, the whole UFCG catalogue peaks at about 180
+# requested vCPUs. Ten 64-core servers would sit at under 30% load with thermal limits
+# rarely binding, so `base` uses six servers, which puts peak demand near half the
+# fleet and above the fastest tier's capacity.
+# ---------------------------------------------------------------------------------
+[scenario.base]
+seed = 42
+dt_seconds = 300
+periods = 288                     # 24 h
+start_hour_local = 6              # period 1 = 06:00, so the daytime arrival peak and
+                                  # its deadlines both fall inside the horizon
+n_servers = 6
+freq_mhz = [2100.0, 2400.0, 3000.0]
+freq_split = [2, 2, 2]
+n_zones = 2
+# Workloads are drawn from the pooled catalogue (keeping time of day) until the peak
+# requested vCPUs reach this share of fleet cores, or the catalogue runs out.
+target_peak_load = 0.60
+min_et_periods = 3                # under 15 core-minutes per vCPU in a whole life: idle VMs
+max_et_periods = 144              # longest baseline execution time admitted (12 h)
+rt_share = 0.30                   # share flagged time-sensitive (RT_i = 1)
+rt_slack_frac = 0.25              # RT slack = max(1, ceil(frac x ET_base)) periods
+dt_slack_mult = 2.0               # delay-tolerant slack = mult x ET_base, clamped to
+dt_slack_min = 24                 #   [2 h,
+dt_slack_max = 96                 #    8 h] so work can move across the carbon profile
+# Carbon intensity: annual mean from the thesis's own source (Our World in Data,
+# Philippines 2024), with a SYNTHETIC daily shape because no hourly series is cited.
+ci_mean_g_per_kwh = 621.73
+ci_amplitude = 0.25               # 0 gives the flat annual value of the thesis table
+
+[scenario.thesis10]
+seed = 42
+dt_seconds = 300
+periods = 288
+start_hour_local = 6
+n_servers = 10
+freq_mhz = [2100.0, 2400.0, 3000.0]
+freq_split = [4, 3, 3]            # Eq. (15) text: 4, 3, 3 servers
+n_zones = 2
+target_peak_load = 0.60
+min_et_periods = 3
+max_et_periods = 144
+rt_share = 0.30
+rt_slack_frac = 0.25
+dt_slack_mult = 2.0
+dt_slack_min = 24
+dt_slack_max = 96
+ci_mean_g_per_kwh = 621.73
+ci_amplitude = 0.25
+
+[scenario.small]
+seed = 42
+dt_seconds = 300
+periods = 96                      # 8 h, 12:00-20:00: spans the carbon dip and peak
+start_hour_local = 12
+n_servers = 3
+freq_mhz = [2100.0, 2400.0, 3000.0]
+freq_split = [1, 1, 1]
+n_zones = 2
+target_peak_load = 0.60
+min_et_periods = 3
+max_et_periods = 36
+rt_share = 0.30
+rt_slack_frac = 0.25
+dt_slack_mult = 2.0
+dt_slack_min = 12
+dt_slack_max = 36
+ci_mean_g_per_kwh = 621.73
+ci_amplitude = 0.25
+
+# Constants exactly as printed in thesisb.pdf (section 4.1). Unit oddities are kept
+# as printed and are for the model builder to resolve (section 7, D1).
+[constants]
+R_dvfs = 0.378
+F_throttle = 0.662
+T_max_server_C = 90.0
+H_min_C = 10.0
+c_pw = 4182.0
+c_pa = 1.00643
+T_dvfs_C = 75.0
+T_throttle_C = 100.0
+Q_crac_kW = 116.0
+COP_crac_coeffs = [0.0068, 0.0008, 0.458]
+T_crac_min_C = 18.0
+T_crac_max_C = 27.0
+FR_crac_min_m3s = 0.0
+FR_crac_max_m3s = 6.56
+Q_cp_kW = 0.3
+T_cp_min_K = 293.15
+T_cp_max_K = 313.1
+FR_cp_min_Lmin = 0.05               # printed 0.005; the thesis group confirmed 0.05 (2026-10-14)
+FR_cp_max_Lmin = 0.35
+P_cp_rated_as_printed_mW = 0.657
+FR_cp_rated_Lmin = 0.264
+T_max_zone_C = 32.0
+
+# Cold-plate model agreed with the thesis group (IE_Thesis_Master_Document.pdf, 2026-10-14).
+# Flow is chosen per server and period from these settings; R = (T_cpu,max - T_in) / P_cpu
+# from Wang et al. (2026), Fig. 10(a), CPU 1, at 200 W. FR_cp_min/max above are only the
+# limits of Eq. (47); FR_cp_rated (0.264 L/min, 0.657 mW, Wang and Tao 2025) is only the
+# pump reference of Eq. (48). Plates per server: `n_cold_plates` in servers.csv (editable),
+# or --cold-plate-count N for every server.
+[cold_plate]
+flow_settings_Lmin = [0.10, 0.15, 0.20, 0.25, 0.30]
+R_C_per_W = [0.1543, 0.1143, 0.0943, 0.0843, 0.0793]
+water_density_kg_per_L = 1.0

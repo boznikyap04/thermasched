@@ -1,0 +1,6 @@
+dataset,step,unit,before,after,removed,note
+UniMelb,keep 64-core period,rows,2748525,1621427,1127098,before 2019-03-14 11:40:00
+UniMelb,"drop duplicate (server, time)",rows,1621427,1621427,0,
+UniMelb,drop rows missing CPU_Load or Power,rows,1621427,1621427,0,
+UniMelb,null failed-sensor inlet readings,rows,1621427,1621427,0,"53,165 inlet values set to null"
+UniMelb,servers passing power-curve and thermal gates,servers,81,45,36,

@@ -1,0 +1,13 @@
+dataset,step,unit,before,after,removed,note
+UFCG,"snap to 5-minute slots, merge doubles",rows,15397129,15395669,1460,
+UFCG,usage reported as NA,rows,15395669,11942874,3452795,kept as missing
+UFCG,has a flavor record,VMs,2800,2799,1,
+UFCG,drop infrastructure flavors,VMs,2799,1193,1606,'amphora'
+UFCG,drop implausible flavor memory,VMs,1193,1191,2,
+UFCG,drop resized VMs,VMs,1191,1172,19,C_req must be constant
+UFCG,drop migrated VMs,VMs,1172,1166,6,host is NA for some VMs; that is not a migration
+UFCG,drop VMs alive at trace start,VMs,1166,1054,112,arrival unknown
+UFCG,drop VMs alive at trace end,VMs,1054,944,110,total work unknown
+UFCG,at least 3 snapshots,VMs,944,785,159,
+UFCG,has any usage reading,VMs,785,527,258,
+UFCG,usage coverage >= 90%,VMs,527,502,25,
