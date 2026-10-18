@@ -13,7 +13,7 @@ import pytest
 
 from scheduler.optimize import diagnose_infeasibility, solve
 from scheduler.types import (
-    RELAX_CAPACITY, RELAX_COOLING, RELAX_DEADLINES, RELAX_THERMAL, STATUS_INFEASIBLE,
+    RELAX_CAPACITY, RELAX_COOLING, RELAX_DEADLINES, RELAX_PRIORITY, RELAX_THERMAL, STATUS_INFEASIBLE,
     STATUS_OPTIMAL, Constants, NotDefinedYet, Placement, RunSettings, Scenario, Schedule,
     Server, Workload, cop)
 
@@ -38,20 +38,20 @@ def server(s, zone=1, cores=4, p_idle=100.0, p_max=400.0, T0=30.0, a=0.0, R=0.01
                   th_a_C=a, th_R_C_per_W=R, th_alpha=alpha, n_cold_plates=plates)
 
 
-def work(i, A, D, AD, cores, n_periods, B=0, f=F) -> Workload:
+def work(i, A, D, AD, cores, n_periods, B=0, f=F, RT=0) -> Workload:
     """A workload needing ``n_periods`` full-speed periods of its own cores on a server of
     frequency f."""
     return Workload(i=i, workload_id=f"w{i}", flavor="x", A=A, D=D, AD=AD,
-                    ET_base=n_periods, RT=0, B=B, X0=None, C_req=cores, M_req_MB=1.0,
+                    ET_base=n_periods, RT=RT, B=B, X0=None, C_req=cores, M_req_MB=1.0,
                     W_MHz_s=cores * f * DT * n_periods)
 
 
-def scenario(workloads, servers, CI, consts=None, n_zones=None) -> Scenario:
+def scenario(workloads, servers, CI, consts=None, n_zones=None, AV=None) -> Scenario:
     CI = np.asarray(CI, dtype=float)
     return Scenario(name="t", T=len(CI), dt_seconds=DT, workloads=tuple(workloads),
                     servers=tuple(servers),
                     n_zones=n_zones or max(sv.zone for sv in servers),
-                    CI_g_per_kWh=CI, constants=consts or constants())
+                    CI_g_per_kWh=CI, constants=consts or constants(), AV=AV)
 
 
 def settings(**kw) -> RunSettings:
@@ -282,7 +282,8 @@ def test_cap_above_throttle_is_rejected():
 
 def feasible_only_when(family):
     return {f: ("feasible" if f == family else "infeasible")
-            for f in (RELAX_DEADLINES, RELAX_THERMAL, RELAX_CAPACITY, RELAX_COOLING)}
+            for f in (RELAX_DEADLINES, RELAX_THERMAL, RELAX_CAPACITY, RELAX_COOLING,
+                      RELAX_PRIORITY)}
 
 
 def test_infeasible_only_because_of_deadline():
@@ -331,6 +332,94 @@ def test_infeasible_only_because_of_cooling_capacity():
     assert res.status == STATUS_INFEASIBLE
     assert diagnose_infeasibility(sc, {1: 1}, st, time_limit_s=20) == \
         feasible_only_when(RELAX_COOLING)
+
+
+def test_infeasible_only_because_of_priority():
+    # w2 (delay-tolerant) must run in period 1 (D=2, AD=0) on the only server, which it fills,
+    # so it starts while the time-sensitive w1 (A=1) waits
+    ws = [work(1, 1, 4, 2, 4, 1, RT=1), work(2, 1, 2, 0, 4, 1)]
+    sc = scenario(ws, [server(1)], [100.0] * 3)
+    st = settings()
+    assert solve(sc, {1: 1, 2: 1}, st).status == STATUS_INFEASIBLE
+    assert solve(sc, {1: 1, 2: 1}, settings(priority=False)).status == STATUS_OPTIMAL
+    assert diagnose_infeasibility(sc, {1: 1, 2: 1}, st, time_limit_s=20) == {
+        RELAX_DEADLINES: "feasible", RELAX_THERMAL: "infeasible", RELAX_CAPACITY: "feasible",
+        RELAX_COOLING: "infeasible", RELAX_PRIORITY: "feasible"}
+    assert RELAX_PRIORITY not in diagnose_infeasibility(sc, {1: 1, 2: 1},
+                                                        settings(priority=False))
+
+
+# ---------------------------------------------------------------------------
+# Priority (56)-(57), availability (11), running workloads (29)
+# ---------------------------------------------------------------------------
+#
+# One 4-core server, three hours, CI = [1000, 1, 1]. The time-sensitive w1 takes the whole
+# server for one hour; the delay-tolerant w2 takes half of it for two hours, so they cannot
+# overlap. w2 first (hours 1-2, then w1 in 3) costs 2*(1000+1) + 4*1 = 2006 core-CI units;
+# w1 first (hour 1, then w2 in 2-3) costs 4*1000 + 2*2 = 4004. Without priority the
+# optimizer runs w2 first, which starts it while w1 waits.
+
+def priority_scenario():
+    return scenario([work(1, 1, 4, 2, 4, 1, RT=1), work(2, 1, 4, 2, 2, 2)], [server(1)],
+                    [1000.0, 1.0, 1.0])
+
+
+def test_time_sensitive_goes_first():
+    from scheduler.evaluate import evaluate
+    sc = priority_scenario()
+    off = solve(sc, {1: 1, 2: 1}, settings(priority=False))
+    assert placements(off) == {1: (1, 3, 4), 2: (1, 1, 3)}
+    on = solve(sc, {1: 1, 2: 1}, settings())
+    assert on.status == STATUS_OPTIMAL
+    assert placements(on) == {1: (1, 1, 2), 2: (1, 2, 4)}
+    assert on.objective_g > off.objective_g
+    # the evaluator flags the inversion only when the run enforces priority
+    ev = evaluate(sc, off.schedule, off.supply_temp_C, settings())
+    assert not ev.valid and ev.totals["n_priority_violations"] == 1
+    assert ev.compliance["priority_violations"] == [[1, 2]]
+    assert any("priority" in v for v in ev.compliance["violations"])
+    ev_off = evaluate(sc, off.schedule, off.supply_temp_C, settings(priority=False))
+    assert ev_off.valid and not ev_off.compliance["priority_ok"]
+    assert evaluate(sc, on.schedule, on.supply_temp_C, settings()).valid
+
+
+def test_priority_needs_a_shared_server():
+    sc = scenario([work(1, 1, 4, 2, 4, 1, RT=1), work(2, 1, 4, 2, 2, 2)],
+                  [server(1), server(2)], [1000.0, 1.0, 1.0])
+    res = solve(sc, {1: 1, 2: 2}, settings(reassignment="none"))
+    # on different servers both simply run in the cheap hours
+    assert placements(res) == {1: (1, 2, 3), 2: (2, 2, 4)}
+
+
+def test_fifo_tiebreak_same_type_and_deadline():
+    # w1 (A=1) and w2 (A=2) are both delay-tolerant with deadline 5: w2 may not start while
+    # w1 waits, although running w2 in 2-3 and w1 in 4 would be cheaper.
+    sc = scenario([work(1, 1, 5, 3, 4, 1), work(2, 2, 5, 2, 2, 2)], [server(1)],
+                  [1000.0, 1000.0, 1.0, 1.0])
+    off = solve(sc, {1: 1, 2: 1}, settings(priority=False))
+    assert placements(off) == {1: (1, 4, 5), 2: (1, 2, 4)}
+    on = solve(sc, {1: 1, 2: 1}, settings())
+    p = placements(on)
+    assert p[1][1] <= p[2][1] and p[2] == (1, 3, 5)
+
+
+def test_unavailable_period_takes_no_work():
+    from scheduler.baseline import build_baseline
+    from scheduler.evaluate import evaluate
+    AV = np.array([[0, 1, 1]])
+    sc = scenario([work(1, 1, 4, 2, 1, 1)], [server(1)], [1.0, 100.0, 100.0], AV=AV)
+    res = solve(sc, {1: 1}, settings())
+    assert placements(res) == {1: (1, 2, 3)}
+    ev = evaluate(sc, res.schedule, res.supply_temp_C, settings())
+    assert ev.valid and ev.total_carbon_g == pytest.approx(res.objective_g, rel=1e-9)
+    assert build_baseline(sc, settings()).placements[0] == Placement(1, 1, 2, 3)
+    bad = evaluate(sc, Schedule((Placement(1, 1, 1, 2),)), res.supply_temp_C, settings())
+    assert not bad.valid and not bad.compliance["availability_ok"]
+    assert any("Eq. 11" in v for v in bad.compliance["violations"])
+    # with two servers the work moves instead of waiting
+    sc2 = scenario([work(1, 1, 4, 2, 1, 1)], [server(1), server(2)], [1.0, 100.0, 100.0],
+                   AV=np.array([[0, 1, 1], [1, 1, 1]]))
+    assert placements(solve(sc2, {1: 1}, settings())) == {1: (2, 1, 2)}
 
 
 # ---------------------------------------------------------------------------
@@ -471,6 +560,35 @@ def test_cold_plate_count_zero_matches_off():
     zero = solve(sc, {1: 1, 2: 1}, settings(cold_plates=True, cold_plate_count=0))
     assert zero.objective_g == pytest.approx(off.objective_g, rel=1e-9)
     assert zero.cold_plate_ops is None
+
+
+def test_fixed_cold_plates_hold_the_settings():
+    sc = cold_plate_scenario()
+    st = settings(cold_plates=True, cp_mode="fixed", fixed_cp_flow_Lmin=0.2,
+                  fixed_cp_coolant_C=30.0)
+    res = solve(sc, {1: 1, 2: 1}, st)
+    assert res.status == STATUS_OPTIMAL
+    ops = res.cold_plate_ops
+    assert np.all(ops.flow_Lmin[1] == 0.2) and np.allclose(ops.coolant_C[1], 30.0)
+    ev = evaluate_or_skip(sc, res, st)
+    assert ev.valid and ev.total_carbon_g == pytest.approx(res.objective_g, rel=1e-6)
+    free = solve(sc, {1: 1, 2: 1}, settings(cold_plates=True))
+    assert free.objective_g <= res.objective_g + 1e-9
+
+
+def test_fixed_coolant_warmer_than_the_server_removes_nothing():
+    # T0 = 30 and the server stays near 21-30 C, below a 39 C coolant: the drive is zero
+    sc = scenario([work(1, 1, 3, 1, 2, 1)], [server(1, plates=1)], [100.0, 100.0],
+                  constants(COP_coeffs=(0.0, 0.0, 2.0)))
+    st = settings(cold_plates=True, cp_mode="fixed", fixed_cp_flow_Lmin=0.1,
+                  fixed_cp_coolant_C=39.0)
+    res = solve(sc, {1: 1}, st)
+    assert res.status == STATUS_OPTIMAL
+    np.testing.assert_allclose(res.model_values["Q_cp_W"], 0.0, atol=1e-6)
+    ev = evaluate_or_skip(sc, res, st)
+    assert ev.total_carbon_g == pytest.approx(res.objective_g, rel=1e-6)
+    with pytest.raises(ValueError, match="Eq. \\(49\\)"):
+        solve(sc, {1: 1}, settings(cold_plates=True, cp_mode="fixed", fixed_cp_coolant_C=45.0))
 
 
 def test_two_plates_take_more_heat():

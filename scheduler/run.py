@@ -4,6 +4,9 @@
     uv run python -m scheduler.run --scenario small --baseline-rule fastest_first --baseline-supply-temp 27
     uv run python -m scheduler.run --scenario small --cold-plates
     uv run python -m scheduler.run --scenario small --cold-plate-count 2
+    uv run python -m scheduler.run --scenario base --zone-map 1,1,1,2,2,2
+    uv run python -m scheduler.run --scenario base --cold-plates --cp-mode fixed
+    uv run python -m scheduler.run --scenario base --ci-flat
 
 Both schedules are scored by the shared evaluator; only its numbers are compared.
 """
@@ -17,11 +20,11 @@ from pathlib import Path
 
 from scheduler.baseline import build_baseline
 from scheduler.evaluate import evaluate
-from scheduler.io import load_reference_baseline, load_scenario
+from scheduler.io import apply_overrides, load_reference_baseline, load_scenario
 from scheduler.optimize import diagnose_infeasibility, solve
 from scheduler.report import format_summary, write_results
 from scheduler.types import (
-    BASELINE_RULES, REASSIGNMENT_MODES, STATUS_INFEASIBLE, SUPPLY_TEMP_MODES,
+    BASELINE_RULES, COLD_PLATE_MODES, REASSIGNMENT_MODES, STATUS_INFEASIBLE, SUPPLY_TEMP_MODES,
     NotDefinedYet, RunSettings, constant_supply_temp,
 )
 
@@ -60,6 +63,22 @@ def parse_args(argv=None) -> tuple[RunSettings, argparse.Namespace]:
                    help="fixed cold-plate flow of the baseline, L/min (one of the flow settings)")
     p.add_argument("--baseline-cp-coolant", type=float, default=d.baseline_cp_coolant_C,
                    help="fixed cold-plate coolant temperature of the baseline, degC")
+    p.add_argument("--cp-mode", choices=COLD_PLATE_MODES, default=d.cp_mode,
+                   help="optimize: the optimized run picks flow and coolant per server and period; "
+                        "fixed: it holds them at --fixed-cp-flow / --fixed-cp-coolant")
+    p.add_argument("--fixed-cp-flow", type=float, default=None,
+                   help="cold-plate flow when --cp-mode fixed, L/min (default: the baseline's)")
+    p.add_argument("--fixed-cp-coolant", type=float, default=None,
+                   help="coolant temperature when --cp-mode fixed, degC (default: the baseline's)")
+    p.add_argument("--no-priority", action="store_true",
+                   help="drop the priority rules (56)-(57) from the optimized run")
+    p.add_argument("--zone-map", default=None,
+                   help="zone of each server in order, e.g. 1,1,1,2,2,2 (replaces servers.csv)")
+    ci = p.add_mutually_exclusive_group()
+    ci.add_argument("--carbon-file", default=None,
+                    help="CSV with columns t, CI_t_g_per_kWh replacing the scenario's carbon.csv")
+    ci.add_argument("--ci-flat", action="store_true",
+                    help="hold carbon intensity at the scenario's mean in every period")
     p.add_argument("--fan-power", action="store_true", help="not defined yet")
     p.add_argument("--baseline-only", action="store_true", help="skip the optimized run")
     p.add_argument("--no-warm-start", action="store_true",
@@ -71,13 +90,24 @@ def parse_args(argv=None) -> tuple[RunSettings, argparse.Namespace]:
     p.add_argument("--results-dir", default="results")
     a = p.parse_args(argv)
     cold_plates = a.cold_plates or a.cold_plate_count is not None
+    zone_map = None
+    if a.zone_map:
+        try:
+            zone_map = tuple(int(z) for z in a.zone_map.split(","))
+        except ValueError:
+            p.error(f"--zone-map must be comma-separated zone numbers, got {a.zone_map!r}")
 
     run_name = a.run_name or "_".join([
         a.baseline_rule, f"base{a.baseline_supply_temp:g}", a.reassignment,
         a.supply_temp_mode if a.supply_temp_mode == "optimize" else
         f"fixed{(a.baseline_supply_temp if a.fixed_supply_temp is None else a.fixed_supply_temp):g}",
     ] + ([] if not cold_plates else
-         ["cp" if a.cold_plate_count is None else f"cp{a.cold_plate_count}"]))
+         ["cp" if a.cold_plate_count is None else f"cp{a.cold_plate_count}"])
+      + (["cpfixed"] if cold_plates and a.cp_mode == "fixed" else [])
+      + (["noprio"] if a.no_priority else [])
+      + ([f"zones{''.join(map(str, zone_map))}"] if zone_map else [])
+      + (["ciflat"] if a.ci_flat else [])
+      + ([f"ci-{Path(a.carbon_file).stem}"] if a.carbon_file else []))
     settings = RunSettings(
         scenario=a.scenario, run_name=run_name, baseline_rule=a.baseline_rule, seed=a.seed,
         baseline_supply_temp_C=a.baseline_supply_temp, reassignment=a.reassignment,
@@ -85,7 +115,9 @@ def parse_args(argv=None) -> tuple[RunSettings, argparse.Namespace]:
         H_min_C=a.h_min, time_limit_s=a.time_limit, mip_rel_gap=a.mip_gap,
         cold_plates=cold_plates, cold_plate_count=a.cold_plate_count,
         baseline_cp_flow_Lmin=a.baseline_cp_flow, baseline_cp_coolant_C=a.baseline_cp_coolant,
-        fan_power=a.fan_power,
+        cp_mode=a.cp_mode, fixed_cp_flow_Lmin=a.fixed_cp_flow, fixed_cp_coolant_C=a.fixed_cp_coolant,
+        priority=not a.no_priority, zone_map=zone_map, carbon_file=a.carbon_file,
+        ci_flat=a.ci_flat, fan_power=a.fan_power,
     )
     return settings, a
 
@@ -130,7 +162,7 @@ def run(settings: RunSettings, *, scenarios_dir="scenarios", results_dir="result
         solver_log=False, quiet=False) -> dict:
     """Run one comparison and write its results. Returns the summary dict."""
     settings.validate()
-    scenario = load_scenario(settings.scenario, scenarios_dir)
+    scenario = apply_overrides(load_scenario(settings.scenario, scenarios_dir), settings)
     checks: dict = {}
 
     # baseline
@@ -169,6 +201,12 @@ def run(settings: RunSettings, *, scenarios_dir="scenarios", results_dir="result
                 "relative_difference": diff / abs(opt_eval.total_carbon_g)}
             checks["optimized_schedule_valid_under_evaluator"] = {
                 "passed": opt_eval.valid, "violations": opt_eval.compliance["violations"]}
+            running = [w.i for w in scenario.workloads if w.B == 1]
+            if running:
+                moved = [i for i in running
+                         if result.schedule.placements[i - 1].server != original[i]]
+                checks["running_workloads_not_reassigned"] = {
+                    "passed": not moved, "running": len(running), "moved": moved}
             same_temp = (settings.supply_temp_mode == "fixed" and
                          settings.optimized_fixed_supply_temp_C() == settings.baseline_supply_temp_C)
             if settings.reassignment == "none" and same_temp:

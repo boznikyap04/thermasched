@@ -12,7 +12,7 @@ import pytest
 
 from scheduler.baseline import build_baseline
 from scheduler.evaluate import evaluate
-from scheduler.io import load_reference_baseline, load_scenario
+from scheduler.io import apply_overrides, load_reference_baseline, load_scenario
 from scheduler.optimize import solve
 from scheduler.run import main, parse_args, run
 from scheduler.types import (
@@ -20,7 +20,7 @@ from scheduler.types import (
 )
 
 
-@pytest.mark.parametrize("name", ["small", "base", "thesis10"])
+@pytest.mark.parametrize("name", ["small", "base", "thesis10", "small_running"])
 def test_least_loaded_reproduces_reference_baseline(name):
     sc = load_scenario(name)
     assert build_baseline(sc, RunSettings(scenario=name)) == load_reference_baseline(name)
@@ -144,3 +144,64 @@ def test_run_name_is_built_from_the_switches():
                         "--reassignment", "same_zone", "--supply-temp-mode", "fixed"])
     assert st.run_name == "fastest_first_base27_same_zone_fixed27"
     assert st.optimized_fixed_supply_temp_C() == 27.0
+
+
+def test_small_running_exercises_availability_and_running_workloads(tmp_path):
+    sc = load_scenario("small_running")
+    assert [w.i for w in sc.workloads if w.B == 1] == [1, 2, 3, 4]
+    AV = sc.availability()
+    assert int((AV == 0).sum()) == 12 and not AV[2, 36:48].any()
+    st = RunSettings(scenario="small_running", run_name="t", time_limit_s=60.0)
+    summary = run(st, results_dir=tmp_path, quiet=True)
+    checks = summary["checks"]
+    assert checks["running_workloads_not_reassigned"]["passed"] is True
+    assert all(c["passed"] in (True, None) for c in checks.values())
+    assert summary["scenario"]["n_running"] == 4
+    assert summary["scenario"]["n_unavailable_server_periods"] == 12
+    rows = list(csv.DictReader(open(tmp_path / "small_running" / "t" / "optimized" /
+                                    "reassignment.csv")))
+    assert all(r["reassigned"] == "0" and "Eq. (29)" in r["reason"] for r in rows[:4])
+    sp = list(csv.DictReader(open(tmp_path / "small_running" / "t" / "optimized" /
+                                  "server_period.csv")))
+    assert all(float(r["cpu_used_cores"]) == 0 for r in sp
+               if r["s"] == "3" and 37 <= int(r["t"]) <= 48)
+
+
+def test_zone_map_and_carbon_overrides(tmp_path):
+    sc = load_scenario("base")
+    st, _ = parse_args(["--scenario", "base", "--zone-map", "1,1,1,2,2,2"])
+    assert st.zone_map == (1, 1, 1, 2, 2, 2)
+    assert st.run_name == "least_loaded_base18_free_optimize_zones111222"
+    sc2 = apply_overrides(sc, st)
+    assert [sv.zone for sv in sc2.servers] == [1, 1, 1, 2, 2, 2] and sc2.Z == 2
+    assert [sv.zone for sv in sc.servers] == [1, 2, 1, 2, 1, 2]       # loaded copy untouched
+    with pytest.raises(ValueError, match="entries"):
+        apply_overrides(sc, RunSettings(zone_map=(1, 2)))
+    with pytest.raises(ValueError, match="every zone"):
+        apply_overrides(sc, RunSettings(zone_map=(1, 1, 1, 3, 3, 3)))
+
+    st, _ = parse_args(["--scenario", "base", "--ci-flat"])
+    assert st.run_name.endswith("_ciflat")
+    flat = apply_overrides(sc, st).CI_g_per_kWh
+    assert np.allclose(flat, sc.CI_g_per_kWh.mean())
+
+    path = tmp_path / "night.csv"
+    with open(path, "w", newline="") as f:
+        w = csv.writer(f)
+        w.writerow(["t", "CI_t_g_per_kWh"])
+        w.writerows([t, 500.0 + t] for t in range(1, sc.T + 1))
+    st, _ = parse_args(["--scenario", "base", "--carbon-file", str(path)])
+    assert st.run_name.endswith("_ci-night")
+    assert apply_overrides(sc, st).CI_g_per_kWh[0] == 501.0
+    with pytest.raises(SystemExit):
+        parse_args(["--ci-flat", "--carbon-file", str(path)])
+
+
+def test_switch_run_names():
+    st, _ = parse_args(["--cold-plates", "--cp-mode", "fixed", "--no-priority"])
+    assert st.run_name == "least_loaded_base18_free_optimize_cp_cpfixed_noprio"
+    assert st.cp_mode == "fixed" and not st.priority
+    assert st.optimized_fixed_cp() == (0.30, 20.0)
+    st, _ = parse_args(["--cold-plates", "--cp-mode", "fixed", "--fixed-cp-flow", "0.2",
+                        "--fixed-cp-coolant", "30"])
+    assert st.optimized_fixed_cp() == (0.2, 30.0)

@@ -1,0 +1,17 @@
+--scenario base --reassignment free --supply-temp-mode optimize
+--scenario base --reassignment same_zone --supply-temp-mode optimize
+--scenario base --reassignment free --supply-temp-mode fixed
+--scenario base --reassignment free --supply-temp-mode fixed --cold-plates
+--scenario base --reassignment free --supply-temp-mode optimize --cold-plates
+--scenario base --reassignment free --supply-temp-mode optimize --h-min 5 --run-name least_loaded_base18_free_optimize_hmin5
+--scenario base --reassignment free --supply-temp-mode optimize --h-min 15 --run-name least_loaded_base18_free_optimize_hmin15
+--scenario thesis10 --reassignment free --supply-temp-mode optimize
+--scenario thesis10 --reassignment same_zone --supply-temp-mode optimize
+--scenario thesis10 --reassignment free --supply-temp-mode optimize --cold-plates
+--scenario small --reassignment free --supply-temp-mode optimize
+--scenario small --baseline-rule fastest_first --baseline-supply-temp 27 --reassignment free --supply-temp-mode optimize --time-limit 180
+--scenario base --reassignment none --supply-temp-mode fixed
+--scenario base --reassignment none --supply-temp-mode optimize
+--scenario thesis10 --reassignment none --supply-temp-mode optimize
+--scenario small --reassignment none --supply-temp-mode fixed
+--scenario small --reassignment free --supply-temp-mode optimize --h-min 20 --time-limit 120 --run-name infeasible_demo_hmin20

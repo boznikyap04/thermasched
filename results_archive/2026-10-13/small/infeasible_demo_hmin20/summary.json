@@ -1,0 +1,242 @@
+{
+  "scenario": {
+    "name": "small",
+    "I": 99,
+    "S": 3,
+    "Z": 2,
+    "T": 96,
+    "dt_seconds": 300.0
+  },
+  "settings": {
+    "scenario": "small",
+    "run_name": "infeasible_demo_hmin20",
+    "baseline_rule": "least_loaded",
+    "seed": 42,
+    "baseline_supply_temp_C": 18.0,
+    "reassignment": "free",
+    "supply_temp_mode": "optimize",
+    "fixed_supply_temp_C": null,
+    "H_min_C": 20.0,
+    "time_limit_s": 120.0,
+    "mip_rel_gap": 0.001,
+    "cold_plates": false,
+    "fan_power": false
+  },
+  "model_note": "Airflow and fan power are not modelled (fan power and airflow are zero). Cold plates are not modelled (cold-plate heat removal and pump power are zero; CT_cold_plate is carried through to outputs only).",
+  "airflow_modelled": false,
+  "thermal_cap_C": 70.0,
+  "T_dvfs_C": 75.0,
+  "baseline": {
+    "valid": false,
+    "violations": [
+      "server temperature above thermal cap 70 C in 4 server-periods (Eq. 31-33), hottest 74.93 C"
+    ],
+    "metrics": {
+      "carbon_kg": 3.875033885211267,
+      "E_IT_kWh": 4.4534869921875,
+      "E_crac_kWh": 1.6644816086812302,
+      "E_cp_kWh": 0.0,
+      "E_fan_kWh": 0.0,
+      "E_total_kWh": 6.11796860086873,
+      "n_late": 0,
+      "n_noncompliant": 0,
+      "mean_wait_RT": 0.0,
+      "max_wait_RT": 0.0,
+      "mean_wait_DT": 0.0,
+      "max_wait_DT": 0.0,
+      "hottest_T_C": 74.930579147667,
+      "min_headroom_C": 15.069420852332996,
+      "periods_above_dvfs": 0,
+      "periods_above_cap": 4,
+      "n_reassigned": 0,
+      "hottest_server": 3,
+      "hottest_period": 1,
+      "n_unplaced": 0,
+      "min_DPF": 1.0
+    },
+    "totals": {
+      "E_IT_kWh": 4.4534869921875,
+      "E_crac_kWh": 1.6644816086812302,
+      "E_cp_kWh": 0.0,
+      "E_fan_kWh": 0.0,
+      "E_total_kWh": 6.11796860086873,
+      "carbon_g": 3875.0338852112673,
+      "carbon_kg": 3.875033885211267,
+      "n_workloads": 99,
+      "n_unplaced": 0,
+      "n_late": 0,
+      "n_wait_exceeded": 0,
+      "n_work_short": 0,
+      "n_noncompliant": 0,
+      "mean_wait_RT": 0.0,
+      "max_wait_RT": 0.0,
+      "mean_wait_DT": 0.0,
+      "max_wait_DT": 0.0,
+      "hottest_T_C": 74.930579147667,
+      "hottest_server": 3,
+      "hottest_period": 1,
+      "min_headroom_C": 15.069420852332996,
+      "periods_above_dvfs": 0,
+      "periods_above_cap": 4,
+      "min_DPF": 1.0
+    },
+    "compliance_flags": {
+      "all_ok": false,
+      "cpu_ok": true,
+      "mem_ok": true,
+      "thermal_cap_ok": false,
+      "workloads_ok": true,
+      "supply_range_ok": true,
+      "zone_temp_ok": true,
+      "ramp_ok": true,
+      "crac_capacity_ok": true
+    }
+  },
+  "optimized": null,
+  "has_optimized_schedule": false,
+  "comparison": {
+    "carbon_kg": {
+      "baseline": 3.875033885211267,
+      "optimized": null,
+      "diff": null,
+      "pct": null
+    },
+    "E_IT_kWh": {
+      "baseline": 4.4534869921875,
+      "optimized": null,
+      "diff": null,
+      "pct": null
+    },
+    "E_crac_kWh": {
+      "baseline": 1.6644816086812302,
+      "optimized": null,
+      "diff": null,
+      "pct": null
+    },
+    "E_cp_kWh": {
+      "baseline": 0.0,
+      "optimized": null,
+      "diff": null,
+      "pct": null
+    },
+    "E_fan_kWh": {
+      "baseline": 0.0,
+      "optimized": null,
+      "diff": null,
+      "pct": null
+    },
+    "E_total_kWh": {
+      "baseline": 6.11796860086873,
+      "optimized": null,
+      "diff": null,
+      "pct": null
+    },
+    "n_late": {
+      "baseline": 0,
+      "optimized": null,
+      "diff": null,
+      "pct": null
+    },
+    "n_noncompliant": {
+      "baseline": 0,
+      "optimized": null,
+      "diff": null,
+      "pct": null
+    },
+    "mean_wait_RT": {
+      "baseline": 0.0,
+      "optimized": null,
+      "diff": null,
+      "pct": null
+    },
+    "max_wait_RT": {
+      "baseline": 0.0,
+      "optimized": null,
+      "diff": null,
+      "pct": null
+    },
+    "mean_wait_DT": {
+      "baseline": 0.0,
+      "optimized": null,
+      "diff": null,
+      "pct": null
+    },
+    "max_wait_DT": {
+      "baseline": 0.0,
+      "optimized": null,
+      "diff": null,
+      "pct": null
+    },
+    "hottest_T_C": {
+      "baseline": 74.930579147667,
+      "optimized": null,
+      "diff": null,
+      "pct": null
+    },
+    "min_headroom_C": {
+      "baseline": 15.069420852332996,
+      "optimized": null,
+      "diff": null,
+      "pct": null
+    },
+    "periods_above_dvfs": {
+      "baseline": 0,
+      "optimized": null,
+      "diff": null,
+      "pct": null
+    },
+    "periods_above_cap": {
+      "baseline": 4,
+      "optimized": null,
+      "diff": null,
+      "pct": null
+    },
+    "n_reassigned": {
+      "baseline": 0,
+      "optimized": null,
+      "diff": null,
+      "pct": null
+    }
+  },
+  "solver": {
+    "status": "infeasible",
+    "solver_status_text": "Infeasible",
+    "solve_time_s": 0.011699624970788136,
+    "mip_gap": null,
+    "objective_g": null,
+    "best_bound_g": null,
+    "n_variables": 9550,
+    "n_binaries": 5902,
+    "n_constraints": 7661,
+    "relaxed": [],
+    "has_schedule": false,
+    "notes": [
+      "Y[i,s,t] is eliminated: a workload occupies n_min core periods after its start, U[t] - U[t-n_min], plus optional tail binaries E[i,s,t] only where n_max > n_min, because the Y-based model made the root LP of 'base' unsolvable (500k rows).",
+      "Start indicators S are replaced by cumulative 'started by t' steps U[i,s,t] (S = U[t] - U[t-1], X[i,s] is the last step), so one unbroken block needs no window sums.",
+      "The tail E[t] <= U[t-n_min] - U[t-n_max] and E[t] <= E[t-1] + U[t-n_min] - U[t-n_min-1] keep the run unbroken and within n_min..n_max periods; Y <= X (10) is then implied and Eq. (9) is kept.",
+      "n_min = ceil(W/(C_req*f_s*dt)) is the shortest run since DPF <= 1, and starts with t + n_min > D are dropped.",
+      "n_max = ceil(W/(C_req*f_s*dt*DPF_cap)) caps the run: valid for the optimum because trimming the tail of a run never raises power, heat or temperature, so every other limit stays met.",
+      "DPF enters only through the loss L = 1 - DPF >= slope*(T - T_dvfs), L >= 0 (the linear piece of Eq. 37, valid below T_throttle, so a cap above T_throttle is rejected), and only on servers where some pair has n_max > n_min; higher DPF never hurts, so no binaries are needed.",
+      "Work (39) uses core credit n_min*X - coreLoss, where coreLoss >= CL[tau+n_min-1] - CL[tau-1] - M(1 - sigma_tau) over the running sum CL of L, plus tail credits wt <= E, wt <= 1 - L; for a pair with n_max == n_min any core block delivers at least W, so its term is exactly X.",
+      "The work row is divided by W_i (right side 1), and with the cap at or below T_dvfs there are no loss, tail or work-credit columns at all.",
+      "Server utilisation and heat are substituted into P_IT[s,t] = P_idle + (P_max-P_idle)*sum C_req*occupancy/C_s (Eq. 16, 20, 21); P_IT is bounded by P_max (or by the cores of the workloads that can ever run there) as a column bound.",
+      "Eq. (54) Q_crac <= 116 kW and the big-M of the supply-level split are one column bound Qmax = min(116, sum of the zone's maximum IT power in kW); the heat balance sets Q_crac >= heat and the cost increases in Q_crac, so it sits at equality in any optimum.",
+      "CRAC power is Q_crac / COP (divide), COP looked up per whole-degree level; the printed Eq. (46) multiplies.",
+      "Cold-plate heat Q_cp, pump power P_cp and fan power P_fan are named columns fixed at zero (built in _add_cold_plate_terms / _add_fan_terms) and already appear in the temperature recursion, the heat balance and the objective.",
+      "Idle energy is in the objective through the P_IT columns (lower bound P_idle), so objective_g equals total carbon with no separate offset.",
+      "Priority ordering O_ij (56, 57) and availability AV (11, all 1) are not modelled; the wait limit (28) is applied to all workloads, which includes (25).",
+      "Starting schedule: the baseline (the reassignment=none stage ended with status infeasible after 0.0 s)."
+    ]
+  },
+  "infeasibility": {
+    "deadlines_and_waiting": "infeasible",
+    "thermal_cap": "feasible",
+    "capacity": "infeasible",
+    "cooling_capacity": "infeasible"
+  },
+  "checks": {
+    "least_loaded_reproduces_baseline_schedule_csv": {
+      "passed": true
+    }
+  }
+}

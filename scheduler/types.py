@@ -26,13 +26,15 @@ import numpy as np
 BASELINE_RULES = ("least_loaded", "fastest_first", "random")
 REASSIGNMENT_MODES = ("free", "same_zone", "none")
 SUPPLY_TEMP_MODES = ("optimize", "fixed")
+COLD_PLATE_MODES = ("optimize", "fixed")
 
 # Constraint families that the infeasibility diagnosis relaxes one at a time.
 RELAX_DEADLINES = "deadlines_and_waiting"   # (27), (28): windows widened to the horizon
 RELAX_THERMAL = "thermal_cap"               # (31)-(33): T <= T_max - H_min dropped
 RELAX_CAPACITY = "capacity"                 # (12), (13)
 RELAX_COOLING = "cooling_capacity"          # (54): Q_crac <= Q_crac_kW
-RELAX_FAMILIES = (RELAX_DEADLINES, RELAX_THERMAL, RELAX_CAPACITY, RELAX_COOLING)
+RELAX_PRIORITY = "priority"                 # (56), (57): start order dropped
+RELAX_FAMILIES = (RELAX_DEADLINES, RELAX_THERMAL, RELAX_CAPACITY, RELAX_COOLING, RELAX_PRIORITY)
 
 # Solver outcomes reported by the optimizer.
 STATUS_OPTIMAL = "optimal"            # solved to the requested gap
@@ -180,6 +182,7 @@ class Scenario:
     CI_g_per_kWh: np.ndarray          # shape (T,)
     constants: Constants
     cold_plate: ColdPlateSpec = field(default_factory=ColdPlateSpec)
+    AV: np.ndarray | None = None      # (S, T) 0/1 availability, Eq. (11); None: all 1
 
     @property
     def I(self) -> int:
@@ -199,6 +202,12 @@ class Scenario:
 
     def servers_in_zone(self, z: int) -> tuple[Server, ...]:
         return tuple(sv for sv in self.servers if sv.zone == z)
+
+    def availability(self) -> np.ndarray:
+        """AV[s, t] as a (S, T) 0/1 int array, Eq. (11)."""
+        if self.AV is None:
+            return np.ones((self.S, self.T), dtype=int)
+        return np.asarray(self.AV, dtype=int)
 
 
 @dataclass
@@ -222,6 +231,15 @@ class RunSettings:
     cold_plate_count: int | None = None        # plates on every server; None: servers.csv
     baseline_cp_flow_Lmin: float = 0.30        # baseline runs its cold plates fixed at these
     baseline_cp_coolant_C: float = 20.0
+    cp_mode: str = "optimize"                  # "fixed": the optimized run holds them too
+    fixed_cp_flow_Lmin: float | None = None    # None: use baseline_cp_flow_Lmin
+    fixed_cp_coolant_C: float | None = None    # None: use baseline_cp_coolant_C
+    # priority, Eq. (56)-(57)
+    priority: bool = True
+    # scenario overrides (applied by io.apply_overrides)
+    zone_map: tuple[int, ...] | None = None    # zone per server, replaces servers.csv
+    carbon_file: str | None = None             # CSV with t, CI_t_g_per_kWh
+    ci_flat: bool = False                      # CI_t held at the scenario's mean
     # slot that is not defined yet
     fan_power: bool = False
 
@@ -232,6 +250,12 @@ class RunSettings:
             raise ValueError(f"reassignment must be one of {REASSIGNMENT_MODES}")
         if self.supply_temp_mode not in SUPPLY_TEMP_MODES:
             raise ValueError(f"supply_temp_mode must be one of {SUPPLY_TEMP_MODES}")
+        if self.cp_mode not in COLD_PLATE_MODES:
+            raise ValueError(f"cp_mode must be one of {COLD_PLATE_MODES}")
+        if self.carbon_file is not None and self.ci_flat:
+            raise ValueError("carbon_file and ci_flat cannot both be set")
+        if self.zone_map is not None and any(int(z) < 1 for z in self.zone_map):
+            raise ValueError("zone_map: zones are numbered from 1")
         if self.cold_plate_count is not None:
             if not self.cold_plates:
                 raise ValueError("cold_plate_count is set but cold_plates is off")
@@ -254,6 +278,13 @@ class RunSettings:
             return self.baseline_supply_temp_C
         return self.fixed_supply_temp_C
 
+    def optimized_fixed_cp(self) -> tuple[float, float]:
+        """(flow L/min, coolant degC) held by the optimized run when cp_mode is fixed."""
+        flow = self.baseline_cp_flow_Lmin if self.fixed_cp_flow_Lmin is None else self.fixed_cp_flow_Lmin
+        cool = (self.baseline_cp_coolant_C if self.fixed_cp_coolant_C is None
+                else self.fixed_cp_coolant_C)
+        return float(flow), float(cool)
+
     def as_dict(self) -> dict:
         return asdict(self)
 
@@ -275,6 +306,27 @@ def fixed_cold_plate_ops(scenario: Scenario, plates: np.ndarray, flow_Lmin: floa
     shape = (scenario.S, scenario.T)
     return ColdPlateOps(flow_Lmin=np.where(has, float(flow_Lmin), np.nan) * np.ones(shape),
                         coolant_C=np.where(has, float(coolant_C), np.nan) * np.ones(shape))
+
+
+def priority_pairs(scenario: Scenario) -> list[tuple[int, int]]:
+    """Ordered pairs (i, j) with O_ij = 1: i goes before j.
+
+    Eq. (56): a time-sensitive i goes before a delay-tolerant j. Eq. (57): between two
+    workloads of the same type and deadline, the earlier arrival goes first.
+
+    O_ij is linked to the schedule as follows (the thesis prints no link, see
+    PROJECT_CONTEXT.md A6): if i and j run on the same server and j starts while i is
+    waiting (A_i <= ST_j), then ST_i <= ST_j. Workloads on different servers do not
+    compete, and j may start before i arrives.
+    """
+    out = []
+    for wi in scenario.workloads:
+        for wj in scenario.workloads:
+            if wi.i == wj.i:
+                continue
+            if (wi.RT == 1 and wj.RT == 0) or (wi.RT == wj.RT and wi.D == wj.D and wi.A < wj.A):
+                out.append((wi.i, wj.i))
+    return out
 
 
 def cop(constants: Constants, T_supply_C):
@@ -350,6 +402,7 @@ class EvalResult:
     on_time: np.ndarray                      # bool, Eq. (27): end <= D
     work_complete: np.ndarray                # bool, Eq. (39)
     compliant: np.ndarray                    # bool: all of the above
+    min_DPF_run: np.ndarray                  # lowest DPF over the periods it runs, NaN if unplaced
     # totals
     total_carbon_g: float           # Eq. (7), (8)
     totals: dict = field(default_factory=dict)       # scalar totals, see evaluate()

@@ -2,8 +2,9 @@
 
 Workloads are taken in arrival order (the order of ``scenario.workloads``). Each one starts
 at the earliest period at or after its arrival where some server has CPU room for the whole
-run. Only CPU cores are checked: no memory, temperature or deadline. A workload that fits
-nowhere gets ``Placement(i, None, None, None)``.
+run and is available (AV = 1, Eq. 11) throughout. Only CPU cores and availability are
+checked: no memory, temperature or deadline. A workload that fits nowhere gets
+``Placement(i, None, None, None)``.
 """
 
 from __future__ import annotations
@@ -28,6 +29,7 @@ def build_baseline(scenario: Scenario, settings: RunSettings) -> Schedule:
     servers = scenario.servers
     # used[s - 1][t] = cores in use in period t (index 0 unused, periods 1..T)
     used = [[0] * (T + 2) for _ in servers]
+    AV = scenario.availability()
     rng = random.Random(settings.seed)
     by_speed = sorted(servers, key=lambda sv: (-sv.f_MHz, sv.s))
 
@@ -36,8 +38,8 @@ def build_baseline(scenario: Scenario, settings: RunSettings) -> Schedule:
         end = start + periods_needed(w, sv, dt)
         if end - 1 > T:
             return None
-        u = used[sv.s - 1]
-        if all(u[t] + w.C_req <= sv.C_cores for t in range(start, end)):
+        u, av = used[sv.s - 1], AV[sv.s - 1]
+        if all(u[t] + w.C_req <= sv.C_cores and av[t - 1] for t in range(start, end)):
             return end
         return None
 

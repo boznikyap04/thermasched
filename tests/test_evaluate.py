@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import csv
 import json
 from dataclasses import replace
 
@@ -480,7 +481,8 @@ def _small():
 
 
 TABLES = ["schedule.csv", "server_period.csv", "zone_period.csv", "period.csv",
-          "compliance_servers.csv", "compliance_zones.csv", "compliance_workloads.csv"]
+          "compliance_servers.csv", "compliance_zones.csv", "compliance_workloads.csv",
+          "compliance_cold_plates.csv"]
 
 
 def test_report_without_optimized(tmp_path):
@@ -504,7 +506,9 @@ def test_report_without_optimized(tmp_path):
     assert loaded["baseline"]["metrics"]["carbon_kg"] == pytest.approx(ev.totals["carbon_kg"])
     assert loaded["baseline"]["metrics"]["n_reassigned"] == 0
     assert loaded["scenario"] == {"name": "small", "I": sc.I, "S": sc.S, "Z": sc.Z,
-                                  "T": sc.T, "dt_seconds": 300.0}
+                                  "T": sc.T, "dt_seconds": 300.0, "zones": [1, 2, 1],
+                                  "n_running": 0, "n_unavailable_server_periods": 0,
+                                  "CI_mean_g_per_kWh": pytest.approx(sc.CI_g_per_kWh.mean())}
     assert loaded["settings"]["baseline_rule"] == "least_loaded"
     assert loaded["solver"]["status"] == "no_solution" and loaded["solver"]["best_bound_g"] is None
     assert loaded["infeasibility"]["thermal_cap"] is None
@@ -558,3 +562,39 @@ def test_report_counts_reassigned(tmp_path):
     n = 0 if base.placements[0].server == 1 else 1
     assert summary["comparison"]["n_reassigned"]["optimized"] == n
     assert summary["comparison"]["n_reassigned"]["baseline"] == 0
+    rows = list(csv.DictReader(open(out / "optimized" / "reassignment.csv")))
+    assert len(rows) == sc.I
+    assert sum(int(r["reassigned"]) for r in rows) == n
+    r1 = rows[0]
+    assert int(r1["final_server"]) == 1 and int(r1["original_server"]) == base.placements[0].server
+    zone = {sv.s: sv.zone for sv in sc.servers}
+    assert int(r1["cross_zone"]) == int(n == 1 and zone[1] != zone[base.placements[0].server])
+    assert summary["comparison"]["n_cross_zone"]["optimized"] == int(r1["cross_zone"])
+    assert all(r["reason"] == "kept" for r in rows[1:])
+    if n:
+        assert r1["reason"] and r1["reason"] != "kept"
+    assert not (out / "baseline" / "reassignment.csv").exists()
+
+
+def test_new_compliance_columns(tmp_path):
+    sc, base, st, ev, orig = _small()
+    st = RunSettings(scenario="small", cold_plates=True)
+    ev = evaluate(sc, base, constant_supply_temp(sc, 18.0), st)
+    out = tmp_path / "run"
+    write_results(out, sc, st, orig, base, ev, None, None, None, None, {})
+    srv = list(csv.DictReader(open(out / "baseline" / "compliance_servers.csv")))
+    for r, sv in zip(srv, sc.servers):
+        k = sv.s - 1
+        assert float(r["max_utilization"]) == pytest.approx(ev.util[k].max())
+        assert float(r["min_PC_eff_MHz"]) == pytest.approx(ev.PC_eff_MHz[k].min())
+        assert int(r["periods_unavailable"]) == 0
+    cps = list(csv.DictReader(open(out / "baseline" / "compliance_cold_plates.csv")))
+    assert [int(r["s"]) for r in cps] == [sv.s for sv in sc.servers if sv.plates > 0]
+    for r in cps:
+        assert float(r["coolant_min_C"]) == float(r["coolant_max_C"]) == st.baseline_cp_coolant_C
+        assert float(r["flow_min_Lmin"]) == float(r["flow_max_Lmin"]) == st.baseline_cp_flow_Lmin
+        assert float(r["coolant_allowed_min_C"]) == 20.0 and float(r["flow_allowed_max_Lmin"]) == 0.35
+    wl = list(csv.DictReader(open(out / "baseline" / "compliance_workloads.csv")))
+    for r, k in zip(wl, range(sc.I)):
+        assert float(r["min_DPF"]) == pytest.approx(ev.min_DPF_run[k])
+        assert 0 < float(r["min_DPF"]) <= 1

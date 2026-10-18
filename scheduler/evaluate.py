@@ -15,7 +15,7 @@ import numpy as np
 
 from .types import (
     ColdPlateOps, EvalResult, RunSettings, Scenario, Schedule, cold_plate_counts, cop,
-    fixed_cold_plate_ops,
+    fixed_cold_plate_ops, priority_pairs,
 )
 
 TOL = 1e-6
@@ -110,6 +110,19 @@ def _placement_arrays(scenario: Scenario, schedule: Schedule):
         placed[w.i - 1] = True
         srv[w.i - 1], start[w.i - 1], end[w.i - 1] = p.server, p.start, p.end
     return placed, srv, start, end
+
+
+def priority_violations(scenario: Scenario, placed, srv, start) -> list[tuple[int, int]]:
+    """Pairs (i, j) of priority_pairs where j started on i's server while i was waiting:
+    A_i <= ST_j < ST_i, Eq. (56)-(57)."""
+    out = []
+    for i, j in priority_pairs(scenario):
+        a, b = i - 1, j - 1
+        if not (placed[a] and placed[b]) or srv[a] != srv[b]:
+            continue
+        if scenario.workloads[a].A <= start[b] < start[a]:
+            out.append((i, j))
+    return out
 
 
 def _f(x) -> float:
@@ -212,6 +225,7 @@ def evaluate(scenario: Scenario, schedule: Schedule, supply_temp_C: np.ndarray,
     on_time = np.zeros(I, dtype=bool)
     work_ok = np.zeros(I, dtype=bool)
     within_horizon = np.zeros(I, dtype=bool)
+    min_dpf_run = np.full(I, nan)
     for w in scenario.workloads:
         k = w.i - 1
         if not placed[k]:
@@ -222,6 +236,8 @@ def evaluate(scenario: Scenario, schedule: Schedule, supply_temp_C: np.ndarray,
         on_time[k] = end[k] <= w.D
         idx = run_idx[k]
         delivered[k] = float(w.C_req * f_MHz[srv[k] - 1] * dt * DPF[srv[k] - 1, idx].sum())
+        if len(idx):
+            min_dpf_run[k] = float(DPF[srv[k] - 1, idx].min())
         work_ok[k] = delivered[k] >= w.W_MHz_s * (1.0 - 1e-6)
         within_horizon[k] = start[k] >= 1 and end[k] <= T + 1 and end[k] > start[k]
     compliant = placed & starts_ok & wait_ok & on_time & work_ok & within_horizon
@@ -249,6 +265,11 @@ def evaluate(scenario: Scenario, schedule: Schedule, supply_temp_C: np.ndarray,
                                 & (cp_coolant[has_cp] <= cps.coolant_max_C + TOL)))
     cp_flow_ok = bool(np.all((cp_flow[has_cp] >= cps.flow_min_Lmin - TOL)
                              & (cp_flow[has_cp] <= cps.flow_max_Lmin + TOL)))
+    AV = scenario.availability()
+    unavailable_used = (AV == 0) & (cpu_used > 0)
+    availability_ok = not bool(unavailable_used.any())                   # Eq. (11)
+    prio_bad = priority_violations(scenario, placed, srv, start)
+    priority_ok = not prio_bad                                           # Eq. (56)-(57)
 
     above_dvfs = temp > c.T_dvfs_C
     above_cap = temp > cap + TOL
@@ -261,11 +282,29 @@ def evaluate(scenario: Scenario, schedule: Schedule, supply_temp_C: np.ndarray,
             "n_cold_plates": int(plates[k]),
             "Q_cp_peak_W": _f(Q_cp[k].max()), "Q_cp_capacity_W": _f(plates[k] * cps.Q_max_per_plate_W),
             "cpu_peak_cores": _f(cpu_used[k].max()), "cpu_capacity_cores": _f(sv.C_cores),
+            "max_utilization": _f(util[k].max()),
             "mem_peak_MB": _f(mem_used[k].max()), "mem_capacity_MB": _f(sv.M_MB),
             "hottest_T_C": _f(temp[k].max()), "min_headroom_C": _f(headroom[k].min()),
             "periods_above_dvfs": int(above_dvfs[k].sum()),
             "periods_above_cap": int(above_cap[k].sum()),
-            "min_DPF": _f(DPF[k].min()),
+            "min_DPF": _f(DPF[k].min()), "min_PC_eff_MHz": _f(PC_eff[k].min()),
+            "periods_unavailable": int((AV[k] == 0).sum()),
+        })
+    cold_plates_detail = []
+    for sv in scenario.servers:
+        k = sv.s - 1
+        if not has_cp[k]:
+            continue
+        cold_plates_detail.append({
+            "s": sv.s, "name": sv.name, "n_cold_plates": int(plates[k]),
+            "coolant_min_C": _f(cp_coolant[k].min()), "coolant_max_C": _f(cp_coolant[k].max()),
+            "coolant_allowed_min_C": _f(cps.coolant_min_C),
+            "coolant_allowed_max_C": _f(cps.coolant_max_C),
+            "flow_min_Lmin": _f(cp_flow[k].min()), "flow_max_Lmin": _f(cp_flow[k].max()),
+            "flow_allowed_min_Lmin": _f(cps.flow_min_Lmin),
+            "flow_allowed_max_Lmin": _f(cps.flow_max_Lmin),
+            "Q_cp_peak_W": _f(Q_cp[k].max()),
+            "Q_cp_capacity_W": _f(plates[k] * cps.Q_max_per_plate_W),
         })
     zones_detail = []
     for z in range(1, Z + 1):
@@ -289,7 +328,10 @@ def evaluate(scenario: Scenario, schedule: Schedule, supply_temp_C: np.ndarray,
               "workloads_ok": workloads_ok, "supply_range_ok": supply_range_ok,
               "zone_temp_ok": zone_temp_ok, "ramp_ok": ramp_ok,
               "crac_capacity_ok": crac_capacity_ok, "cold_plate_coolant_ok": cp_coolant_ok,
-              "cold_plate_flow_ok": cp_flow_ok}
+              "cold_plate_flow_ok": cp_flow_ok, "availability_ok": availability_ok,
+              "priority_ok": priority_ok}
+    # Priority is measured either way but is only a limit when the run enforces it.
+    binding = {k: v for k, v in checks.items() if settings.priority or k != "priority_ok"}
 
     violations: list[str] = []
     if not cpu_ok:
@@ -331,10 +373,21 @@ def evaluate(scenario: Scenario, schedule: Schedule, supply_temp_C: np.ndarray,
     if not cp_flow_ok:
         violations.append(f"cold-plate flow outside [{cps.flow_min_Lmin:g}, {cps.flow_max_Lmin:g}] "
                           f"L/min (Eq. 47)")
+    if not availability_ok:
+        bad = sorted({int(k) + 1 for k in np.nonzero(unavailable_used)[0]})
+        violations.append(f"work runs on unavailable server-periods ({int(unavailable_used.sum())}, "
+                          f"server(s) {', '.join(map(str, bad))}) (Eq. 11)")
+    if not priority_ok and settings.priority:
+        ex = ", ".join(f"{scenario.workloads[j - 1].workload_id} before "
+                       f"{scenario.workloads[i - 1].workload_id}" for i, j in prio_bad[:3])
+        violations.append(f"{len(prio_bad)} priority inversion(s): a lower-priority workload "
+                          f"started on a server while a higher-priority one waited for it, "
+                          f"e.g. {ex} (Eq. 56-57)")
 
     compliance = {
-        "all_ok": all(checks.values()), **checks,
-        "servers": servers_detail, "zones": zones_detail,
+        "all_ok": all(binding.values()), **checks,
+        "servers": servers_detail, "zones": zones_detail, "cold_plates": cold_plates_detail,
+        "priority_violations": [list(x) for x in prio_bad],
         "thermal_cap_C": _f(cap), "violations": violations,
         "within_horizon": [bool(x) for x in within_horizon],
     }
@@ -373,6 +426,11 @@ def evaluate(scenario: Scenario, schedule: Schedule, supply_temp_C: np.ndarray,
         "periods_above_dvfs": int(above_dvfs.sum()),
         "periods_above_cap": int(above_cap.sum()),
         "min_DPF": _f(DPF.min()),
+        "n_throttled_servers": int((DPF < 1.0 - 1e-12).any(axis=1).sum()),
+        "mean_T_C": _f(temp.mean()),
+        "mean_headroom_C": _f(headroom.mean()),
+        "n_priority_violations": len(prio_bad),
+        "E_crac_by_zone_kWh": [_f(P_crac[z].sum() * dt / 3600.0) for z in range(Z)],
     }
 
     return EvalResult(
@@ -383,7 +441,7 @@ def evaluate(scenario: Scenario, schedule: Schedule, supply_temp_C: np.ndarray,
         E_total_kWh=E_total, carbon_g=carbon,
         wait_periods=wait, work_delivered_MHz_s=delivered, work_required_MHz_s=required,
         placed=placed, starts_on_or_after_arrival=starts_ok, wait_within_allowed=wait_ok,
-        on_time=on_time, work_complete=work_ok, compliant=compliant,
+        on_time=on_time, work_complete=work_ok, compliant=compliant, min_DPF_run=min_dpf_run,
         total_carbon_g=total_carbon, totals=totals, compliance=compliance,
         airflow_modelled=False,
         n_cold_plates=plates, cp_flow_Lmin=cp_flow, cp_coolant_C=cp_coolant,

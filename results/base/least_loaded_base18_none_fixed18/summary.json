@@ -20,9 +20,64 @@
     "time_limit_s": 600.0,
     "mip_rel_gap": 0.001,
     "cold_plates": false,
+    "cold_plate_count": null,
+    "baseline_cp_flow_Lmin": 0.3,
+    "baseline_cp_coolant_C": 20.0,
     "fan_power": false
   },
-  "model_note": "Airflow and fan power are not modelled (fan power and airflow are zero). Cold plates are not modelled (cold-plate heat removal and pump power are zero; CT_cold_plate is carried through to outputs only).",
+  "model_note": "Airflow and fan power are not modelled (fan power and airflow are zero). Cold plates are off (cold-plate heat removal and pump power are zero; run with --cold-plates to model them).",
+  "cold_plates": {
+    "enabled": false,
+    "plates_per_server": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "count_source": "not modelled",
+    "flow_settings_Lmin": [
+      0.1,
+      0.15,
+      0.2,
+      0.25,
+      0.3
+    ],
+    "R_C_per_W": [
+      0.1543,
+      0.1143,
+      0.0943,
+      0.0843,
+      0.0793
+    ],
+    "conductance_W_per_C": [
+      6.480881399870382,
+      8.748906386701663,
+      10.604453870625663,
+      11.862396204033216,
+      12.610340479192939
+    ],
+    "pump_W_per_plate": [
+      3.5707018532431756e-05,
+      0.00012051118754695714,
+      0.00028565614825945405,
+      0.0005579221645692461,
+      0.0009640895003756571
+    ],
+    "flow_limits_Lmin": [
+      0.05,
+      0.35
+    ],
+    "coolant_limits_C": [
+      20.0,
+      39.95
+    ],
+    "Q_max_per_plate_W": 300.0,
+    "baseline_flow_Lmin": 0.3,
+    "baseline_coolant_C": 20.0,
+    "flag": null
+  },
   "airflow_modelled": false,
   "thermal_cap_C": 80.0,
   "T_dvfs_C": 75.0,
@@ -34,6 +89,7 @@
       "E_IT_kWh": 26.267448697916663,
       "E_crac_kWh": 9.817404955119102,
       "E_cp_kWh": 0.0,
+      "Q_cp_kWh": 0.0,
       "E_fan_kWh": 0.0,
       "E_total_kWh": 36.084853653035765,
       "n_late": 0,
@@ -57,6 +113,7 @@
       "E_crac_kWh": 9.817404955119102,
       "E_cp_kWh": 0.0,
       "E_fan_kWh": 0.0,
+      "Q_cp_kWh": 0.0,
       "E_total_kWh": 36.084853653035765,
       "carbon_g": 22433.781529084692,
       "carbon_kg": 22.43378152908469,
@@ -87,7 +144,9 @@
       "supply_range_ok": true,
       "zone_temp_ok": true,
       "ramp_ok": true,
-      "crac_capacity_ok": true
+      "crac_capacity_ok": true,
+      "cold_plate_coolant_ok": true,
+      "cold_plate_flow_ok": true
     }
   },
   "optimized": {
@@ -98,6 +157,7 @@
       "E_IT_kWh": 26.267448697916663,
       "E_crac_kWh": 9.817404955119102,
       "E_cp_kWh": 0.0,
+      "Q_cp_kWh": 0.0,
       "E_fan_kWh": 0.0,
       "E_total_kWh": 36.084853653035765,
       "n_late": 0,
@@ -121,6 +181,7 @@
       "E_crac_kWh": 9.817404955119102,
       "E_cp_kWh": 0.0,
       "E_fan_kWh": 0.0,
+      "Q_cp_kWh": 0.0,
       "E_total_kWh": 36.084853653035765,
       "carbon_g": 22304.386343840255,
       "carbon_kg": 22.304386343840257,
@@ -151,7 +212,9 @@
       "supply_range_ok": true,
       "zone_temp_ok": true,
       "ramp_ok": true,
-      "crac_capacity_ok": true
+      "crac_capacity_ok": true,
+      "cold_plate_coolant_ok": true,
+      "cold_plate_flow_ok": true
     }
   },
   "has_optimized_schedule": true,
@@ -175,6 +238,12 @@
       "pct": 0.0
     },
     "E_cp_kWh": {
+      "baseline": 0.0,
+      "optimized": 0.0,
+      "diff": 0.0,
+      "pct": null
+    },
+    "Q_cp_kWh": {
       "baseline": 0.0,
       "optimized": 0.0,
       "diff": 0.0,
@@ -262,7 +331,7 @@
   "solver": {
     "status": "optimal",
     "solver_status_text": "Optimal",
-    "solve_time_s": 1.5911412079876754,
+    "solve_time_s": 2.151956458999848,
     "mip_gap": 0.0,
     "objective_g": 22304.386343840248,
     "best_bound_g": 22304.386343840248,
@@ -283,9 +352,10 @@
       "Server utilisation and heat are substituted into P_IT[s,t] = P_idle + (P_max-P_idle)*sum C_req*occupancy/C_s (Eq. 16, 20, 21); P_IT is bounded by P_max (or by the cores of the workloads that can ever run there) as a column bound.",
       "Eq. (54) Q_crac <= 116 kW and the big-M of the supply-level split are one column bound Qmax = min(116, sum of the zone's maximum IT power in kW); the heat balance sets Q_crac >= heat and the cost increases in Q_crac, so it sits at equality in any optimum.",
       "CRAC power is Q_crac / COP (divide), COP looked up per whole-degree level; the printed Eq. (46) multiplies.",
-      "Cold-plate heat Q_cp, pump power P_cp and fan power P_fan are named columns fixed at zero (built in _add_cold_plate_terms / _add_fan_terms) and already appear in the temperature recursion, the heat balance and the objective.",
+      "Fan power P_fan is a named column fixed at zero (_add_fan_terms) that already appears in the objective.",
       "Idle energy is in the objective through the P_IT columns (lower bound P_idle), so objective_g equals total carbon with no separate offset.",
-      "Priority ordering O_ij (56, 57) and availability AV (11, all 1) are not modelled; the wait limit (28) is applied to all workloads, which includes (25)."
+      "Priority ordering O_ij (56, 57) and availability AV (11, all 1) are not modelled; the wait limit (28) is applied to all workloads, which includes (25).",
+      "Cold plates are off: Q_cp and P_cp are columns fixed at zero."
     ]
   },
   "infeasibility": null,

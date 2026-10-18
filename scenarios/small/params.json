@@ -30,7 +30,7 @@
   },
   "constants_as_printed": {
     "R_dvfs": 0.378,
-    "F_throttle": 0.662,
+    "F_throttle": 0.622,
     "T_max_server_C": 90.0,
     "H_min_C": 10.0,
     "c_pw": 4182.0,

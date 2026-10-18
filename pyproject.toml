@@ -10,6 +10,11 @@ dependencies = [
 ]
 
 [dependency-groups]
+dashboard = [
+    "pandas>=3.0.6",
+    "plotly>=7.1.0",
+    "streamlit>=1.65.0",
+]
 dev = [
     "ipykernel>=7.4.0",
     "nbclient>=0.11.0",
@@ -20,3 +25,6 @@ dev = [
 [tool.pytest.ini_options]
 pythonpath = ["."]
 testpaths = ["tests"]
+
+[tool.uv]
+default-groups = ["dev", "dashboard"]

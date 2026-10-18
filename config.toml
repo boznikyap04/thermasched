@@ -125,7 +125,7 @@ ci_amplitude = 0.25
 # as printed and are for the model builder to resolve (section 7, D1).
 [constants]
 R_dvfs = 0.378
-F_throttle = 0.662
+F_throttle = 0.622                  # printed 0.662; 1 - R_dvfs = 0.622 (typo, decided)
 T_max_server_C = 90.0
 H_min_C = 10.0
 c_pw = 4182.0

@@ -49,6 +49,9 @@ def _cold_plate_block(scenario: Scenario, settings: RunSettings, ev: EvalResult)
         "Q_max_per_plate_W": cp.Q_max_per_plate_W,
         "baseline_flow_Lmin": settings.baseline_cp_flow_Lmin,
         "baseline_coolant_C": settings.baseline_cp_coolant_C,
+        "optimized_mode": settings.cp_mode,
+        "optimized_fixed_flow_Lmin": settings.optimized_fixed_cp()[0] if settings.cp_mode == "fixed" else None,
+        "optimized_fixed_coolant_C": settings.optimized_fixed_cp()[1] if settings.cp_mode == "fixed" else None,
         "flag": COLD_PLATE_FLAG if settings.cold_plates else None,
     })
 
@@ -111,6 +114,70 @@ def _count_reassigned(schedule: Schedule, original_server: dict) -> int:
     return n
 
 
+def _count_cross_zone(scenario: Scenario, schedule: Schedule, original_server: dict) -> int:
+    zone = {sv.s: sv.zone for sv in scenario.servers}
+    return sum(1 for p in schedule.placements
+               if p.server is not None and original_server.get(p.i) is not None
+               and zone[p.server] != zone[original_server[p.i]])
+
+
+def _move_reason(scenario: Scenario, ev: EvalResult, w, orig: int, final: int,
+                 start: int, end: int) -> str:
+    """Post-hoc reading of one move, from the scored schedule. The solver only minimises
+    carbon; these are the local conditions that favoured the new server."""
+    so, sf = scenario.servers[orig - 1], scenario.servers[final - 1]
+    idx = np.arange(max(start, 1) - 1, min(end - 1, scenario.T))
+    out = []
+    if len(idx) and (np.any(ev.cpu_used_cores[orig - 1, idx] + w.C_req > so.C_cores + 1e-9)
+                     or np.any(ev.mem_used_MB[orig - 1, idx] + w.M_req_MB > so.M_MB + 1e-9)):
+        out.append("original server full at the chosen start")
+    if sf.f_MHz > so.f_MHz:
+        out.append("faster server")
+
+    def it_energy(sv) -> float:   # extra IT energy of this workload on sv, W x periods
+        n = max(1, math.ceil(w.W_MHz_s / (w.C_req * sv.f_MHz * scenario.dt_seconds) - 1e-9))
+        return (sv.P_max_W - sv.P_idle_W) * w.C_req / sv.C_cores * n
+    if it_energy(sf) < it_energy(so) - 1e-9:
+        out.append("less IT energy for its work")
+    if len(idx) and ev.T_C[final - 1, idx].mean() < ev.T_C[orig - 1, idx].mean() - 1e-9:
+        out.append("cooler server")
+    if len(idx) and sf.zone != so.zone and \
+            ev.COP[sf.zone - 1, idx].mean() > ev.COP[so.zone - 1, idx].mean() + 1e-9:
+        out.append("zone with higher CRAC COP")
+    return "; ".join(out) or "carbon trade-off across the fleet (no single local cause)"
+
+
+def _write_reassignment(path: Path, scenario: Scenario, settings: RunSettings,
+                        schedule: Schedule, ev: EvalResult, original_server: dict) -> None:
+    """One row per workload: original and final server and zone, and why it moved (or not)."""
+    by_i = {p.i: p for p in schedule.placements}
+    zone = {sv.s: sv.zone for sv in scenario.servers}
+    rows = []
+    for w in scenario.workloads:
+        p = by_i.get(w.i)
+        orig = original_server.get(w.i)
+        placed = bool(ev.placed[w.i - 1]) and p is not None
+        final = p.server if placed else None
+        moved = placed and orig is not None and final != orig
+        if not placed:
+            reason = "not placed"
+        elif moved:
+            reason = _move_reason(scenario, ev, w, orig, final, p.start, p.end)
+        elif w.B == 1:
+            reason = "running at the start (B_i = 1): stays on its server, Eq. (29)"
+        elif settings.reassignment == "none":
+            reason = "reassignment off"
+        else:
+            reason = "kept"
+        rows.append([
+            w.i, w.workload_id, _type_name(w.RT), w.B, orig,
+            zone.get(orig) if orig is not None else None, final,
+            zone.get(final) if final is not None else None, moved,
+            bool(moved and zone[orig] != zone[final]), reason])
+    _write_csv(path, ["i", "workload_id", "type", "B_running", "original_server", "original_zone",
+                      "final_server", "final_zone", "reassigned", "cross_zone", "reason"], rows)
+
+
 def _write_schedule_tables(folder: Path, scenario: Scenario, schedule: Schedule,
                            ev: EvalResult, original_server: dict) -> None:
     folder.mkdir(parents=True, exist_ok=True)
@@ -132,13 +199,14 @@ def _write_schedule_tables(folder: Path, scenario: Scenario, schedule: Schedule,
             ev.wait_periods[k], w.AD, w.D,
             ev.work_required_MHz_s[k], ev.work_delivered_MHz_s[k],
             ev.compliant[k], ev.placed[k], ev.starts_on_or_after_arrival[k],
-            ev.wait_within_allowed[k], ev.on_time[k], ev.work_complete[k],
+            ev.wait_within_allowed[k], ev.on_time[k], ev.work_complete[k], w.B,
         ])
     _write_csv(folder / "schedule.csv",
                ["i", "workload_id", "type", "arrival", "original_server", "server", "reassigned",
                 "start", "periods_run", "finish", "wait", "allowed_delay", "deadline",
                 "work_required_MHz_s", "work_delivered_MHz_s", "compliant", "placed",
-                "starts_on_or_after_arrival", "wait_within_allowed", "on_time", "work_complete"],
+                "starts_on_or_after_arrival", "wait_within_allowed", "on_time", "work_complete",
+                "B_running"],
                rows)
 
     T = scenario.T
@@ -164,9 +232,10 @@ def _write_schedule_tables(folder: Path, scenario: Scenario, schedule: Schedule,
 
     comp = ev.compliance
     srv_cols = ["s", "name", "zone", "cold_plate", "n_cold_plates", "Q_cp_peak_W", "Q_cp_capacity_W",
-                "cpu_peak_cores", "cpu_capacity_cores",
+                "cpu_peak_cores", "cpu_capacity_cores", "max_utilization",
                 "mem_peak_MB", "mem_capacity_MB", "hottest_T_C", "min_headroom_C",
-                "periods_above_dvfs", "periods_above_cap", "min_DPF"]
+                "periods_above_dvfs", "periods_above_cap", "min_DPF", "min_PC_eff_MHz",
+                "periods_unavailable"]
     _write_csv(folder / "compliance_servers.csv", srv_cols,
                ([d[c] for c in srv_cols] for d in comp["servers"]))
     zone_cols = ["z", "supply_min_C", "supply_max_C", "supply_allowed_min_C",
@@ -174,13 +243,19 @@ def _write_schedule_tables(folder: Path, scenario: Scenario, schedule: Schedule,
                  "max_ramp_long_C", "ramp_long_limit_C", "Q_crac_peak_kW", "Q_crac_capacity_kW"]
     _write_csv(folder / "compliance_zones.csv", zone_cols,
                ([d[c] for c in zone_cols] for d in comp["zones"]))
+    cp_cols = ["s", "name", "n_cold_plates", "coolant_min_C", "coolant_max_C",
+               "coolant_allowed_min_C", "coolant_allowed_max_C", "flow_min_Lmin", "flow_max_Lmin",
+               "flow_allowed_min_Lmin", "flow_allowed_max_Lmin", "Q_cp_peak_W", "Q_cp_capacity_W"]
+    _write_csv(folder / "compliance_cold_plates.csv", cp_cols,
+               ([d[c] for c in cp_cols] for d in comp.get("cold_plates", [])))
     horizon = comp.get("within_horizon", [None] * scenario.I)
     _write_csv(folder / "compliance_workloads.csv",
                ["i", "workload_id", "placed", "work_delivered_MHz_s", "work_required_MHz_s",
-                "starts_on_or_after_arrival", "wait_within_allowed", "on_time", "work_complete",
-                "within_horizon", "compliant"],
+                "min_DPF", "starts_on_or_after_arrival", "wait_within_allowed", "on_time",
+                "work_complete", "within_horizon", "compliant"],
                ([w.i, w.workload_id, ev.placed[w.i - 1], ev.work_delivered_MHz_s[w.i - 1],
-                 ev.work_required_MHz_s[w.i - 1], ev.starts_on_or_after_arrival[w.i - 1],
+                 ev.work_required_MHz_s[w.i - 1], ev.min_DPF_run[w.i - 1],
+                 ev.starts_on_or_after_arrival[w.i - 1],
                  ev.wait_within_allowed[w.i - 1], ev.on_time[w.i - 1], ev.work_complete[w.i - 1],
                  horizon[w.i - 1], ev.compliant[w.i - 1]] for w in scenario.workloads))
 
@@ -222,18 +297,26 @@ METRICS = [
     ("max_wait_RT", "Max wait, time-sensitive", "periods"),
     ("mean_wait_DT", "Mean wait, delay-tolerant", "periods"),
     ("max_wait_DT", "Max wait, delay-tolerant", "periods"),
+    ("n_priority_violations", "Priority inversions", ""),
     ("hottest_T_C", "Hottest server temperature", "C"),
+    ("mean_T_C", "Mean server temperature", "C"),
     ("min_headroom_C", "Minimum headroom", "C"),
+    ("mean_headroom_C", "Mean headroom", "C"),
     ("periods_above_dvfs", "Server-periods above DVFS temperature", ""),
     ("periods_above_cap", "Server-periods above thermal cap", ""),
+    ("n_throttled_servers", "Servers throttled (DPF < 1)", ""),
     ("n_reassigned", "Workloads reassigned", ""),
+    ("n_cross_zone", "Reassigned to another zone", ""),
 ]
+_SCHEDULE_METRICS = ("n_reassigned", "n_cross_zone")
 
 
-def _metrics_block(ev: EvalResult, schedule: Schedule, original_server: dict) -> dict:
+def _metrics_block(scenario: Scenario, ev: EvalResult, schedule: Schedule,
+                   original_server: dict) -> dict:
     t = ev.totals
-    block = {k: t.get(k) for k, _, _ in METRICS if k != "n_reassigned"}
+    block = {k: t.get(k) for k, _, _ in METRICS if k not in _SCHEDULE_METRICS}
     block["n_reassigned"] = _count_reassigned(schedule, original_server)
+    block["n_cross_zone"] = _count_cross_zone(scenario, schedule, original_server)
     block["hottest_server"] = t.get("hottest_server")
     block["hottest_period"] = t.get("hottest_period")
     block["n_unplaced"] = t.get("n_unplaced")
@@ -241,11 +324,11 @@ def _metrics_block(ev: EvalResult, schedule: Schedule, original_server: dict) ->
     return to_jsonable(block)
 
 
-def _side(ev: EvalResult, schedule: Schedule, original_server: dict) -> dict:
+def _side(scenario: Scenario, ev: EvalResult, schedule: Schedule, original_server: dict) -> dict:
     return {
         "valid": bool(ev.valid),
         "violations": list(ev.compliance.get("violations", [])),
-        "metrics": _metrics_block(ev, schedule, original_server),
+        "metrics": _metrics_block(scenario, ev, schedule, original_server),
         "totals": to_jsonable(ev.totals),
         "compliance_flags": to_jsonable({k: v for k, v in ev.compliance.items()
                                          if k.endswith("_ok") or k == "all_ok"}),
@@ -287,11 +370,14 @@ def write_results(out_dir, scenario: Scenario, settings: RunSettings,
     if have_opt:
         _write_schedule_tables(out / "optimized", scenario, optimized_schedule, optimized_eval,
                                original_server)
+        _write_reassignment(out / "optimized" / "reassignment.csv", scenario, settings,
+                            optimized_schedule, optimized_eval, original_server)
     _write_comparison_period(out / "comparison_period.csv", scenario, baseline_eval,
                              optimized_eval if have_opt else None)
 
-    base_side = _side(baseline_eval, baseline_schedule, original_server)
-    opt_side = _side(optimized_eval, optimized_schedule, original_server) if have_opt else None
+    base_side = _side(scenario, baseline_eval, baseline_schedule, original_server)
+    opt_side = (_side(scenario, optimized_eval, optimized_schedule, original_server)
+                if have_opt else None)
     comparison = {}
     for key, _, _ in METRICS:
         b = base_side["metrics"].get(key)
@@ -300,7 +386,11 @@ def write_results(out_dir, scenario: Scenario, settings: RunSettings,
 
     summary = {
         "scenario": {"name": scenario.name, "I": scenario.I, "S": scenario.S, "Z": scenario.Z,
-                     "T": scenario.T, "dt_seconds": scenario.dt_seconds},
+                     "T": scenario.T, "dt_seconds": scenario.dt_seconds,
+                     "zones": [sv.zone for sv in scenario.servers],
+                     "n_running": sum(w.B for w in scenario.workloads),
+                     "n_unavailable_server_periods": int((scenario.availability() == 0).sum()),
+                     "CI_mean_g_per_kWh": float(np.mean(scenario.CI_g_per_kWh))},
         "settings": settings.as_dict(),
         "model_note": model_note(settings),
         "cold_plates": _cold_plate_block(scenario, settings, baseline_eval),
@@ -359,13 +449,26 @@ def format_summary(summary: dict) -> str:
     lines.append(f"Run '{st.get('run_name')}': baseline={st.get('baseline_rule')} at "
                  f"{st.get('baseline_supply_temp_C')} C, reassignment={st.get('reassignment')}, "
                  f"supply_temp_mode={st.get('supply_temp_mode')}, "
+                 f"priority={'on' if st.get('priority', True) else 'off'}, "
                  f"thermal cap {summary.get('thermal_cap_C')} C")
+    extra = []
+    if st.get("zone_map"):
+        extra.append(f"zone map {st['zone_map']}")
+    if st.get("carbon_file"):
+        extra.append(f"carbon intensity from {st['carbon_file']}")
+    if st.get("ci_flat"):
+        extra.append(f"flat carbon intensity {sc.get('CI_mean_g_per_kWh', 0):.2f} g/kWh")
+    if extra:
+        lines.append("Scenario overrides: " + "; ".join(extra))
     cpb = summary.get("cold_plates") or {}
     if cpb.get("enabled"):
         lines.append(f"Cold plates per server {cpb.get('plates_per_server')} "
                      f"({cpb.get('count_source')}); flow settings {cpb.get('flow_settings_Lmin')} L/min; "
                      f"baseline fixed at {cpb.get('baseline_flow_Lmin')} L/min, "
-                     f"{cpb.get('baseline_coolant_C')} C coolant")
+                     f"{cpb.get('baseline_coolant_C')} C coolant"
+                     + (f"; optimized fixed at {cpb.get('optimized_fixed_flow_Lmin')} L/min, "
+                        f"{cpb.get('optimized_fixed_coolant_C')} C coolant"
+                        if cpb.get("optimized_mode") == "fixed" else ""))
     lines.append("")
 
     have_opt = summary.get("has_optimized_schedule")

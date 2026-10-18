@@ -1,4 +1,4 @@
-s,name,zone,cold_plate,cpu_peak_cores,cpu_capacity_cores,mem_peak_MB,mem_capacity_MB,hottest_T_C,min_headroom_C,periods_above_dvfs,periods_above_cap,min_DPF
-1,qh2-rcc160,1,0,23.0,64.0,47104.0,528286.0,61.596109381290006,28.403890618709994,0,0,1.0
-2,qh2-rcc135,2,0,22.0,64.0,45056.0,528286.0,61.93902041162,28.06097958838,0,0,1.0
-3,qh2-rcc137,1,1,24.0,64.0,49152.0,528286.0,74.930579147667,15.069420852332996,0,4,1.0
+s,name,zone,cold_plate,n_cold_plates,Q_cp_peak_W,Q_cp_capacity_W,cpu_peak_cores,cpu_capacity_cores,mem_peak_MB,mem_capacity_MB,hottest_T_C,min_headroom_C,periods_above_dvfs,periods_above_cap,min_DPF
+1,qh2-rcc160,1,0,0,0.0,0.0,23.0,64.0,47104.0,528286.0,61.596109381290006,28.403890618709994,0,0,1.0
+2,qh2-rcc135,2,0,0,0.0,0.0,22.0,64.0,45056.0,528286.0,61.93902041162,28.06097958838,0,0,1.0
+3,qh2-rcc137,1,1,0,0.0,0.0,24.0,64.0,49152.0,528286.0,74.930579147667,15.069420852332996,0,4,1.0

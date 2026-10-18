@@ -1,15 +1,20 @@
-"""Scenario loader: reads scenarios/<name>/*.csv and params.json into the shared types."""
+"""Scenario loader: reads scenarios/<name>/*.csv and params.json into the shared types.
+
+``availability.csv`` (columns s, t, AV) is optional: server-periods it does not list are
+available, Eq. (11).
+"""
 
 from __future__ import annotations
 
 import csv
+import dataclasses
 import json
 from pathlib import Path
 
 import numpy as np
 
 from scheduler.types import (
-    ColdPlateSpec, Constants, Placement, Scenario, Schedule, Server, Workload,
+    ColdPlateSpec, Constants, Placement, RunSettings, Scenario, Schedule, Server, Workload,
 )
 
 
@@ -97,12 +102,11 @@ def load_scenario(name: str, scenarios_dir: str | Path = "scenarios") -> Scenari
     )
 
     # carbon
-    ci_path = d / "carbon.csv"
-    ci_rows = _read_rows(ci_path)
-    if len(ci_rows) != T:
-        raise ValueError(f"{ci_path}: has {len(ci_rows)} rows, params.json says T={T}")
-    _check_contiguous([_int(r["t"]) for r in ci_rows], "t", ci_path)
-    ci = np.array([float(r["CI_t_g_per_kWh"]) for r in ci_rows], dtype=float)
+    ci = _read_carbon(d / "carbon.csv", T)
+
+    # availability, Eq. (11)
+    av_path = d / "availability.csv"
+    AV = _read_availability(av_path, len(servers), T) if av_path.is_file() else None
 
     # constants
     c = params["constants_as_printed"]
@@ -120,11 +124,49 @@ def load_scenario(name: str, scenarios_dir: str | Path = "scenarios") -> Scenari
     cold_plate.validate()
 
     sc = Scenario(name=name, T=T, dt_seconds=dt, workloads=workloads, servers=servers,
-                  n_zones=n_zones, CI_g_per_kWh=ci, constants=constants, cold_plate=cold_plate)
+                  n_zones=n_zones, CI_g_per_kWh=ci, constants=constants, cold_plate=cold_plate,
+                  AV=AV)
     settings_dt = params.get("settings", {}).get("dt_seconds")
     if settings_dt is not None and float(settings_dt) != dt:
         raise ValueError(f"{d / 'params.json'}: time.dt_seconds={dt} does not match "
                          f"settings.dt_seconds={settings_dt}")
+    return sc
+
+
+def _read_carbon(path: Path, T: int) -> np.ndarray:
+    rows = _read_rows(path)
+    if len(rows) != T:
+        raise ValueError(f"{path}: has {len(rows)} rows, the scenario has T={T}")
+    _check_contiguous([_int(r["t"]) for r in rows], "t", path)
+    return np.array([float(r["CI_t_g_per_kWh"]) for r in rows], dtype=float)
+
+
+def _read_availability(path: Path, S: int, T: int) -> np.ndarray:
+    AV = np.ones((S, T), dtype=int)
+    for r in _read_rows(path):
+        s, t, v = _int(r["s"]), _int(r["t"]), _int(r["AV"])
+        if not (1 <= s <= S and 1 <= t <= T) or v not in (0, 1):
+            raise ValueError(f"{path}: row s={s}, t={t}, AV={v} is outside 1..{S}, 1..{T}, {{0, 1}}")
+        AV[s - 1, t - 1] = v
+    return AV
+
+
+def apply_overrides(scenario: Scenario, settings: RunSettings) -> Scenario:
+    """Scenario switches of a run: zone map (S1 T1) and carbon intensity (S4 T3)."""
+    sc = scenario
+    if settings.zone_map is not None:
+        zones = [int(z) for z in settings.zone_map]
+        if len(zones) != sc.S:
+            raise ValueError(f"zone_map has {len(zones)} entries, the scenario has {sc.S} servers")
+        n_zones = max(zones)
+        if sorted(set(zones)) != list(range(1, n_zones + 1)):
+            raise ValueError(f"zone_map {zones}: every zone 1..{n_zones} must have a server")
+        servers = tuple(dataclasses.replace(sv, zone=z) for sv, z in zip(sc.servers, zones))
+        sc = dataclasses.replace(sc, servers=servers, n_zones=n_zones)
+    if settings.carbon_file is not None:
+        sc = dataclasses.replace(sc, CI_g_per_kWh=_read_carbon(Path(settings.carbon_file), sc.T))
+    elif settings.ci_flat:
+        sc = dataclasses.replace(sc, CI_g_per_kWh=np.full(sc.T, float(np.mean(sc.CI_g_per_kWh))))
     return sc
 
 

@@ -14,8 +14,9 @@ DPF, and the work credit ``w`` follow the approved thesis equations. The supply
 temperature of every zone and period is chosen from whole degrees by a one-hot choice so
 the COP is a lookup. With cold plates on, each cold-plate server picks one flow setting per
 period (one-hot, so resistance and pump power are lookups) and a coolant temperature; the
-heat removed is linear in the temperature difference split across the settings. All
-limits are hard.
+heat removed is linear in the temperature difference split across the settings. Priority
+(56)-(57) orders the start times ``ST[i]`` of workloads that share a server, and servers
+take no work in periods where AV = 0 (11). All limits are hard.
 
 Units: P_IT in W, Q_crac / P_crac / P_fan in kW, dt in seconds, energy in kWh, CI in
 g/kWh, carbon in g.
@@ -35,9 +36,10 @@ import numpy as np
 import highspy
 
 from .types import (
-    RELAX_COOLING, RELAX_CAPACITY, RELAX_DEADLINES, RELAX_FAMILIES, RELAX_THERMAL,
+    RELAX_COOLING, RELAX_CAPACITY, RELAX_DEADLINES, RELAX_FAMILIES, RELAX_PRIORITY, RELAX_THERMAL,
     STATUS_INFEASIBLE, STATUS_NO_SOLUTION, STATUS_OPTIMAL, STATUS_TIME_LIMIT,
     ColdPlateOps, Placement, RunSettings, Scenario, Schedule, SolveResult, cold_plate_counts, cop,
+    priority_pairs,
 )
 
 _INF = highspy.kHighsInf
@@ -121,26 +123,33 @@ class _LP:
 
 class _ColdPlateCols:
     """Per cold-plate server k and period t: one-hot flow choice b[k][t][j], the temperature
-    difference split d[k][t][j] across the settings, and the coolant temperature cool[k][t]."""
+    difference split d[k][t][j] across the settings, and the coolant temperature cool[k][t].
+    With the settings fixed (cp_mode "fixed") b and cool are fixed columns, and neg[k][t]
+    (coolant above T_prev) with the switch on[k][t] lets the drive fall to zero."""
 
     def __init__(self):
         self.b: dict[int, list[list[int]]] = {}
         self.d: dict[int, list[list[int]]] = {}
         self.cool: dict[int, list[int]] = {}
+        self.neg: dict[int, list[int]] = {}
+        self.on: dict[int, list[int]] = {}
+        self.fixed: tuple[int, float] | None = None    # (flow level, coolant degC)
 
 
 def _add_cold_plate_terms(lp: _LP, scenario: Scenario, plates: np.ndarray, d_max: float,
-                          ci_w_to_g: np.ndarray):
+                          ci_w_to_g: np.ndarray, fixed: tuple[int, float] | None = None):
     """Q_cp[s,t] and P_cp[s,t] columns, plus the choice columns of servers with cold plates.
 
     Servers without cold plates get Q_cp = P_cp = 0. P_cp enters the objective with the same
-    weight as IT power (W -> g per period). The rows are added by _add_cold_plate_rows.
+    weight as IT power (W -> g per period). ``fixed`` = (flow level, coolant) holds every
+    plate at one setting. The rows are added by _add_cold_plate_rows.
     """
     S, T = scenario.S, scenario.T
     cp = scenario.cold_plate
     pump = cp.pump_W()
     nlev = len(cp.flow_settings_Lmin)
     cols = _ColdPlateCols()
+    cols.fixed = fixed
     Q_cp, P_cp = [], []
     for k in range(S):
         n = int(plates[k])
@@ -149,14 +158,23 @@ def _add_cold_plate_terms(lp: _LP, scenario: Scenario, plates: np.ndarray, d_max
                      for t in range(T)])
         if n == 0:
             continue
-        cols.b[k] = [[lp.col(0.0, 1.0, integer=True) for _ in range(nlev)] for _ in range(T)]
+        if fixed is None:
+            cols.b[k] = [[lp.col(0.0, 1.0, integer=True) for _ in range(nlev)] for _ in range(T)]
+            cols.cool[k] = [lp.col(cp.coolant_min_C, cp.coolant_max_C) for _ in range(T)]
+        else:
+            lv, cool = fixed
+            cols.b[k] = [[lp.col(float(j == lv), float(j == lv)) for j in range(nlev)]
+                         for _ in range(T)]
+            cols.cool[k] = [lp.col(cool, cool) for _ in range(T)]
+            cols.on[k] = [lp.col(0.0, 1.0, integer=True) for _ in range(T)]
+            cols.neg[k] = [lp.col(0.0, _INF) for _ in range(T)]
         cols.d[k] = [[lp.col(0.0, d_max) for _ in range(nlev)] for _ in range(T)]
-        cols.cool[k] = [lp.col(cp.coolant_min_C, cp.coolant_max_C) for _ in range(T)]
     return Q_cp, P_cp, cols
 
 
 def _add_cold_plate_rows(lp: _LP, scenario: Scenario, plates: np.ndarray, d_max: float,
-                         cols: _ColdPlateCols, Q_cp, P_cp, P_IT, Tcol) -> None:
+                         cols: _ColdPlateCols, Q_cp, P_cp, P_IT, Tcol,
+                         neg_max: dict[int, float] | None = None) -> None:
     """For server k with n plates in period t, with T_prev = T[k,t-1] (T0 in period 1):
 
         sum_j b_j = 1                              one flow setting
@@ -165,6 +183,10 @@ def _add_cold_plate_rows(lp: _LP, scenario: Scenario, plates: np.ndarray, d_max:
         Q_cp <= P_IT                               no more than the server's heat
         Q_cp <= n * Q_max                          column bound, Eq. (55)
         P_cp  = n * sum_j pump_j * b_j             Eq. (48) at the chosen setting
+
+    With the settings fixed the coolant cannot follow T_prev down, so the drive is
+    max(0, T_prev - coolant): sum_j d_j - neg = T_prev - coolant, sum_j d_j <= d_max * on,
+    neg <= neg_max[k] * (1 - on).
     """
     cp = scenario.cold_plate
     G = cp.conductance_W_per_C()
@@ -176,6 +198,11 @@ def _add_cold_plate_rows(lp: _LP, scenario: Scenario, plates: np.ndarray, d_max:
             b, d, cool = bk[t], cols.d[k][t], cols.cool[k][t]
             lp.row([(c_, 1.0) for c_ in b], 1.0, 1.0)
             terms = [(c_, 1.0) for c_ in d] + [(cool, 1.0)]
+            if cols.fixed is not None:
+                on, neg = cols.on[k][t], cols.neg[k][t]
+                terms.append((neg, -1.0))
+                lp.row([(c_, 1.0) for c_ in d] + [(on, -d_max)], -_INF, 0.0)
+                lp.row([(neg, 1.0), (on, neg_max[k])], -_INF, neg_max[k])
             if t == 0:
                 lp.row(terms, sv.T0_C, sv.T0_C)
             else:
@@ -401,7 +428,21 @@ def _build(scenario: Scenario, original_server: dict[int, int], settings: RunSet
         if plates[sv.s - 1] > 0 and sv.T0_C < scenario.cold_plate.coolant_min_C:
             raise ValueError(f"server {sv.s}: T0 {sv.T0_C:g} C is below the lowest coolant "
                              f"temperature {scenario.cold_plate.coolant_min_C:g} C")
-    Q_cp, P_cp, cp_cols = _add_cold_plate_terms(lp, scenario, plates, cp_d_max, ci_w_to_g)
+    cp_fixed = None
+    cp_neg_max: dict[int, float] = {}
+    if settings.cp_mode == "fixed" and plates.any():
+        flow, cool = settings.optimized_fixed_cp()
+        cps = scenario.cold_plate
+        if not cps.coolant_min_C - _EPS <= cool <= cps.coolant_max_C + _EPS:
+            raise ValueError(f"fixed coolant temperature {cool:g} degC is outside "
+                             f"[{cps.coolant_min_C:g}, {cps.coolant_max_C:g}], Eq. (49)")
+        cp_fixed = (cps.level_of(flow), cool)
+        # Lowest temperature a server can reach: the steady state with all heat removed.
+        sup_min = fixed_value if fixed_mode else float(levels[0])
+        for sv in servers:
+            cp_neg_max[sv.s - 1] = max(1.0, cool - min(sv.T0_C, sup_min + sv.th_a_C) + 1.0)
+    Q_cp, P_cp, cp_cols = _add_cold_plate_terms(lp, scenario, plates, cp_d_max, ci_w_to_g,
+                                                cp_fixed)
     P_fan = _add_fan_terms(lp, scenario, ci_kw_to_g)
     T_ub = cap_eff
     Tcol = [[lp.col(-_INF, T_ub) for t in range(T)] for _ in servers]
@@ -497,7 +538,50 @@ def _build(scenario: Scenario, original_server: dict[int, int], settings: RunSet
                 lp.row([(CLcol[s][t - 1], 1.0), (CLcol[s][t - 2] if t >= 2 else None, -1.0),
                         (Lcol[s][t - 1], -1.0)], 0.0, 0.0)
 
+    # ---- priority, Eq. (56)-(57) -------------------------------------------
+    # ST[i] = sum_s (b * X[i,s] - sum_{t<b} U[i,s,t]), the start period. For a pair (i, j)
+    # with O_ij = 1 and a shared server s:
+    #   ST_i - ST_j <= M * (2 - X_is - X_js) + M * started_j(A_i - 1)
+    # so i starts no later than j when both run on s and j had not started when i arrived.
+    ST: dict[int, int] = {}
+
+    def st_col(i: int) -> int:
+        if i not in ST:
+            spans = [win[(i, s)] for s in allowed[i] if (i, s) in win]
+            col = lp.col(float(min(wd.a for wd in spans)), float(max(wd.b for wd in spans)))
+            terms = [(col, 1.0)]
+            for s in allowed[i]:
+                wd = win.get((i, s))
+                if wd is None:
+                    continue
+                terms.append((X[(i, s)], -float(wd.b)))
+                terms += [(uc, 1.0) for uc in U[(i, s)].values()]
+            lp.row(terms, 0.0, 0.0)
+            ST[i] = col
+        return ST[i]
+
+    n_priority_rows = 0
+    if settings.priority and RELAX_PRIORITY not in relax:
+        for i, j in priority_pairs(scenario):
+            A_i = scenario.workloads[i - 1].A
+            shared = [s for s in allowed[i] if (i, s) in win and (j, s) in win]
+            if not shared:
+                continue
+            M = (max(win[(i, s)].b for s in allowed[i] if (i, s) in win)
+                 - min(win[(j, s)].a for s in allowed[j] if (j, s) in win))
+            if M <= 0:
+                continue                      # i can never start after j
+            started_j = [(ustep(j, s, A_i - 1), -float(M)) for s in allowed[j] if (j, s) in win]
+            for s in shared:
+                wi, wj = win[(i, s)], win[(j, s)]
+                if wj.b < A_i or wi.b <= max(wj.a, A_i):
+                    continue                  # no inversion possible on s
+                lp.row([(st_col(i), 1.0), (st_col(j), -1.0), (X[(i, s)], float(M)),
+                        (X[(j, s)], float(M))] + started_j, -_INF, 2.0 * M)
+                n_priority_rows += 1
+
     # ---- per server, per period -------------------------------------------
+    AV = scenario.availability()
     for sv in servers:
         k = sv.s - 1
         dP = sv.P_max_W - sv.P_idle_W
@@ -505,6 +589,9 @@ def _build(scenario: Scenario, original_server: dict[int, int], settings: RunSet
         z = sv.zone
         for t in range(1, T + 1):
             items = by_st.get((sv.s, t), [])
+            if not AV[k, t - 1]:
+                for _, occ in items:                                                   # (11)
+                    lp.row(occ, 0.0, 0.0)
             # (16), (20), (21): P_IT = P_idle + dP * sum C_req * occupancy / C_s
             terms = [(P_IT[k][t - 1], 1.0)]
             cpu: list = []
@@ -533,7 +620,8 @@ def _build(scenario: Scenario, original_server: dict[int, int], settings: RunSet
                 terms.append((Tcol[k][t - 2], -alpha))
             lp.row(terms, rhs, rhs)
 
-    _add_cold_plate_rows(lp, scenario, plates, cp_d_max, cp_cols, Q_cp, P_cp, P_IT, Tcol)
+    _add_cold_plate_rows(lp, scenario, plates, cp_d_max, cp_cols, Q_cp, P_cp, P_IT, Tcol,
+                         cp_neg_max)
 
     # ---- cooling zones -----------------------------------------------------
     members = {z: [sv for sv in servers if sv.zone == z] for z in range(1, Z + 1)}
@@ -567,6 +655,8 @@ def _build(scenario: Scenario, original_server: dict[int, int], settings: RunSet
     built.choice = choice
     built.dpf_cap = dpf_cap
     built.plates, built.cp_cols = plates, cp_cols
+    built.n_priority_rows = n_priority_rows
+    built.n_unavailable = int((AV == 0).sum())
     return built
 
 
@@ -603,9 +693,23 @@ def _model_notes(scenario: Scenario, settings: RunSettings, built: _Built) -> li
         "the objective.",
         "Idle energy is in the objective through the P_IT columns (lower bound P_idle), so "
         "objective_g equals total carbon with no separate offset.",
-        "Priority ordering O_ij (56, 57) and availability AV (11, all 1) are not modelled; the wait "
-        "limit (28) is applied to all workloads, which includes (25).",
+        "The wait limit (28) is applied to all workloads, which includes (25). Workloads with "
+        "B_i = 1 keep their original server (29).",
     ]
+    if settings.priority and RELAX_PRIORITY not in built.relax:
+        n.append(
+            f"Priority (56)-(57): O_ij = 1 for a time-sensitive i and a delay-tolerant j, and for the "
+            f"earlier arrival of two same-type, same-deadline workloads. It is linked to the start "
+            f"times as: on a shared server, j may not start while i waits (A_i <= ST_j implies "
+            f"ST_i <= ST_j), through ST_i = sum_s (b X - sum U) and big-M rows "
+            f"({getattr(built, 'n_priority_rows', 0)} pair-server rows after dropping those that "
+            f"cannot bind). EDF within a type is not in the equations and is not modelled.")
+    else:
+        n.append("Priority (56)-(57) is off for this run: start order is not constrained.")
+    n_off = getattr(built, "n_unavailable", 0)
+    n.append(f"Availability (11): {n_off} server-period(s) with AV = 0 take no work; their "
+             "servers stay on at idle power." if n_off else
+             "Availability (11): every server is available in every period (AV = 1).")
     plates = getattr(built, "plates", cold_plate_counts(scenario, settings))
     if plates.any():
         cp = scenario.cold_plate
@@ -616,6 +720,11 @@ def _model_notes(scenario: Scenario, settings: RunSettings, built: _Built) -> li
             "T_prev - coolant is split into d_j <= d_max*b_j, so Q_cp <= n*sum G_j*d_j is linear "
             "(G_j = min(1/R_j, flow_j*c_pw)); Q_cp <= P_IT and Q_cp <= n*0.3 kW. T_prev is the "
             "previous period's temperature, and d_j >= 0 keeps the coolant at or below it.")
+        if settings.cp_mode == "fixed":
+            flow, cool = settings.optimized_fixed_cp()
+            n.append(f"Cold plates fixed (cp_mode fixed): every plate runs at {flow:g} L/min and "
+                     f"{cool:g} C coolant in every period. The drive is max(0, T_prev - coolant), "
+                     "with one on/off binary per server and period.")
     else:
         n.append("Cold plates are off: Q_cp and P_cp are columns fixed at zero.")
     if built.feasibility_only:
@@ -670,7 +779,8 @@ def _warm_start_values(scenario: Scenario, built: _Built, schedule: Schedule,
             for t, ec in built.E[(p.i, s)].items():
                 vals[ec] = 1.0 if (on and p.start + wd.n_min <= t < p.start + m) else 0.0
     if built.cp_cols.b:
-        lv = scenario.cold_plate.level_of(settings.baseline_cp_flow_Lmin)
+        lv = (built.cp_cols.fixed[0] if built.cp_cols.fixed is not None
+              else scenario.cold_plate.level_of(settings.baseline_cp_flow_Lmin))
         for bk in built.cp_cols.b.values():
             for b in bk:
                 for j, col in enumerate(b):
@@ -857,6 +967,8 @@ def diagnose_infeasibility(scenario: Scenario, original_server: dict[int, int],
     settings.validate()
     out: dict[str, str] = {}
     for fam in RELAX_FAMILIES:
+        if fam == RELAX_PRIORITY and not settings.priority:
+            continue
         res = _solve_impl(scenario, original_server, settings, relax=(fam,), warm_start=None,
                           warm_start_supply_temp_C=None, time_limit_s=time_limit_s, log=False,
                           feasibility_only=True)

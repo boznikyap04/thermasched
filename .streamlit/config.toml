@@ -1,0 +1,10 @@
+# Dashboard theme (uv run streamlit run dashboard/app.py, from the repository root).
+# A neutral primary colour: orange and blue are reserved for baseline and optimized.
+[theme.light]
+primaryColor = "#52514e"
+
+[theme.dark]
+primaryColor = "#c3c2b7"
+
+[browser]
+gatherUsageStats = false
