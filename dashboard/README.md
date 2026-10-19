@@ -21,7 +21,7 @@ The dashboard finds a run only when its `summary.json` is at this location:
 
 ```
 results/
-└── <scenario>/                 small, base or thesis10
+└── <scenario>/                 thesis10 (main), or an experiment: consolidated6, thesis10_tight, ...
     └── <run-name>/             any name; shown in the sidebar
         ├── summary.json        required
         ├── comparison_period.csv
@@ -53,7 +53,7 @@ permanently instead:
 **Common mistakes**
 
 - **Extra folder level.** Unzipping often adds one, for example
-  `results/base/my_run/my_run/summary.json`. Move the inner folder up a level.
+  `results/consolidated6/my_run/my_run/summary.json`. Move the inner folder up a level.
 - **No scenario folder.** Putting the run directly in `results/my_run/` doesn't work.
   It must be inside a scenario folder.
 - **Scenario missing from `scenarios/`.** The dashboard reads the server names and the

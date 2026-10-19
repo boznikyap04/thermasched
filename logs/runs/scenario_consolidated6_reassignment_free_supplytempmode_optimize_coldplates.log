@@ -1,0 +1,54 @@
+Scenario consolidated6: I=238 workloads, S=6 servers, Z=2 zones, T=288 periods of 300 s
+Run 'least_loaded_base18_free_optimize_cp': baseline=least_loaded at 18.0 C, reassignment=free, supply_temp_mode=optimize, thermal cap 80.0 C
+Cold plates per server [0, 0, 0, 0, 1, 1] (servers.csv); flow settings [0.1, 0.15, 0.2, 0.25, 0.3] L/min; baseline fixed at 0.3 L/min, 20.0 C coolant
+
+Metric                                       Baseline         Optimized    Diff  Diff %
+-----------------------------------  ----------------  ----------------  ------  ------
+Total carbon (kg)                               20.70             18.28   -2.42  -11.7%
+Energy, IT (kWh)                                26.27             26.27   +0.00   +0.0%
+Energy, CRAC (kWh)                               7.02              3.30   -3.72  -53.0%
+Energy, cold plate (kWh)                     4.63e-05          4.63e-05   +0.00   +0.0%
+Heat removed by cold plates (kWh)                7.47              8.31   +0.83  +11.1%
+Energy, fan (kWh)                                0.00              0.00   +0.00       -
+Energy, total (kWh)                             33.29             29.57   -3.72  -11.2%
+Workloads late                                      0                 0      +0       -
+Non-compliant workloads                             0                 0      +0       -
+Mean wait, time-sensitive (periods)              0.00              1.25   +1.25       -
+Max wait, time-sensitive (periods)               0.00             24.00  +24.00       -
+Mean wait, delay-tolerant (periods)              0.00             19.68  +19.68       -
+Max wait, delay-tolerant (periods)               0.00             96.00  +96.00       -
+Hottest server temperature (C)       68.08 (server 3)  72.85 (server 4)   +4.76   +7.0%
+Minimum headroom (C)                            21.92             17.15   -4.76  -21.7%
+Server-periods above 75 C                           0                 0      +0       -
+Server-periods above thermal cap                    0                 0      +0       -
+Workloads reassigned                                0                 0      +0       -
+Schedule valid (no limit broken)                 True              True                
+
+Solver: status=time_limit (Time limit reached), time=600.4 s, gap=3.1824%, objective=18,279.59 g, bound=17,697.86 g
+        150800 variables, 91080 binaries, 254356 constraints
+        note: Y[i,s,t] is eliminated: a workload occupies n_min core periods after its start, U[t] - U[t-n_min], plus optional tail binaries E[i,s,t] only where n_max > n_min, because the Y-based model made the root LP of 'consolidated6' unsolvable (500k rows).
+        note: Start indicators S are replaced by cumulative 'started by t' steps U[i,s,t] (S = U[t] - U[t-1], X[i,s] is the last step), so one unbroken block needs no window sums.
+        note: The tail E[t] <= U[t-n_min] - U[t-n_max] and E[t] <= E[t-1] + U[t-n_min] - U[t-n_min-1] keep the run unbroken and within n_min..n_max periods; Y <= X (10) is then implied and Eq. (9) is kept.
+        note: n_min = ceil(W/(C_req*f_s*dt)) is the shortest run since DPF <= 1, and starts with t + n_min > D are dropped.
+        note: n_max = ceil(W/(C_req*f_s*dt*DPF_cap)) caps the run: valid for the optimum because trimming the tail of a run never raises power, heat or temperature, so every other limit stays met.
+        note: DPF enters only through the loss L = 1 - DPF >= slope*(T - T_dvfs), L >= 0 (the linear piece of Eq. 37, valid below T_throttle, so a cap above T_throttle is rejected), and only on servers where some pair has n_max > n_min; higher DPF never hurts, so no binaries are needed.
+        note: Work (39) uses core credit n_min*X - coreLoss, where coreLoss >= CL[tau+n_min-1] - CL[tau-1] - M(1 - sigma_tau) over the running sum CL of L, plus tail credits wt <= E, wt <= 1 - L; for a pair with n_max == n_min any core block delivers at least W, so its term is exactly X.
+        note: The work row is divided by W_i (right side 1), and with the cap at or below T_dvfs there are no loss, tail or work-credit columns at all.
+        note: Server utilisation and heat are substituted into P_IT[s,t] = P_idle + (P_max-P_idle)*sum C_req*occupancy/C_s (Eq. 16, 20, 21); P_IT is bounded by P_max (or by the cores of the workloads that can ever run there) as a column bound.
+        note: Eq. (54) Q_crac <= 116 kW and the big-M of the supply-level split are one column bound Qmax = min(116, sum of the zone's maximum IT power in kW); the heat balance sets Q_crac >= heat and the cost increases in Q_crac, so it sits at equality in any optimum.
+        note: CRAC power is Q_crac / COP (divide), COP looked up per whole-degree level; the printed Eq. (46) multiplies.
+        note: Fan power P_fan is a named column fixed at zero (_add_fan_terms) that already appears in the objective.
+        note: Idle energy is in the objective through the P_IT columns (lower bound P_idle), so objective_g equals total carbon with no separate offset.
+        note: Priority ordering O_ij (56, 57) and availability AV (11, all 1) are not modelled; the wait limit (28) is applied to all workloads, which includes (25).
+        note: Cold plates: 2 on 2 server(s). Each picks one of the flow settings [0.1, 0.15, 0.2, 0.25, 0.3] L/min per period (one-hot), so its resistance and the cubic pump power of Eq. (48) are lookups. T_prev - coolant is split into d_j <= d_max*b_j, so Q_cp <= n*sum G_j*d_j is linear (G_j = min(1/R_j, flow_j*c_pw)); Q_cp <= P_IT and Q_cp <= n*0.3 kW. T_prev is the previous period's temperature, and d_j >= 0 keeps the coolant at or below it.
+        note: More than 30000 binaries: the MIP's LP relaxations use interior point (mip_lp_solver = ipm) because dual and primal simplex do not finish the root LP on large models.
+        note: Starting schedule: the same model with reassignment=none, solved first (time_limit, 18,297.37 g, 120.2 s); its time is included in the solve time.
+
+Note: Airflow and fan power are not modelled (fan power and airflow are zero). FLAGGED: cold-plate flow and coolant temperature carry almost no cost (pump power is at most about 1 mW per plate, and no equation charges energy for cooling the water), so the optimizer runs them wherever they remove the most heat. Where the 0.3 kW limit or the server's own heat is what limits removal, the reported flow and coolant values are arbitrary.
+
+Checks:
+  [PASS] least_loaded_reproduces_baseline_schedule_csv
+  [PASS] optimizer_objective_equals_evaluator_carbon  {'optimizer_objective_g': 18279.593182893208, 'evaluator_carbon_g': 18279.593182893208, 'relative_difference': 0.0}
+  [PASS] optimized_schedule_valid_under_evaluator  {'violations': []}
+
+Results written to results/consolidated6/least_loaded_base18_free_optimize_cp/

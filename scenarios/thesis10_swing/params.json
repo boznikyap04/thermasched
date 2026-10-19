@@ -1,0 +1,131 @@
+{
+  "scenario": "thesis10_swing",
+  "settings": {
+    "seed": 42,
+    "dt_seconds": 300,
+    "periods": 288,
+    "start_hour_local": 6,
+    "n_servers": 10,
+    "freq_mhz": [
+      2100.0,
+      2400.0,
+      3000.0
+    ],
+    "freq_split": [
+      4,
+      3,
+      3
+    ],
+    "n_zones": 2,
+    "target_peak_load": 0.6,
+    "min_et_periods": 3,
+    "max_et_periods": 144,
+    "rt_share": 0.3,
+    "rt_slack_frac": 0.25,
+    "dt_slack_mult": 2.0,
+    "dt_slack_min": 24,
+    "dt_slack_max": 96,
+    "ci_mean_g_per_kwh": 621.73,
+    "ci_amplitude": 0.5
+  },
+  "constants_as_printed": {
+    "R_dvfs": 0.378,
+    "F_throttle": 0.622,
+    "T_max_server_C": 90.0,
+    "H_min_C": 10.0,
+    "c_pw": 4182.0,
+    "c_pa": 1.00643,
+    "T_dvfs_C": 75.0,
+    "T_throttle_C": 100.0,
+    "Q_crac_kW": 116.0,
+    "COP_crac_coeffs": [
+      0.0068,
+      0.0008,
+      0.458
+    ],
+    "T_crac_min_C": 18.0,
+    "T_crac_max_C": 27.0,
+    "FR_crac_min_m3s": 0.0,
+    "FR_crac_max_m3s": 6.56,
+    "Q_cp_kW": 0.3,
+    "T_cp_min_K": 293.15,
+    "T_cp_max_K": 313.1,
+    "FR_cp_min_Lmin": 0.05,
+    "FR_cp_max_Lmin": 0.35,
+    "P_cp_rated_as_printed_mW": 0.657,
+    "FR_cp_rated_Lmin": 0.264,
+    "T_max_zone_C": 32.0
+  },
+  "cold_plate": {
+    "flow_settings_Lmin": [
+      0.1,
+      0.15,
+      0.2,
+      0.25,
+      0.3
+    ],
+    "R_C_per_W": [
+      0.1543,
+      0.1143,
+      0.0943,
+      0.0843,
+      0.0793
+    ],
+    "water_density_kg_per_L": 1.0,
+    "source": "Thesis group, IE_Thesis_Master_Document.pdf (2026-10-14): R = (T_cpu,max - T_in) / P_cpu from Wang et al. (2026), Fig. 10(a), CPU 1, at 200 W. Flow is chosen from these settings; 0.05 and 0.35 L/min are only the limits of Eq. (47); 0.264 L/min is only the pump reference flow of Eq. (48) (0.657 mW, Wang and Tao 2025)."
+  },
+  "time": {
+    "dt_seconds": 300,
+    "T": 288,
+    "period_1_local_hour": 6,
+    "convention": "A_i = first period it may run; D_i = period by which it must be finished (CT_i = ST_i + ET_i <= D_i); AD_i = D_i - A_i - ET_base_i, Eq. (22) as an equality"
+  },
+  "work_rule": "ET_is = W_i / (C_req_i * f_s * DPF * dt): a workload is served by its own requested cores, not the whole server. ET_base_i uses f_ref.",
+  "f_ref_MHz": 2400.0,
+  "thermal_fit": "steady state T_cpu = T_inlet + th_a_C + th_R_C_per_W * P_IT; per period T[t] = alpha*T[t-1] + (1-alpha)*steady, alpha = th_alpha_5min. Fitted from UniMelb; not part of the thesis formulation.",
+  "assumed_not_from_data": [
+    "RT_i",
+    "D_i",
+    "zone",
+    "CT_s_cold_plate",
+    "n_cold_plates",
+    "f_s_MHz assignment",
+    "daily shape of CI_t",
+    "AV_st = 1 for all s, t",
+    "B_i = 0"
+  ],
+  "diagnostics": {
+    "I_workloads": 238,
+    "S_servers": 10,
+    "Z_zones": 2,
+    "T_periods": 288,
+    "Y_ist_binaries_inside_windows": 153020,
+    "catalogue_size_within_ET_limits": 240,
+    "fleet_cores": 640,
+    "peak_requested_vcpus": 168,
+    "peak_load_share_of_fleet": 0.263,
+    "peak_load_share_of_fastest_tier": 0.875,
+    "time_sensitive_workloads": 71,
+    "workloads_with_imputed_usage": 0,
+    "median_slack_periods_delay_tolerant": 24,
+    "W_per_MHz_spread_best_to_worst": 1.37,
+    "servers_thermally_capped_at_coldest_inlet": 5,
+    "servers_thermally_capped_at_warmest_inlet": 10,
+    "CI_min_max_g_per_kWh": [
+      355.52,
+      932.58
+    ],
+    "baseline_IT_energy_kWh": 42.27,
+    "baseline_idle_share_of_IT_energy": 0.884,
+    "baseline_IT_carbon_kg": 26.3,
+    "baseline_unplaced_or_late": 0
+  },
+  "variant_of": {
+    "scenario": "thesis10",
+    "changed": {
+      "settings": {
+        "ci_amplitude": 0.5
+      }
+    }
+  }
+}

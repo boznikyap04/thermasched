@@ -438,7 +438,7 @@ def test_cold_plate_settings_checked():
 # ---------------------------------------------------------------------------
 
 @pytest.mark.parametrize("name,e_it,carbon_kg", [
-    ("small", 4.45, 2.82), ("base", 26.27, 16.33), ("thesis10", 42.27, 26.29)])
+    ("small", 4.45, 2.82), ("consolidated6", 26.27, 16.33), ("thesis10", 42.27, 26.29)])
 def test_reference_baseline_it_energy_and_carbon(name, e_it, carbon_kg):
     sc = load_scenario(name)
     ev = evaluate(sc, load_reference_baseline(name), constant_supply_temp(sc, 18.0),
@@ -450,10 +450,10 @@ def test_reference_baseline_it_energy_and_carbon(name, e_it, carbon_kg):
     assert ev.totals["n_noncompliant"] == 0 and ev.totals["n_unplaced"] == 0
 
 
-def test_base_thermal_and_cooling_numbers():
-    sc = load_scenario("base")
-    ref = load_reference_baseline("base")
-    st = RunSettings(scenario="base")
+def test_consolidated6_thermal_and_cooling_numbers():
+    sc = load_scenario("consolidated6")
+    ref = load_reference_baseline("consolidated6")
+    st = RunSettings(scenario="consolidated6")
     ev18 = evaluate(sc, ref, constant_supply_temp(sc, 18.0), st)
     ev27 = evaluate(sc, ref, constant_supply_temp(sc, 27.0), st)
     assert ev18.totals["hottest_T_C"] == pytest.approx(68.1, abs=0.1)

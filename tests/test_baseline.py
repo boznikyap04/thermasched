@@ -5,7 +5,7 @@ from scheduler.baseline import build_baseline, periods_needed
 from scheduler.io import load_reference_baseline, load_scenario
 from scheduler.types import Constants, RunSettings, Scenario, Server, Workload
 
-SCENARIOS = ("small", "base", "thesis10")
+SCENARIOS = ("small", "consolidated6", "thesis10", "thesis10_tight", "thesis10_swing", "thesis10_warm")
 
 
 def cpu_usage(sc, sched):

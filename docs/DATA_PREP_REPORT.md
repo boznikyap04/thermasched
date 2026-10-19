@@ -25,14 +25,17 @@ refer to the open questions in `PROJECT_CONTEXT.md`, section 7.
   `uv run jupyter-execute --inplace notebooks/data_prep.ipynb`. It runs in under a minute.
 - **Servers:** 45 of 81 UniMelb servers have a usable power curve and thermal response.
 - **Workloads:** 502 of 2,800 UFCG virtual machines qualify as finite workloads.
-- Three scenario instances were generated: `base` (tuned to make the model's trade-offs
-  visible), `thesis10` (the ten-server fleet the thesis text implies), and `small` (for
-  solver debugging).
+- The main scenario is `thesis10`, the ten-server fleet the thesis describes. Five
+  experiments are built from it, each changing one aspect: `consolidated6` (the same work on six
+  servers), `small` (for solver debugging), `thesis10_tight` (stricter deadlines),
+  `thesis10_swing` (a deeper daily carbon swing) and `thesis10_warm` (a wider CRAC supply
+  range).
 - Several questions the thesis leaves open had to be decided to make the data fit. All
   are listed in section 5, and all are single values in
   the Settings cell of `notebooks/data_prep.ipynb`.
 - Two findings matter for what the model will be able to show (section 8): idle power
-  is 82% of baseline IT energy, and the thesis still has no temperature equation.
+  is 88% of baseline IT energy in `thesis10`, and the thesis still has no temperature
+  equation.
 
 ---
 
@@ -180,7 +183,7 @@ VMs on unmonitored hosts can instead be kept with imputed usage. This is the
 `impute_unmonitored` switch in the Settings cell of `notebooks/data_prep.ipynb`, off by default. When it is on, each such
 VM takes the mean usage of a measured VM of the same flavor and similar lifetime, and is
 flagged `usage_imputed`. It recovers 239 workloads, 99 of them inside the scenario
-runtime limits. `base` then reaches its 60% load target with 330 workloads, 96 of them
+runtime limits. `consolidated6` then reaches its 60% load target with 330 workloads, 96 of them
 imputed.
 
 **Parameters derived per workload**
@@ -246,52 +249,80 @@ Two consequences worth knowing:
 Built by `data_prep.ipynb` part 3 into `scenarios/<name>/`. Arrivals across the whole
 year are pooled into one day, keeping each workload's time of day, because cleaned
 workloads arrive at only about 1.4 per day. Workloads are drawn in seeded random order
-until peak requested vCPUs reach 60% of fleet cores or the catalogue runs out. In all
-three scenarios the catalogue ran out first.
+until peak requested vCPUs reach 60% of fleet cores or the catalogue runs out. In every
+scenario the catalogue ran out first.
 
-| | `base` | `thesis10` | `small` |
-|---|---|---|---|
-| Purpose | visible trade-offs | fleet as the thesis text implies | solver debugging |
-| Servers (2.1 / 2.4 / 3.0 GHz) | 6 (2 / 2 / 2) | 10 (4 / 3 / 3) | 3 (1 / 1 / 1) |
-| Workloads | 238 | 238 | 99 |
-| Time-sensitive workloads | 71 | 71 | 32 |
-| Horizon | 288 periods (24 h from 06:00) | 288 periods | 96 periods (12:00 to 20:00) |
-| Fleet cores | 384 | 640 | 192 |
-| Peak requested vCPUs | 168 | 168 | 66 |
-| Peak demand, share of fleet | 44% | 26% | 34% |
-| Peak demand, share of fastest tier | 131% | 88% | 103% |
-| Servers capped below full load at 18 °C inlet | 2 | 5 | 1 |
-| Servers capped below full load at 27 °C inlet | 6 | 10 | 3 |
-| Assignment binaries inside time windows | 91,812 | 153,020 | 6,762 |
-| Carbon intensity range (g/kWh) | 489 to 777 | 489 to 777 | 489 to 777 |
+**`thesis10` is the main scenario**: the data center as the thesis describes it, ten
+servers split 4 / 3 / 3 across 2.1 / 2.4 / 3.0 GHz (text beside Eq. 15). It is built
+first, and its results are the main results. Every other scenario is an **experiment**:
+thesis10 with one aspect changed, so its effect is read as the difference from thesis10.
+Each experiment's `params.json` records what it changes under `variant_of`.
+
+| Scenario | Changed from `thesis10` | Question it answers |
+|---|---|---|
+| `thesis10` | (main scenario) | |
+| `consolidated6` | 6 servers (2 / 2 / 2) | What happens when the same work runs on a consolidated fleet? |
+| `small` | 3 servers, 8 h from 12:00, shorter workloads and slack | None: solver checks and debugging |
+| `thesis10_tight` | 50% time-sensitive; delay-tolerant slack 1 × $ET^{base}_i$ within 30 min to 2 h | How much of the saving depends on how long workloads may wait? |
+| `thesis10_swing` | carbon-intensity daily swing ±50% of the mean, not ±25% | How much more is saved on a grid whose carbon intensity varies more over the day? |
+| `thesis10_warm` | CRAC supply air up to 32 °C, not 27 °C | How much does a wider cooling envelope save? |
+
+18 to 27 °C is the ASHRAE recommended supply range, and 32 °C is the top of its A1
+allowable range and the zone air limit $T^{max}_z$. A flat carbon intensity and regrouped
+cooling zones need no scenario of their own: they are run switches on thesis10
+(`--ci-flat`, `--zone-map`).
+
+| | `thesis10` | `consolidated6` | `small` | `thesis10_tight` | `thesis10_swing` | `thesis10_warm` |
+|---|---|---|---|---|---|---|
+| Servers (2.1 / 2.4 / 3.0 GHz) | 10 (4 / 3 / 3) | 6 (2 / 2 / 2) | 3 (1 / 1 / 1) | 10 (4 / 3 / 3) | 10 (4 / 3 / 3) | 10 (4 / 3 / 3) |
+| Workloads | 238 | 238 | 99 | 238 | 238 | 238 |
+| Time-sensitive workloads | 71 | 71 | 32 | 123 | 71 | 71 |
+| Median slack, delay-tolerant (periods) | 24 | 24 | 14 | 14 | 24 | 24 |
+| Horizon | 288 periods (24 h from 06:00) | 288 periods | 96 periods (12:00 to 20:00) | 288 periods | 288 periods | 288 periods |
+| Fleet cores | 640 | 384 | 192 | 640 | 640 | 640 |
+| Peak requested vCPUs | 168 | 168 | 66 | 168 | 168 | 168 |
+| Peak demand, share of fleet | 26% | 44% | 34% | 26% | 26% | 26% |
+| Peak demand, share of fastest tier | 88% | 131% | 103% | 88% | 88% | 88% |
+| Servers capped below full load at 18 °C inlet | 5 | 2 | 1 | 5 | 5 | 5 |
+| Servers capped below full load at the warmest inlet | 10 (27 °C) | 6 (27 °C) | 3 (27 °C) | 10 (27 °C) | 10 (27 °C) | 10 (32 °C) |
+| Assignment binaries inside time windows | 153,020 | 91,812 | 6,762 | 103,480 | 153,020 | 153,020 |
+| Carbon intensity range (g/kWh) | 489 to 777 | 489 to 777 | 489 to 777 | 489 to 777 | 356 to 933 | 489 to 777 |
 
 Only workloads with a baseline execution time of 3 to 144 periods are admitted (240 of
 the 502). Below 3 periods a VM did almost no work in its whole life; above 144 it
 cannot finish with slack inside a day.
 
-### 6.1 Why `base` uses six servers
+### 6.1 Why `consolidated6` is kept as an experiment
 
-The thesis text beside Eq. (15) implies ten servers. With this workload set, ten
-64-core servers would peak at 26% load, and demand would not even fill the fastest
-tier. Six servers put peak demand at 44% of the fleet and 131% of the fastest tier, so
-work must spill onto less efficient machines. The ten-server fleet is kept as
-`thesis10` for comparison.
+With this workload set, the ten servers of thesis10 peak at 26% load, and demand does not
+even fill the fastest tier, so the model can keep most work on efficient servers. Six
+servers put peak demand at 44% of the fleet and 131% of the fastest tier, so work must
+spill onto less efficient machines, and each server runs closer to its thermal limit.
+`consolidated6` shows how the results change when the same work runs on a consolidated
+fleet. It was the first scenario built, under the name `consolidated6`; it was renamed on
+2026-10-19 so that the name no longer suggests it is the main scenario. Older material in
+`archive/` still uses the old name.
 
-### 6.2 The `base` fleet
+### 6.2 The `thesis10` fleet
 
 | s | Server | Zone | Frequency | Cold plate | $P^{idle}$ (W) | $P^{max}$ (W) | Max load at 18 °C / 27 °C inlet |
 |---|---|---|---|---|---|---|---|
-| 1 | qh2-rcc188 | 1 | 2.1 GHz | no | 144.2 | 312.0 | 100% / 74% |
-| 2 | qh2-rcc158 | 2 | 2.1 GHz | no | 158.7 | 352.3 | 100% / 76% |
-| 3 | qh2-rcc159 | 1 | 2.4 GHz | no | 158.7 | 360.0 | 100% / 68% |
-| 4 | qh2-rcc181 | 2 | 2.4 GHz | no | 152.9 | 361.9 | 95% / 63% |
-| 5 | qh2-rcc133 | 1 | 3.0 GHz | yes | 152.8 | 368.0 | 100% / 80% |
-| 6 | qh2-rcc138 | 2 | 3.0 GHz | yes | 126.6 | 368.0 | 93% / 61% |
+| 1 | qh2-rcc165 | 1 | 2.1 GHz | no | 164.8 | 328.3 | 100% / 94% |
+| 2 | qh2-rcc176 | 2 | 2.1 GHz | no | 158.3 | 344.0 | 100% / 92% |
+| 3 | qh2-rcc158 | 1 | 2.1 GHz | no | 158.7 | 352.3 | 100% / 76% |
+| 4 | qh2-rcc127 | 2 | 2.1 GHz | no | 151.9 | 358.0 | 88% / 61% |
+| 5 | qh2-rcc132 | 1 | 2.4 GHz | no | 160.6 | 358.8 | 82% / 58% |
+| 6 | qh2-rcc163 | 2 | 2.4 GHz | no | 155.2 | 360.0 | 93% / 70% |
+| 7 | qh2-rcc150 | 1 | 2.4 GHz | no | 157.4 | 368.0 | 100% / 76% |
+| 8 | qh2-rcc133 | 2 | 3.0 GHz | yes | 152.8 | 368.0 | 100% / 80% |
+| 9 | qh2-rcc183 | 1 | 3.0 GHz | yes | 153.1 | 380.5 | 87% / 60% |
+| 10 | qh2-rcc174 | 2 | 3.0 GHz | yes | 143.8 | 393.2 | 87% / 60% |
 
 "Max load" is the highest steady utilization that keeps the server at or under 80 °C
 (the 90 °C limit less the 10 °C headroom), using the fitted thermal response and
 ignoring cold plates. Servers were picked from the 45 eligible at evenly spaced points
-across the range of dynamic power, which avoids the extremes.
+across the range of dynamic power, which avoids the extremes. The experiments with ten
+servers use this fleet; `consolidated6` and `small` pick six and three servers by the same rule.
 
 ### 6.3 Reference schedule
 
@@ -299,14 +330,16 @@ Each scenario includes a thermally unaware baseline: every workload starts at ar
 on the least-loaded server with room. It supplies the existing assignment $X^0_{is}$
 and a figure to compare the model against.
 
-| | `base` | `thesis10` | `small` |
-|---|---|---|---|
-| IT energy (kWh) | 26.27 | 42.27 | 4.45 |
-| IT carbon (kg CO₂) | 16.33 | 26.29 | 2.82 |
-| Workloads late or unplaced | 0 | 0 | 0 |
+| | `thesis10` | `consolidated6` | `small` | `thesis10_tight` | `thesis10_swing` | `thesis10_warm` |
+|---|---|---|---|---|---|---|
+| IT energy (kWh) | 42.27 | 26.27 | 4.45 | 42.27 | 42.27 | 42.27 |
+| IT carbon (kg CO₂) | 26.29 | 16.33 | 2.82 | 26.29 | 26.30 | 26.29 |
+| Workloads late or unplaced | 0 | 0 | 0 | 0 | 0 | 0 |
 
 These cover server energy only, by Eq. (16), (20), (3), and (6). Cooling energy is not
-included, and the baseline ignores temperature entirely.
+included, and the baseline ignores temperature entirely. The three thesis10 experiments
+share thesis10's servers and workloads, so their reference schedules are the same; only
+the deadlines, the carbon profile or the cooling range differ.
 
 ---
 
@@ -346,9 +379,9 @@ end of `data_prep.ipynb`. There are no other automated tests in the repository.
 
 **Affecting what the model can show**
 
-1. **Idle power is 82% of baseline IT energy in `base`.** The model has no server
-   on/off variable, so idle draw is paid whatever the schedule is. Scheduling can only
-   move the remaining 18% plus cooling energy. Expect small percentage changes in the
+1. **Idle power is 88% of baseline IT energy in `thesis10`** (82% in `consolidated6`). The model
+   has no server on/off variable, so idle draw is paid whatever the schedule is.
+   Scheduling can only move the remaining 12% plus cooling energy. Expect small percentage changes in the
    objective unless a power-off decision is added to the model.
 2. **The thesis still has no temperature equation** (A1 to A3). The fitted thermal
    response is offered for it, but adopting it is a modelling decision that has not
@@ -368,7 +401,8 @@ end of `data_prep.ipynb`. There are no other automated tests in the repository.
    digits; the paper does not state the unit conversion itself.
 6. **Time-sensitive share and deadline rule** are invented for the scenario and have
    no empirical basis.
-7. **Six servers instead of ten** in `base` departs from the thesis text.
+7. **Six servers instead of ten** in the `consolidated6` experiment departs from the thesis
+   text on purpose; the main scenario, `thesis10`, follows it.
 
 **Data caveats**
 
@@ -383,7 +417,7 @@ end of `data_prep.ipynb`. There are no other automated tests in the repository.
 
 11. The optimization model, including the linearizations the thesis promises but does
     not contain (A5).
-12. Solver tractability is untested. `base` has about 92,000 assignment binaries
+12. Solver tractability is untested. `consolidated6` has about 92,000 assignment binaries
     inside time windows; whether that solves in reasonable time is unknown.
 13. Rolling-horizon state: every workload has $B_i = 0$ and every server is always
     available.
@@ -425,11 +459,11 @@ reflect this.
 **Time-sensitive flag made stable.** $RT_i$ used to be drawn from the same seeded
 random sequence as the workload draw order, so a workload's flag depended on its
 position in the shuffled catalogue. Any catalogue change reassigned it: after the fixes
-above, 101 of the 232 workloads in `base` both before and after had switched flag, and
+above, 101 of the 232 workloads in `consolidated6` both before and after had switched flag, and
 their deadlines moved with it. The flag is now a seeded hash of each workload's UFCG VM
-id. Tested by turning imputation on, which adds 92 workloads to `base` and renumbers
+id. Tested by turning imputation on, which adds 92 workloads to `consolidated6` and renumbers
 478 workload ids: none of the 234 workloads in both builds changed flag. This one-time
-change produced a new, equally random assignment (71 of 238 in `base`). The workload
+change produced a new, equally random assignment (71 of 238 in `consolidated6`). The workload
 set, peak load and reference energy are unchanged by it.
 
 The notebook's Eq. (14) check now uses the exact rounding bound per slot. The previous

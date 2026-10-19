@@ -49,8 +49,8 @@ def build_cell_for_data_prep() -> list[dict]:
     body = text.split(SOLVER_ONLY_MARKER)[0]
     # drop the module docstring and the __future__ import; a cell starts at the imports
     body = body[body.index("import csv"):].rstrip() + "\n"
-    head = ("# Generated from scheduler/build.py by tools/sync_notebooks.py. Edit that file, then\n"
-            "# run the script; changes made here are overwritten.\n")
+    # data_prep.ipynb is read on its own, so its copy names no file outside the notebook
+    head = "# Scenario construction rules: servers, workloads, carbon profile, baseline schedule.\n"
     return [_cell("scheduler/build.py", head + body)]
 
 

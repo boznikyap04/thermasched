@@ -4,9 +4,9 @@
     uv run python -m scheduler.run --scenario small --baseline-rule fastest_first --baseline-supply-temp 27
     uv run python -m scheduler.run --scenario small --cold-plates
     uv run python -m scheduler.run --scenario small --cold-plate-count 2
-    uv run python -m scheduler.run --scenario base --zone-map 1,1,1,2,2,2
-    uv run python -m scheduler.run --scenario base --cold-plates --cp-mode fixed
-    uv run python -m scheduler.run --scenario base --ci-flat
+    uv run python -m scheduler.run --scenario consolidated6 --zone-map 1,1,1,2,2,2
+    uv run python -m scheduler.run --scenario consolidated6 --cold-plates --cp-mode fixed
+    uv run python -m scheduler.run --scenario consolidated6 --ci-flat
 
 Both schedules are scored by the shared evaluator; only its numbers are compared.
 """

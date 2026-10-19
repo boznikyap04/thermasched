@@ -117,7 +117,8 @@ and run all cells again. The main groups:
 | `cfg["paths"]` | where the raw files are, where outputs go | file locations only |
 | `cfg["servers"]` | core-count regime, failed-sensor values, eligibility gates | `data/clean/servers.csv` |
 | `cfg["workloads"]` | slot length, dropped flavors, coverage and gap-filling limits, `impute_unmonitored` | `data/clean/workloads.csv`, `workload_usage.parquet` |
-| `base` and `cfg["scenario"]` | servers per scenario, speed split, horizon, load target, deadline slack, carbon intensity | `scenarios/base`, `thesis10`, `small` |
+| `thesis10` and `cfg["scenario"]` | the main scenario's fleet, horizon, load target, deadline slack and carbon intensity, then each experiment's changes to them | `scenarios/thesis10` and the experiments (`consolidated6`, `small`, `thesis10_tight`, `thesis10_swing`, `thesis10_warm`) |
+| `cfg["scenario_constants"]` | constants changed for one experiment only (`thesis10_warm`: CRAC supply up to 32 °C) | that experiment's `params.json` |
 | `cfg["constants"]`, `cfg["cold_plate"]` | thesis constants, cold-plate resistance table | each scenario's `params.json` |
 
 ## 4. What it writes
@@ -126,10 +127,13 @@ and run all cells again. The main groups:
 |---|---|---|
 | 1. Servers | `data/raw/UniMelb.csv` | `data/clean/servers.csv`, `cleaning_log_servers.csv` |
 | 2. Workloads | `data/raw/UFCG/servers_usage.csv`, `servers_specs.csv`, `flavors.csv` | `data/clean/workloads.csv`, `workload_usage.parquet`, `cleaning_log_workloads.csv` |
-| 3. Model inputs | the two cleaned tables | `scenarios/base/`, `scenarios/thesis10/`, `scenarios/small/`, by the rules in `scheduler/build.py` |
+| 3. Model inputs | the two cleaned tables | `scenarios/thesis10/` (the main scenario), then the experiments built from it: `scenarios/consolidated6/`, `small/`, `thesis10_tight/`, `thesis10_swing/`, `thesis10_warm/`, by the rules in `scheduler/build.py` |
 | 4. Checks | all outputs | nothing; every assertion must pass |
 
-Section 5 of the notebook describes every output column. Each scenario folder gets
+`thesis10` is the main scenario, the ten-server data center the thesis describes. Each
+other scenario is an experiment: thesis10 with one aspect changed, recorded under
+`variant_of` in its `params.json`. Section 3 of the notebook has a table of what each one
+changes and which question it answers. Section 5 describes every output column. Each scenario folder gets
 `servers.csv`, `workloads.csv`, `carbon.csv`, `baseline_schedule.csv` and `params.json`.
 `scenarios/small_running/` is not written by the notebook and is left alone: it is
 `small` with four workloads marked as already running and an `availability.csv` added
@@ -165,9 +169,9 @@ see [above](#where-the-notebooks-code-comes-from)), so it gives the same numbers
 `data/clean/` to build scenarios), not the raw data. On Colab, see
 [Google Colab](#google-colab).
 
-- **Scenario:** the first code cell starts with `SCENARIO`, the folder to solve. To build a new
-  one first, set `SCENARIO` to a new name and `BUILD_FROM` to an existing scenario (for example
-  `"small"`), then uncomment and edit values in `SCENARIO_CHANGES`, `CONSTANT_CHANGES` and
+- **Scenario:** the first code cell starts with `SCENARIO`, the folder to solve; it is
+  `thesis10`, the main scenario, by default. To build a new experiment first, set `SCENARIO`
+  to a new name and `BUILD_FROM` to an existing scenario (normally `"thesis10"`), then uncomment and edit values in `SCENARIO_CHANGES`, `CONSTANT_CHANGES` and
   `COLD_PLATE_CHANGES`. Every key is listed there with what it does. Section 1 writes
   `scenarios/<SCENARIO>/` and shows what changed and the new scenario's figures beside the
   starting one's (size, load, thermal caps, baseline carbon). Running again rebuilds it. The
@@ -177,8 +181,8 @@ see [above](#where-the-notebooks-code-comes-from)), so it gives the same numbers
   `RunSettings`, with the same names as the
   [command-line options](../scheduler/README.md#3-run-options)), plus a few notebook options.
   Change them and run all cells again.
-- **Run time:** the settings are the command-line defaults, so the solve on `small` runs for
-  the full 10-minute time limit. With `reassignment="none"`, a run takes a few seconds.
+- **Run time:** the settings are the command-line defaults, so the solve runs for the full
+  10-minute time limit (on `thesis10` as on `small`). With `reassignment="none"`, a run takes a few seconds.
 - **Output:** the run is written to `results/<scenario>/nb_<run name>/`, in the same layout as
   a command-line run, and the local dashboard shows it. The `nb_` prefix keeps it from
   overwriting a command-line run. Set `WRITE_RESULTS = False` to write nothing.

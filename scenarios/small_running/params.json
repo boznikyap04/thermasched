@@ -127,6 +127,6 @@
       "availability.csv: server 3 has AV = 0 in periods 37-48 (one hour of maintenance, Eq. 11)",
       "baseline_schedule.csv rebuilt with the least-loaded rule, which skips unavailable periods"
     ],
-    "purpose": "exercise Eq. (11) and (29), which are never binding in small/base/thesis10"
+    "purpose": "exercise Eq. (11) and (29), which are never binding in small/consolidated6/thesis10"
   }
 }

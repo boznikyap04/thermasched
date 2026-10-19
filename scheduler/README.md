@@ -36,16 +36,16 @@ Some common runs:
 
 ```sh
 # fast run: workloads stay on their baseline server, only timing and cooling change
-uv run python -m scheduler.run --scenario base --reassignment none
+uv run python -m scheduler.run --scenario consolidated6 --reassignment none
 
 # full model on the main scenario, 10-minute time limit (the default)
-uv run python -m scheduler.run --scenario base
+uv run python -m scheduler.run --scenario consolidated6
 
 # with cold plates on every server, and a custom output folder
-uv run python -m scheduler.run --scenario base --cold-plate-count 1 --run-name base_cp1
+uv run python -m scheduler.run --scenario consolidated6 --cold-plate-count 1 --run-name cp1
 
 # baseline only, no optimization
-uv run python -m scheduler.run --scenario base --baseline-only
+uv run python -m scheduler.run --scenario consolidated6 --baseline-only
 ```
 
 To run the same steps one at a time, with tables and charts in between, open
@@ -61,10 +61,17 @@ folders, and how to start a run from the browser.
 
 | Scenario | Servers | Workloads | Horizon | Use |
 |---|---|---|---|---|
+| `thesis10` | 10 (4/3/3 by speed) | 238 | 288 periods (24 h from 06:00) | **main scenario**: the 10-server fleet from the thesis text; main results |
+| `consolidated6` | 6 (2/2/2) | same as `thesis10` | 288 periods | experiment: the same work on a consolidated fleet (peak demand 44% of the fleet, not 26%) |
+| `thesis10_tight` | 10 | same as `thesis10` | 288 periods | experiment: 50% time-sensitive, delay-tolerant slack 30 min to 2 h (not 2 to 8 h) |
+| `thesis10_swing` | 10 | same as `thesis10` | 288 periods | experiment: carbon intensity swings ±50% over the day (not ±25%) |
+| `thesis10_warm` | 10 | same as `thesis10` | 288 periods | experiment: CRAC supply air up to 32 °C (not 27 °C) |
 | `small` | 3 | 99 | 96 periods (8 h, 12:00-20:00) | quick tests, debugging |
 | `small_running` | 3 | same as `small` | 96 periods | `small` with 4 workloads already running (B_i = 1) and server 3 down 15:00-16:00 (`availability.csv`), to exercise Eq. (11) and (29) |
-| `base` | 6 | 238 | 288 periods (24 h from 06:00) | main results |
-| `thesis10` | 10 (4/3/3 by speed) | same workloads as `base` | 288 periods | the 10-server fleet from the thesis text |
+
+`thesis10` is the main scenario; the others are built from it by `notebooks/data_prep.ipynb`,
+each changing one aspect, and record the change under `variant_of` in `params.json`. Read
+an experiment as the difference from thesis10 run with the same switches.
 
 One period is 5 minutes. Scenarios built in `notebooks/solver.ipynb` (see
 [Changing the inputs](#6-changing-the-inputs)) are folders here too, and run the same way.
@@ -114,9 +121,11 @@ Each run folder contains:
 
 ## 5. Thesis scenarios (Ch. 6)
 
+The thesis scenarios are run switches, applied to the main scenario (`--scenario thesis10`).
+
 | Scenario | Command switches |
 |---|---|
-| S1 base / T1 / T2 | default / `--zone-map 1,1,1,2,2,2` / `--reassignment same_zone` |
+| S1 base / T1 / T2 | default / `--zone-map 1,1,1,1,2,2,2,2,2,2` (the 2.1 GHz tier in zone 1, the faster tiers in zone 2) / `--reassignment same_zone` |
 | S2 T1 / T2 | `--cold-plates --cp-mode fixed` (CRAC optimized) / `--cold-plates --supply-temp-mode fixed` (cold plates optimized). Airflow is not modelled |
 | S3 | `--h-min <value>` |
 | S4 base / T1 / T3 | default / `--reassignment none` / `--ci-flat` or `--carbon-file <csv>`. T2 (thermal-blind reassignment) is not defined yet |
@@ -134,7 +143,7 @@ breaks a limit when the evaluator re-checks it.
   `baseline_schedule.csv` no longer matches. To keep it passing, copy the scenario to a new
   folder and regenerate it.
 - **A new scenario from an existing one:** in `notebooks/solver.ipynb`, set `SCENARIO` to a new
-  name and `BUILD_FROM` to the scenario to start from, and put the values to change in
+  name and `BUILD_FROM` to the scenario to start from (normally `thesis10`), and put the values to change in
   `SCENARIO_CHANGES` (fleet size, speed split, horizon, load target, deadlines, carbon
   intensity), `CONSTANT_CHANGES` (the thesis constants) or `COLD_PLATE_CHANGES`. The notebook
   writes `scenarios/<name>/` with its own `baseline_schedule.csv`, so every check passes, and
@@ -163,19 +172,19 @@ Keep the printed output of a long run with `... | tee logs/runs/<name>.log`.
 
 **Solving**
 
-- **Most full-model runs stop at the time limit, not at the optimum.** On `base` and
-  `thesis10` with `--reassignment free` or `same_zone`, the solver stops at 600 s with a
+- **Most full-model runs stop at the time limit, not at the optimum.** On `consolidated6`
+  and `thesis10` with `--reassignment free` or `same_zone`, the solver stops at 600 s with a
   gap of about 1-4%. The worst case so far is 26% on `thesis10 free`. Treat these results
   as good valid schedules with a proven bound, not as optima. Report the gap from
   `summary.json`.
 - **On the large scenarios the solver often doesn't improve on its starting schedule.**
   With `free` or `same_zone`, the model is first solved with workloads fixed to their
-  servers, and that schedule is used as the start. On `base` and `thesis10` with
+  servers, and that schedule is used as the start. On `consolidated6` and `thesis10` with
   `--supply-temp-mode optimize`, several runs stop at the time limit still on that start:
   the carbon is the same as `--reassignment none`, and no workload moves. When the solver
-  does get further, moving workloads helps: `small` moves 67 workloads, and `base` with
+  does get further, moving workloads helps: `small` moves 67 workloads, and `consolidated6` with
   `--h-min 15` moves 197 and solves to optimality.
-- **Results that stop at the time limit can be non-monotone.** For example, `base` with
+- **Results that stop at the time limit can be non-monotone.** For example, `consolidated6` with
   `--h-min 15` (a tighter limit) produced less carbon than `--h-min 5`, which stopped at
   the time limit. Compare scenarios only between runs that are optimal or have small
   gaps, or raise `--time-limit`.

@@ -11,7 +11,7 @@ from dashboard import data
 RUNS = data.discover_runs()
 BY_KEY = {r.key: r for r in RUNS}
 INFEASIBLE = "small/infeasible_demo_hmin20"
-BASE_FREE = "base/least_loaded_base18_free_optimize"
+CONSOLIDATED6_FREE = "consolidated6/least_loaded_base18_free_optimize"
 SMALL_FREE = "small/least_loaded_base18_free_optimize"
 FASTEST = "small/fastest_first_base27_free_optimize"
 
@@ -34,7 +34,7 @@ def loaded():
 def test_discovers_every_run_folder_with_a_summary():
     on_disk = sorted(p.parent for p in data.RESULTS_DIR.glob("*/*/summary.json"))
     assert [r.path for r in RUNS] == on_disk
-    assert {INFEASIBLE, BASE_FREE, SMALL_FREE, FASTEST} <= set(BY_KEY)
+    assert {INFEASIBLE, CONSOLIDATED6_FREE, SMALL_FREE, FASTEST} <= set(BY_KEY)
     assert RUNS == sorted(RUNS)
     assert all(r.key == f"{r.scenario}/{r.name}" for r in RUNS)
 
@@ -124,8 +124,8 @@ def test_unmodelled_columns_are_hidden(loaded, key):
 
 # -- time mapping --------------------------------------------------------------------
 
-def test_base_clock_covers_24_hours_from_6am(loaded):
-    run = loaded(BASE_FREE)
+def test_consolidated6_clock_covers_24_hours_from_6am(loaded):
+    run = loaded(CONSOLIDATED6_FREE)
     clock = run.clock
     assert len(clock) == 288 and clock["t"].tolist() == list(range(1, 289))
     # hour_local is the middle of each 5-minute period
@@ -165,8 +165,8 @@ def test_clock_without_carbon_csv(tmp_path):
 # -- names and derived views ---------------------------------------------------------
 
 def test_server_names_and_zones_from_scenario(loaded):
-    run = loaded(BASE_FREE)
-    servers = pd.read_csv(data.SCENARIOS_DIR / "base" / "servers.csv")
+    run = loaded(CONSOLIDATED6_FREE)
+    servers = pd.read_csv(data.SCENARIOS_DIR / "consolidated6" / "servers.csv")
     assert dict(zip(run.servers["s"], run.servers["name"])) == \
         dict(zip(servers["s"], servers["server"]))
     assert run.server_name(1) == "qh2-rcc188"
@@ -177,7 +177,7 @@ def test_server_names_and_zones_from_scenario(loaded):
 
 
 def test_savings_breakdown_adds_up(loaded):
-    run = loaded(BASE_FREE)
+    run = loaded(CONSOLIDATED6_FREE)
     sb = data.savings_breakdown(run)
     total_kg = run.summary["comparison"]["carbon_kg"]["diff"]
     assert sb["carbon_saved_kg"].sum() == pytest.approx(-total_kg, rel=1e-9)
@@ -190,7 +190,7 @@ def test_savings_breakdown_adds_up(loaded):
 
 
 def test_kpis_match_summary(loaded):
-    kpis = data.kpi_frame(loaded(BASE_FREE).summary).set_index("key")
+    kpis = data.kpi_frame(loaded(CONSOLIDATED6_FREE).summary).set_index("key")
     assert kpis.loc["carbon_kg", "pct"] == pytest.approx(-14.3145, abs=1e-3)
     assert kpis.loc["min_headroom_C", "better"] == "higher"
 
@@ -215,8 +215,8 @@ def test_throttling_and_checks(loaded):
     assert thr.loc["baseline", "periods_throttled"] == 60
     if run.has_optimized:
         assert thr.loc["optimized", "min_DPF"] < 1
-    assert data.throttled_servers(loaded(BASE_FREE)).empty
-    checks = data.checks_frame(loaded(BASE_FREE).summary)
+    assert data.throttled_servers(loaded(CONSOLIDATED6_FREE)).empty
+    checks = data.checks_frame(loaded(CONSOLIDATED6_FREE).summary)
     assert checks["passed"].tolist() == [True, True, True]
 
 

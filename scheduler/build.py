@@ -2,7 +2,8 @@
 
 ``build_scenario`` writes servers.csv, workloads.csv, carbon.csv, baseline_schedule.csv and
 params.json from a dict of scenario settings, the thesis constants and the cold-plate table.
-``notebooks/data_prep.ipynb`` calls it for the scenarios of its Settings cell.
+``notebooks/data_prep.ipynb`` calls it for the scenarios of its Settings cell: the main
+scenario ``thesis10`` and the experiments built from it.
 ``derive_scenario`` builds a new scenario from an existing one's params.json with some values
 changed, for ``notebooks/solver.ipynb``. It reads only data/clean/, not the raw datasets.
 
@@ -252,8 +253,10 @@ def build_scenario(name, sc, const, cold_plate, *, clean_dir, scenarios_dir, f_r
 # --- Only notebooks/solver.ipynb uses what follows: new scenarios from existing ones.
 # (tools/sync_notebooks.py copies the code above this line into notebooks/data_prep.ipynb.)
 
-# Written by data_prep.ipynb from its Settings cell. derive_scenario never overwrites them.
-SHIPPED_SCENARIOS = ("base", "thesis10", "small", "small_running")
+# Written by data_prep.ipynb from its Settings cell (small_running by hand from small).
+# derive_scenario never overwrites them.
+SHIPPED_SCENARIOS = ("thesis10", "consolidated6", "small", "thesis10_tight", "thesis10_swing", "thesis10_warm",
+                     "small_running")
 
 
 def _changed(base: dict, changes: dict | None, what: str) -> dict:

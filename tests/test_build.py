@@ -9,14 +9,41 @@ from scheduler.io import load_scenario
 FILES = ("servers.csv", "workloads.csv", "carbon.csv", "baseline_schedule.csv", "params.json")
 
 
-@pytest.mark.parametrize("name", ["small", "base", "thesis10"])
+@pytest.mark.parametrize("name", ["thesis10", "consolidated6", "small", "thesis10_tight", "thesis10_swing",
+                                  "thesis10_warm"])
 def test_build_reproduces_shipped_scenario(name, tmp_path):
     """The builder used by data_prep.ipynb writes the shipped scenarios byte for byte."""
     p = json.loads(open(f"scenarios/{name}/params.json").read())
+    extra = {"variant_of": p["variant_of"]} if "variant_of" in p else None
     build_scenario(name, p["settings"], p["constants_as_printed"], p["cold_plate"],
-                   clean_dir="data/clean", scenarios_dir=tmp_path, f_ref_mhz=p["f_ref_MHz"])
+                   clean_dir="data/clean", scenarios_dir=tmp_path, f_ref_mhz=p["f_ref_MHz"],
+                   extra=extra)
     for f in FILES:
         assert (tmp_path / name / f).read_bytes() == open(f"scenarios/{name}/{f}", "rb").read(), f
+
+
+def test_experiments_record_what_they_change_from_thesis10():
+    """Every shipped experiment is thesis10 with only the values under variant_of changed."""
+    main = json.loads(open("scenarios/thesis10/params.json").read())
+    assert "variant_of" not in main
+    for name in ("consolidated6", "small", "thesis10_tight", "thesis10_swing", "thesis10_warm"):
+        p = json.loads(open(f"scenarios/{name}/params.json").read())
+        assert p["variant_of"]["scenario"] == "thesis10"
+        changed = p["variant_of"]["changed"]
+        assert changed, name
+        assert p["settings"] == main["settings"] | changed.get("settings", {}), name
+        assert p["constants_as_printed"] == main["constants_as_printed"] | changed.get("constants", {}), name
+        assert p["cold_plate"] == main["cold_plate"], name
+
+
+def test_derive_from_an_experiment(tmp_path):
+    """An experiment written by data_prep.ipynb is a valid starting point in solver.ipynb."""
+    for name in ("thesis10_warm",):
+        shutil.copytree(f"scenarios/{name}", tmp_path / name)
+    out = derive_scenario("nb_warm_six", "thesis10_warm", {"n_servers": 6, "freq_split": [2, 2, 2]},
+                          scenarios_dir=tmp_path, clean_dir="data/clean")
+    assert out["params"]["constants_as_printed"]["T_crac_max_C"] == 32.0
+    assert load_scenario("nb_warm_six", tmp_path).S == 6
 
 
 @pytest.fixture

@@ -74,8 +74,9 @@ captures all of these links together.
 | CPU frequency $f_s$ | Li et al. (2026): 2.1 / 2.4 / 3.0 GHz, split 4 / 3 / 3 across 10 servers (Marahatta et al., 2021) | UniMelb has no frequency data |
 
 - Time step: Δt = 5 min.
-- Base case: 238 workloads. Each one was checked to fit on at least one server of the
-  six-server fleet. A 10-server fleet is also described.
+- Base case: the `thesis10` scenario, 238 workloads on the 10-server fleet of the thesis
+  text. Each workload fits on at least one server. Experiments built from it change one
+  aspect each; the six-server fleet (`consolidated6`) is one of them.
 - vCPU is matched to cores as 1 vCPU = 1 core. This still needs confirmation (§10).
 
 ### 5.2 Parameters (resolved values)
@@ -288,9 +289,9 @@ Results under `results/` were produced before these changes. They lack the new t
 and they were solved without priority and with $F^{throttle}$ = 0.662. Re-run them before
 using them in Ch. 4–6. The dashboard still reads them.
 
-**Results to check before running Ch. 6.** In the current base `free` run, nothing is
-reassigned (`n_reassigned` = 0). The hottest server peaks at 72.8 °C, below the 75 °C
-point where throttling starts, so min DPF = 1.0. As things stand, S1 and S4 would show
+**Results to check before running Ch. 6.** In the current `consolidated6` (formerly
+`base`) `free` run, nothing is reassigned (`n_reassigned` = 0). The hottest server peaks
+at 72.8 °C, below the 75 °C point where throttling starts, so min DPF = 1.0. As things stand, S1 and S4 would show
 no reassignment effect. In S3, $H^{min}$ starts to bind only above about 17 °C (a cap
 below 72.8 °C). Throttling cannot happen once $H^{min} \ge 15$ °C, because the cap is
 then at or below 75 °C. So S3's DPF and throttled-server metrics will probably stay at

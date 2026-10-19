@@ -119,5 +119,23 @@
     "baseline_idle_share_of_IT_energy": 0.844,
     "baseline_IT_carbon_kg": 2.82,
     "baseline_unplaced_or_late": 0
+  },
+  "variant_of": {
+    "scenario": "thesis10",
+    "changed": {
+      "settings": {
+        "periods": 96,
+        "start_hour_local": 12,
+        "n_servers": 3,
+        "freq_split": [
+          1,
+          1,
+          1
+        ],
+        "max_et_periods": 36,
+        "dt_slack_min": 12,
+        "dt_slack_max": 36
+      }
+    }
   }
 }

@@ -664,7 +664,7 @@ def _model_notes(scenario: Scenario, settings: RunSettings, built: _Built) -> li
     n = [
         "Y[i,s,t] is eliminated: a workload occupies n_min core periods after its start, "
         "U[t] - U[t-n_min], plus optional tail binaries E[i,s,t] only where n_max > n_min, because "
-        "the Y-based model made the root LP of 'base' unsolvable (500k rows).",
+        "the Y-based model made the root LP of 'consolidated6' unsolvable (500k rows).",
         "Start indicators S are replaced by cumulative 'started by t' steps U[i,s,t] (S = U[t] - "
         "U[t-1], X[i,s] is the last step), so one unbroken block needs no window sums.",
         "The tail E[t] <= U[t-n_min] - U[t-n_max] and E[t] <= E[t-1] + U[t-n_min] - U[t-n_min-1] keep "

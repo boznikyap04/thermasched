@@ -20,14 +20,16 @@ from scheduler.types import (
 )
 
 
-@pytest.mark.parametrize("name", ["small", "base", "thesis10", "small_running"])
+@pytest.mark.parametrize("name", ["small", "consolidated6", "thesis10", "thesis10_tight", "thesis10_swing",
+                                  "thesis10_warm", "small_running"])
 def test_least_loaded_reproduces_reference_baseline(name):
     sc = load_scenario(name)
     assert build_baseline(sc, RunSettings(scenario=name)) == load_reference_baseline(name)
 
 
-@pytest.mark.parametrize("name,kwh,kg", [("small", 4.45, 2.82), ("base", 26.27, 16.33),
-                                         ("thesis10", 42.27, 26.29)])
+@pytest.mark.parametrize("name,kwh,kg", [("small", 4.45, 2.82), ("consolidated6", 26.27, 16.33),
+                                         ("thesis10", 42.27, 26.29), ("thesis10_tight", 42.27, 26.29),
+                                         ("thesis10_swing", 42.27, 26.30), ("thesis10_warm", 42.27, 26.29)])
 def test_baseline_it_energy_and_carbon(name, kwh, kg):
     sc = load_scenario(name)
     st = RunSettings(scenario=name)
@@ -37,9 +39,9 @@ def test_baseline_it_energy_and_carbon(name, kwh, kg):
 
 
 @pytest.mark.parametrize("supply,hottest,cooling", [(18.0, 68.1, 9.8), (27.0, 73.4, 4.8)])
-def test_base_baseline_thermal_and_cooling(supply, hottest, cooling):
-    sc = load_scenario("base")
-    st = RunSettings(scenario="base", baseline_supply_temp_C=supply)
+def test_consolidated6_baseline_thermal_and_cooling(supply, hottest, cooling):
+    sc = load_scenario("consolidated6")
+    st = RunSettings(scenario="consolidated6", baseline_supply_temp_C=supply)
     ev = evaluate(sc, build_baseline(sc, st), constant_supply_temp(sc, supply), st)
     assert ev.totals["hottest_T_C"] == pytest.approx(hottest, abs=0.05)
     assert ev.totals["periods_above_cap"] == 0 and ev.T_C.max() < 80.0
@@ -168,8 +170,8 @@ def test_small_running_exercises_availability_and_running_workloads(tmp_path):
 
 
 def test_zone_map_and_carbon_overrides(tmp_path):
-    sc = load_scenario("base")
-    st, _ = parse_args(["--scenario", "base", "--zone-map", "1,1,1,2,2,2"])
+    sc = load_scenario("consolidated6")
+    st, _ = parse_args(["--scenario", "consolidated6", "--zone-map", "1,1,1,2,2,2"])
     assert st.zone_map == (1, 1, 1, 2, 2, 2)
     assert st.run_name == "least_loaded_base18_free_optimize_zones111222"
     sc2 = apply_overrides(sc, st)
@@ -180,7 +182,7 @@ def test_zone_map_and_carbon_overrides(tmp_path):
     with pytest.raises(ValueError, match="every zone"):
         apply_overrides(sc, RunSettings(zone_map=(1, 1, 1, 3, 3, 3)))
 
-    st, _ = parse_args(["--scenario", "base", "--ci-flat"])
+    st, _ = parse_args(["--scenario", "consolidated6", "--ci-flat"])
     assert st.run_name.endswith("_ciflat")
     flat = apply_overrides(sc, st).CI_g_per_kWh
     assert np.allclose(flat, sc.CI_g_per_kWh.mean())
@@ -190,7 +192,7 @@ def test_zone_map_and_carbon_overrides(tmp_path):
         w = csv.writer(f)
         w.writerow(["t", "CI_t_g_per_kWh"])
         w.writerows([t, 500.0 + t] for t in range(1, sc.T + 1))
-    st, _ = parse_args(["--scenario", "base", "--carbon-file", str(path)])
+    st, _ = parse_args(["--scenario", "consolidated6", "--carbon-file", str(path)])
     assert st.run_name.endswith("_ci-night")
     assert apply_overrides(sc, st).CI_g_per_kWh[0] == 501.0
     with pytest.raises(SystemExit):
