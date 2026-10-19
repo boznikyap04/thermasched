@@ -9,7 +9,7 @@
 --scenario thesis10 --reassignment same_zone --supply-temp-mode optimize
 --scenario thesis10 --reassignment free --supply-temp-mode optimize --cold-plates
 --scenario small --reassignment free --supply-temp-mode optimize
---scenario small --baseline-rule fastest_first --baseline-supply-temp 27 --reassignment free --supply-temp-mode optimize --time-limit 180
+--scenario small --baseline-rule fastest_first --baseline-supply-temp 27 --reassignment free --supply-temp-mode optimize --time-limit 180 --run-name fastest_first_base27_free_optimize
 --scenario consolidated6 --reassignment none --supply-temp-mode fixed
 --scenario consolidated6 --reassignment none --supply-temp-mode optimize
 --scenario thesis10 --reassignment none --supply-temp-mode optimize

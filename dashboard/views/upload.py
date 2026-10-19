@@ -76,14 +76,14 @@ def _uploaded_list() -> None:
 
 def render() -> None:
     st.title("Upload results")
-    st.caption("Open run folders shared as .zip files. Uploads are only visible in this "
-               "browser tab and are not saved to `results/`; they are gone when you close "
-               "or reload the tab.")
+    st.caption("Open run folders shared as .zip files, such as the zips the solver and "
+               "batch notebooks write to `exports/`. Uploads are only visible in this browser "
+               "tab and are not saved; they are gone when you close or reload the tab.")
+    st.info("**To keep a run on this site for everyone**, send its zip to the project "
+            "owner, who adds it to the site's results.", icon=":material/forward_to_inbox:")
     if not state.discover_runs():
         st.info(f"There are no runs under `{data.RESULTS_DIR}` yet. Upload a zipped run "
-                "folder here, or create one from the command line and press "
-                "**Reload results**:", icon="📭")
-        st.code("uv run python -m scheduler.run --scenario small", language="sh")
+                "folder here.", icon="📭")
 
     files = st.file_uploader("Zipped run folders", type="zip", accept_multiple_files=True,
                              key=f"uploader_{st.session_state.get(UPLOADER_N, 0)}")

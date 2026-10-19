@@ -241,3 +241,30 @@ def test_unzipped_export_carries_its_scenario(tmp_path):
     assert run.servers["name"].tolist() == expected.servers["name"].tolist()
     assert run.period["clock"].tolist() == expected.period["clock"].tolist()
     assert run.period["clock"].iloc[0] == "12:02"
+
+
+# -- provenance ------------------------------------------------------------------------
+
+def test_runs_from_before_versioning_still_load():
+    """Older summary.json layouts keep opening: the archived runs predate 1.0.0."""
+    archived = data.discover_runs(data.REPO_ROOT / "archive" / "results_2026-10-13")
+    assert archived
+    for ref in archived:
+        run = data.load_run(ref.path)
+        assert run.provenance == {}
+        assert data.UNVERSIONED in data.provenance_caption(run.summary)
+        assert data.provenance_warnings(run.summary) == []
+
+
+def test_provenance_warnings():
+    from scheduler.build import scenario_fingerprint
+    here = scenario_fingerprint(data.SCENARIOS_DIR / "small")
+    summary = {"scenario": {"name": "small"},
+               "provenance": {"schema_version": 1, "thermasched_version": "1.0.0",
+                              "made_with": "notebook", "scenario_fingerprint": here}}
+    assert data.provenance_warnings(summary) == []
+    assert "in the notebook" in data.provenance_caption(summary)
+    other = {**summary, "provenance": {**summary["provenance"], "scenario_fingerprint": "0" * 12}}
+    assert "different build of `small`" in data.provenance_warnings(other)[0]
+    newer = {**summary, "provenance": {**summary["provenance"], "schema_version": 99}}
+    assert "newer" in data.provenance_warnings(newer)[0]

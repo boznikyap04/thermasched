@@ -18,7 +18,10 @@ import hashlib
 import json
 import math
 import random
+import shutil
 from pathlib import Path
+
+from scheduler.version import VERSION
 
 
 def read_csv_rows(path):
@@ -124,9 +127,9 @@ def carbon_profile(sc):
             for t, h in enumerate(hours)]
 
 
-def baseline_schedule(servers, workloads, sc):
+def baseline_schedule(servers, workloads, sc, unavailable=frozenset()):
     # Thermally unaware reference: each workload starts at arrival on the least-loaded
-    # server that has room.
+    # server that has room. `unavailable` holds (server, period) pairs with AV = 0, Eq. (11).
     T, dt = sc["periods"], sc["dt_seconds"]
     used = {s["s"]: [0] * (T + 2) for s in servers}
     sched = []
@@ -136,7 +139,8 @@ def baseline_schedule(servers, workloads, sc):
             for s in sorted(servers, key=lambda s: (used[s["s"]][start], s["s"])):
                 et = math.ceil(w["W_i_MHz_s"] / (w["C_req_i"] * s["f_s_MHz"] * dt))
                 span = range(start, start + max(1, et))
-                if span[-1] <= T and all(used[s["s"]][t] + w["C_req_i"] <= s["C_s_cores"] for t in span):
+                if span[-1] <= T and all(used[s["s"]][t] + w["C_req_i"] <= s["C_s_cores"]
+                                         and (s["s"], t) not in unavailable for t in span):
                     placed = (s, span)
                     break
             if placed:
@@ -244,16 +248,104 @@ def build_scenario(name, sc, const, cold_plate, *, clean_dir, scenarios_dir, f_r
                                   "daily shape of CI_t", "AV_st = 1 for all s, t", "B_i = 0"],
         "diagnostics": diag,
         **(extra or {}),
+        "built_with": {"thermasched": VERSION},
     }
     with open(out / "params.json", "w") as f:
         json.dump(params, f, indent=2)
     return servers, diag
 
 
+def build_running_variant(name, start_from, running_arrivals, outage, *, scenarios_dir):
+    """Write scenarios_dir/name/ as scenario ``start_from`` with some workloads already running
+    (B_i = 1 for those arriving in periods ``running_arrivals`` = [first, last], Eq. 29) and
+    one server down (``outage`` = {"server": s, "periods": [first, last]}, AV = 0, Eq. 11).
+    The baseline schedule is rebuilt by the same least-loaded rule, skipping the downtime."""
+    src, out = Path(scenarios_dir) / start_from, Path(scenarios_dir) / name
+    with open(src / "params.json") as f:
+        params = json.load(f)
+    T, dt = params["time"]["T"], params["time"]["dt_seconds"]
+    server_rows = read_csv_rows(src / "servers.csv")
+    rows = read_csv_rows(src / "workloads.csv")
+    servers = [{"s": int(r["s"]), "f_s_MHz": float(r["f_s_MHz"]), "C_s_cores": int(r["C_s_cores"])}
+               for r in server_rows]
+    workloads = [{"i": int(r["i"]), "A_i": int(r["A_i"]), "D_i": int(r["D_i"]),
+                  "C_req_i": int(r["C_req_i"]), "W_i_MHz_s": float(r["W_i_MHz_s"])} for r in rows]
+
+    first, last = running_arrivals
+    running = [r for r in rows if first <= int(r["A_i"]) <= last]
+    for r in running:
+        r["B_i"] = 1
+    down_s, (t0, t1) = outage["server"], outage["periods"]
+    if not 1 <= down_s <= len(servers) or not 1 <= t0 <= t1 <= T:
+        raise ValueError(f"outage {outage} is outside the {len(servers)} servers or {T} periods")
+    down = {(down_s, t) for t in range(t0, t1 + 1)}
+    sched, _ = baseline_schedule(servers, workloads, {"periods": T, "dt_seconds": dt}, down)
+    for r, w in zip(rows, workloads):
+        r["X0_s"] = w.get("X0_s", "")
+
+    out.mkdir(parents=True, exist_ok=True)
+    for fname in ("servers.csv", "carbon.csv"):
+        shutil.copyfile(src / fname, out / fname)
+    write_csv(out / "workloads.csv", rows)
+    write_csv(out / "baseline_schedule.csv", sched)
+    write_csv(out / "availability.csv", [{"s": s, "t": t, "AV": 0} for s, t in sorted(down)])
+
+    params.pop("variant_of", None)
+    params.pop("built_with", None)
+    params["scenario"] = name
+    params["assumed_not_from_data"] = [
+        {"AV_st = 1 for all s, t": "AV_st (availability.csv)", "B_i = 0": "B_i (first arrivals)"}.get(a, a)
+        for a in params["assumed_not_from_data"]]
+    params["derived_from"] = {
+        "scenario": start_from,
+        "changes": [
+            f"B_i = 1 for the {len(running)} workloads arriving in periods {first}-{last} (already "
+            f"running at the start, so they keep their server, Eq. 29)",
+            f"availability.csv: server {down_s} has AV = 0 in periods {t0}-{t1} "
+            f"({(t1 - t0 + 1) * dt / 3600:g} h of maintenance, Eq. 11)",
+            "baseline_schedule.csv and X0_s rebuilt with the least-loaded rule, which skips "
+            "unavailable periods",
+        ],
+        "purpose": "exercise Eq. (11) and (29), which are never binding in the other scenarios",
+    }
+    params["built_with"] = {"thermasched": VERSION}
+    with open(out / "params.json", "w") as f:
+        json.dump(params, f, indent=2)
+    return sched
+
+
+# A scenario's inputs, in the order they enter its fingerprint.
+FINGERPRINT_FILES = ("params.json", "servers.csv", "workloads.csv", "carbon.csv",
+                     "baseline_schedule.csv", "availability.csv")
+
+
+def scenario_fingerprint(folder):
+    """Short hash of a scenario folder's inputs: equal fingerprints mean the same scenario.
+    params.json is compared by content without ``built_with``, and line endings are
+    ignored, so a rebuild with a newer release or on another system still matches.
+    None if the folder has no params.json."""
+    folder = Path(folder)
+    if not (folder / "params.json").is_file():
+        return None
+    h = hashlib.sha256()
+    for fname in FINGERPRINT_FILES:
+        path = folder / fname
+        if not path.is_file():
+            continue
+        if fname == "params.json":
+            params = json.loads(path.read_text())
+            params.pop("built_with", None)
+            data = json.dumps(params, sort_keys=True).encode()
+        else:
+            data = path.read_bytes().replace(b"\r\n", b"\n")
+        h.update(fname.encode() + b"\0" + data + b"\0")
+    return h.hexdigest()[:12]
+
+
 # --- Only notebooks/solver.ipynb uses what follows: new scenarios from existing ones.
 # (tools/sync_notebooks.py copies the code above this line into notebooks/data_prep.ipynb.)
 
-# Written by data_prep.ipynb from its Settings cell (small_running by hand from small).
+# Written by data_prep.ipynb from its Settings cell.
 # derive_scenario never overwrites them.
 SHIPPED_SCENARIOS = ("thesis10", "consolidated6", "small", "thesis10_tight", "thesis10_swing", "thesis10_warm",
                      "small_running")

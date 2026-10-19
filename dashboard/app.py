@@ -20,6 +20,7 @@ if str(ROOT) not in sys.path:
 import streamlit as st  # noqa: E402
 
 from dashboard import data, state  # noqa: E402
+from scheduler.version import VERSION  # noqa: E402
 from dashboard.views import (  # noqa: E402
     compare, compliance, cooling, energy, new_run, overview, schedule, thermal, upload,
 )
@@ -86,6 +87,7 @@ def main() -> None:
     runs = state.discover_runs()
     with st.sidebar:
         st.markdown("**ThermaSched** · pick a run")
+        st.caption(f"Release {VERSION}")
     if runs:
         _sidebar(runs)
 

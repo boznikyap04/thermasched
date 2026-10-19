@@ -153,6 +153,9 @@ def render() -> None:
                       f"{sc.get('Z', '?')} zones · {sc.get('T', '?')} periods of "
                       f"{run.dt_seconds / 60:g} min ({hours:g} h)")
     _settings_row(run)
+    st.caption(data.provenance_caption(run.summary))
+    for warning in data.provenance_warnings(run.summary):
+        st.warning(warning, icon=":material/difference:")
     st.space("small")
     if not run.has_optimized:
         _infeasibility(run)

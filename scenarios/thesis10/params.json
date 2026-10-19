@@ -119,5 +119,8 @@
     "baseline_idle_share_of_IT_energy": 0.884,
     "baseline_IT_carbon_kg": 26.29,
     "baseline_unplaced_or_late": 0
+  },
+  "built_with": {
+    "thermasched": "1.0.0"
   }
 }

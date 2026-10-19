@@ -45,7 +45,7 @@ def _work(job: Job, diagnosis_s: float) -> None:
     try:
         job.summary = run(job.settings, scenarios_dir=str(data.SCENARIOS_DIR),
                           results_dir=str(data.RESULTS_DIR), quiet=True,
-                          diagnosis_time_limit_s=diagnosis_s)
+                          diagnosis_time_limit_s=diagnosis_s, made_with="dashboard")
     except Exception:  # noqa: BLE001 - reported on the page
         job.error = traceback.format_exc()
     finally:

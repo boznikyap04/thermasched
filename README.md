@@ -40,7 +40,7 @@ The project has three parts, each with its own guide:
 | Part | What it does | Guide |
 |---|---|---|
 | **Cleaning notebook** | turns the raw datasets into cleaned tables and ready-to-solve scenarios | [`notebooks/README.md`](notebooks/README.md) |
-| **Solver** | builds the baseline, solves the MILP with HiGHS, writes the comparison to `results/`; also runs step by step in `notebooks/solver.ipynb` | [`scheduler/README.md`](scheduler/README.md) |
+| **Solver** | builds the baseline, solves the MILP with HiGHS, writes the comparison to `results/`; runs step by step in `notebooks/solver.ipynb`, or a list of runs in `notebooks/batch.ipynb` | [`scheduler/README.md`](scheduler/README.md) |
 | **Dashboard** | browser app to explore, compare and share the results | [`dashboard/README.md`](dashboard/README.md) |
 
 ```
@@ -49,7 +49,65 @@ raw data ──► notebooks/data_prep.ipynb ──► scenarios/ ──► sche
 
 The scenarios and a full set of results are already in the repository, so you can open
 the dashboard or run the solver right away. The cleaning notebook is only needed to
-change the data.
+change the data. From the raw data it rebuilds the scenarios in the repository byte for
+byte, and checks that it did (fingerprints, its section 4).
+
+## Delivery to the thesis group
+
+The thesis group gets the three notebooks and the link to the deployed dashboard (the
+"site"), not the repository:
+
+```
+raw data (4 files, ~4 GB, shared by hand)
+   │
+   ▼
+data_prep.ipynb ──► data/clean/, scenarios/        on their Google Drive (or laptop)
+   │
+   ▼
+solver.ipynb (one run) or batch.ipynb (a list) ──► results/, exports/<run>.zip
+   │
+   ▼
+site › Upload results ── the zip opens for that browser tab only
+   │
+   └── to keep a run on the site: they send the zip to the project owner, who unzips it
+       into results/ and pushes it to the release branch
+```
+
+Every scenario and run records the release that made it (`scheduler/version.py`), and every
+run records a fingerprint of the scenario it was solved on, so the site can tell runs from
+different releases or scenario builds apart.
+
+## Releasing an update
+
+The group works from a release, not from `main`. The site is deployed from the `release`
+branch, so work in progress on `main` never reaches them.
+
+1. Make the change on `main`. If it changes `scheduler/` or `dashboard/data.py`, `theme.py` or
+   `uploads.py`, run `uv run python tools/sync_notebooks.py`. If it changes how scenarios are
+   built, run `notebooks/data_prep.ipynb` too, then the sync again: it records the new
+   scenario fingerprints in the notebook.
+2. Raise the version in `pyproject.toml` and `scheduler/version.py` (`1.0.0` → `1.0.1` for a
+   fix, `1.1.0` for a change in the results), and add a section to `CHANGELOG.md` that says
+   what changed and what the group must re-run. If `summary.json` changed shape, raise
+   `SCHEMA_VERSION` and keep the dashboard reading the older layout.
+3. `uv run pytest` (it checks the notebooks, the version and the changelog), then commit.
+4. Publish:
+
+   ```sh
+   git tag v1.0.1 && git push origin main v1.0.1
+   git push origin main:release                     # the site redeploys from release
+   gh release create v1.0.1 notebooks/data_prep.ipynb notebooks/solver.ipynb \
+       notebooks/batch.ipynb --title "ThermaSched 1.0.1" --notes "<the CHANGELOG section>"
+   ```
+
+5. Tell the group: the release page has the new notebooks, and the changelog says what to
+   re-run.
+
+**Adding a run the group sent:** unzip it into `results/` (you get
+`results/<scenario>/<run>/summary.json`, with the scenario's `servers.csv` and `carbon.csv`
+next to the run folders), check it on the local dashboard, commit, and push `main` and
+`release`. The Overview page warns if it was solved on another scenario build than the one
+in `scenarios/`.
 
 ## Setup
 
@@ -74,14 +132,16 @@ Run every command from the repository root.
 
 ```
 .
-├── README.md                  this file: project summary and folder hierarchy
-├── pyproject.toml, uv.lock    dependencies (installed with `uv sync`)
+├── README.md                  this file: project summary, delivery, releases, folder hierarchy
+├── CHANGELOG.md               every release: what changed and what to re-run
+├── pyproject.toml, uv.lock    dependencies (installed with `uv sync`) and the version
 ├── .streamlit/config.toml     dashboard theme
 │
 ├── notebooks/                 DATA PREPARATION AND SOLVER NOTEBOOKS (self-contained; run on Colab too)
 │   ├── README.md              how to use the notebooks
 │   ├── data_prep.ipynb        raw data → data/clean/ and scenarios/; every setting is in its first cell
-│   └── solver.ipynb           build a scenario, then the solver step by step → results/ and exports/
+│   ├── solver.ipynb           build a scenario, then the solver step by step → results/ and exports/
+│   └── batch.ipynb            a list of runs (preset: the thesis scenarios) → results/ and one zip
 │
 ├── data/
 │   ├── raw/                   raw UniMelb and UFCG files (not in git, too large; see data/raw/README.md)
@@ -110,8 +170,9 @@ Run every command from the repository root.
 │   ├── baseline.py            baseline scheduling rules
 │   ├── optimize.py            MILP model (HiGHS) and infeasibility diagnosis
 │   ├── evaluate.py            scores any schedule against every limit
-│   ├── report.py              writes the result files
-│   └── types.py               shared data types and constants
+│   ├── report.py              writes the result files, with the run's provenance
+│   ├── types.py               shared data types and constants
+│   └── version.py             the release version and the summary.json layout version
 │
 ├── results/                   SOLVER OUTPUTS: results/<scenario>/<run-name>/ (the deployed dashboard shows these)
 │   └── <scenario>/<run>/      summary.json, comparison_period.csv, baseline/, optimized/
@@ -129,7 +190,7 @@ Run every command from the repository root.
 │   └── views/                 one file per page (overview, energy, thermal, cooling, ...)
 │
 ├── tests/                     automated tests (uv run pytest)
-├── tools/sync_notebooks.py    copies scheduler/ and dashboard/ code into the notebooks
+├── tools/sync_notebooks.py    copies the code, the version and the scenario fingerprints into the notebooks
 │
 ├── docs/                      DOCUMENTATION
 │   ├── PRD.md                 product requirements: what the model must do and output
@@ -156,6 +217,9 @@ Run every command from the repository root.
 - **Run a new scenario or setting:** see [`scheduler/README.md`](scheduler/README.md). To build
   a scenario with other settings or constants and solve it in one place, use
   [`notebooks/solver.ipynb`](notebooks/README.md#solver-notebook).
+- **Solve every thesis scenario in one go:** use
+  [`notebooks/batch.ipynb`](notebooks/README.md#batch-notebook).
+- **Ship an update to the thesis group:** see [Releasing an update](#releasing-an-update).
 - **Change the data or how scenarios are built:** see [`notebooks/README.md`](notebooks/README.md).
 - **Understand the model and its equations:** read
   [`docs/PROJECT_CONTEXT.md`](docs/PROJECT_CONTEXT.md); the known limitations of the

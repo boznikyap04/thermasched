@@ -127,5 +127,8 @@
         "T_crac_max_C": 32.0
       }
     }
+  },
+  "built_with": {
+    "thermasched": "1.0.0"
   }
 }

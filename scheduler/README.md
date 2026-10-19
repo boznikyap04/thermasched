@@ -29,8 +29,10 @@ uv run python -m scheduler.run --scenario small
 
 The run prints a summary and a list of checks, then writes its outputs to
 `results/<scenario>/<run-name>/`. If you don't pass `--run-name`, the name is built from
-the switches, for example `least_loaded_base18_free_optimize`. A run with the same name
-overwrites the old one.
+the switches, for example `least_loaded_base18_free_optimize`, with a suffix for every other
+switch that differs from its default (`_hmin15`, `_tl180`, `_gap0.01`, `_seed3` for the
+random rule, cold-plate values), so runs with different switches never share a folder. A
+run with the same name overwrites the old one.
 
 Some common runs:
 
@@ -71,7 +73,9 @@ folders, and how to start a run from the browser.
 
 `thesis10` is the main scenario; the others are built from it by `notebooks/data_prep.ipynb`,
 each changing one aspect, and record the change under `variant_of` in `params.json`. Read
-an experiment as the difference from thesis10 run with the same switches.
+an experiment as the difference from thesis10 run with the same switches. The notebook makes
+`small_running` from `small` (`build.build_running_variant`) and records it under
+`derived_from`.
 
 One period is 5 minutes. Scenarios built in `notebooks/solver.ipynb` (see
 [Changing the inputs](#6-changing-the-inputs)) are folders here too, and run the same way.
@@ -110,6 +114,12 @@ Each run folder contains:
 
 - `summary.json`: settings, totals (carbon, IT/CRAC/cold-plate energy, waits,
   temperatures), the baseline-vs-optimized comparison, solver status and gap, and checks.
+  Its `provenance` block says what made the run: the release (`scheduler/version.py`), the
+  layout version of the file (`schema_version`), where it was made (command line, notebook,
+  batch notebook, dashboard), when, the git commit for a run made in the repository, the
+  HiGHS version, and the **scenario fingerprint**, a hash of the scenario's input files
+  (`build.scenario_fingerprint`). Runs of one scenario are comparable only when their
+  fingerprints are equal; the dashboard warns when they are not.
 - `comparison_period.csv`: baseline and optimized values side by side for each period.
 - `baseline/` and `optimized/`: `schedule.csv`, per-period tables (`period.csv`,
   `server_period.csv`, `zone_period.csv`) and compliance tables (`compliance_servers.csv`,

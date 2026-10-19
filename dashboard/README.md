@@ -99,13 +99,13 @@ green for optimal, orange for time limit reached, red for infeasible or no solut
 
 | Page | What it shows |
 |---|---|
-| **Overview** | run settings, key results (carbon, energy, temperatures, late workloads) for optimized vs baseline, solver status and gap, self-checks, and the infeasibility diagnosis if there is no solution |
+| **Overview** | run settings, what made the run (release, notebook or command line, date, scenario build), key results (carbon, energy, temperatures, late workloads) for optimized vs baseline, solver status and gap, self-checks, and the infeasibility diagnosis if there is no solution. A warning shows if the run was solved on a different build of the scenario than this dashboard holds |
 | **Energy & Carbon** | carbon per period against grid carbon intensity, energy by component, cumulative carbon saved, and where the savings came from |
 | **Thermal** | temperature heatmap; per server over time: temperature, headroom (with H_min), CPU utilization, IT power and effective processing capability (PC_eff); throttling (DPF) |
 | **Cooling** | CRAC supply temperature and cooling load per zone, plus the supply range, ramp and capacity limits. With cold plates: coolant temperature next to the zone's supply air, coolant flow, and the cold-plate limits table. Cold-plate pump energy is on Energy & Carbon |
 | **Schedule** | Gantt chart of workloads per server for both schedules. You can filter by type or server, or show only reassigned workloads. The list of moved workloads can be downloaded as CSV |
 | **Compliance** | every limit per server, zone, cold plate and workload, plus the reassignment table (original and final zone, cross-zone moves, reason). Red cells break a limit |
-| **Compare runs** | every run of one scenario side by side: carbon saved and settings. The table can be downloaded as CSV |
+| **Compare runs** | every run of one scenario side by side: carbon saved, settings, release and scenario build. A warning shows if the runs were solved on more than one scenario build, since only runs of the same build are comparable. The table can be downloaded as CSV |
 
 Most charts are interactive. Hover for values, drag to zoom, and double-click to reset.
 The browser URL includes the selected run (`?run=<scenario>/<run-name>`), so you can
@@ -150,7 +150,12 @@ uploads (for that browser session only).
 owns the repository):
 
 1. *Create app* › *Yup, I have an app*.
-2. Repository `boznikyap04/thermasched`, branch `main`, main file path `dashboard/app.py`.
+2. Repository `boznikyap04/thermasched`, branch **`release`**, main file path
+   `dashboard/app.py`. The site follows the release branch, not `main`, so work in progress
+   never reaches the thesis group (see
+   [Releasing an update](../README.md#releasing-an-update)). If the app already runs from
+   `main` and its settings don't offer a branch change, delete it and deploy it again from
+   `release`.
 3. Under *Advanced settings*, keep Python 3.12 (the default) or later, then *Save*.
 4. Deploy. Community Cloud installs `dashboard/requirements.txt` (it looks next to
    `app.py` before the repository root, so the root `uv.lock` is not used): Streamlit,
@@ -163,15 +168,19 @@ The repository is private, so the app is private too: only you see it until you 
 viewers by email (*Share* at the top right of the app, or *App settings › Sharing*). A
 Community Cloud account can have only one private app at a time.
 
-**Add a run for good:**
+**Add a run for good** (the thesis group sends you zips for this; they can't commit):
 
-1. Make the run: `solver.ipynb` (locally or on Colab) writes
-   `exports/<scenario>__<run>.zip`; for a command-line run, use the *Download run (.zip)*
-   button in the local dashboard.
+1. Get the zip: `solver.ipynb` writes `exports/<scenario>__<run>.zip`, `batch.ipynb` writes
+   `exports/batch.zip`; for a command-line run, use the *Download run (.zip)* button in the
+   local dashboard.
 2. Unzip it into the repository's `results/` folder, so that you get
    `results/<scenario>/<run>/summary.json`, plus `results/<scenario>/servers.csv` and
    `carbon.csv`.
-3. Commit and push. Community Cloud redeploys the app with the new run within a few minutes.
+3. Open it on the local dashboard. If the Overview page warns that it was solved on a
+   different scenario build, it isn't comparable with the other runs of that scenario: ask
+   which settings or data were used before adding it.
+4. Commit and push `main`, then `git push origin main:release`. Community Cloud redeploys the
+   app with the new run within a few minutes.
 
 **Show a run for a while:** drop the zip on the deployed dashboard's *Upload results* page.
 Nothing is committed and only that browser tab sees it.

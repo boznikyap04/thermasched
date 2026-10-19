@@ -10,11 +10,16 @@ from __future__ import annotations
 import csv
 import json
 import math
+import platform
+import subprocess
+from datetime import datetime, timezone
+from importlib import metadata
 from pathlib import Path
 
 import numpy as np
 
 from .types import EvalResult, RunSettings, Scenario, Schedule, SolveResult
+from .version import SCHEMA_VERSION, VERSION
 
 AIRFLOW_TEXT = "not modelled"
 AIRFLOW_NOTE = "Airflow and fan power are not modelled (fan power and airflow are zero)."
@@ -356,11 +361,51 @@ def _solver_block(sr: SolveResult | None) -> dict | None:
     })
 
 
+def _git_commit() -> str | None:
+    """Commit of the code that made the run, with "+dirty" for uncommitted changes; None
+    outside a git checkout (the notebooks run a copy of the code)."""
+    here = Path(__file__).resolve().parent
+    try:
+        commit = subprocess.run(["git", "-C", str(here), "rev-parse", "--short", "HEAD"],
+                                capture_output=True, text=True, timeout=5)
+        if commit.returncode != 0:
+            return None
+        dirty = subprocess.run(["git", "-C", str(here), "status", "--porcelain",
+                                "--untracked-files=no", "--", "."],
+                               capture_output=True, text=True, timeout=5).stdout.strip()
+    except (OSError, subprocess.SubprocessError):
+        return None
+    return commit.stdout.strip() + ("+dirty" if dirty else "")
+
+
+def _package_version(name: str) -> str | None:
+    try:
+        return metadata.version(name)
+    except metadata.PackageNotFoundError:
+        return None
+
+
+def provenance(scenario: Scenario, made_with: str) -> dict:
+    """What made a run: the release, the scenario build it was solved on, and the solver.
+    Two runs are comparable when their scenario fingerprints are equal."""
+    return {
+        "schema_version": SCHEMA_VERSION,
+        "thermasched_version": VERSION,
+        "made_with": made_with,
+        "created_utc": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "git_commit": _git_commit(),
+        "scenario_fingerprint": scenario.fingerprint,
+        "scenario_built_with": scenario.built_with,
+        "highspy": _package_version("highspy"),
+        "python": platform.python_version(),
+    }
+
+
 def write_results(out_dir, scenario: Scenario, settings: RunSettings,
                   original_server: dict, baseline_schedule: Schedule, baseline_eval: EvalResult,
                   optimized_schedule: Schedule | None, optimized_eval: EvalResult | None,
                   solve_result: SolveResult | None, infeasibility: dict | None,
-                  checks: dict) -> dict:
+                  checks: dict, made_with: str = "command line") -> dict:
     out = Path(out_dir)
     out.mkdir(parents=True, exist_ok=True)
 
@@ -391,6 +436,7 @@ def write_results(out_dir, scenario: Scenario, settings: RunSettings,
                      "n_running": sum(w.B for w in scenario.workloads),
                      "n_unavailable_server_periods": int((scenario.availability() == 0).sum()),
                      "CI_mean_g_per_kWh": float(np.mean(scenario.CI_g_per_kWh))},
+        "provenance": provenance(scenario, made_with),
         "settings": settings.as_dict(),
         "model_note": model_note(settings),
         "cold_plates": _cold_plate_block(scenario, settings, baseline_eval),
@@ -451,6 +497,11 @@ def format_summary(summary: dict) -> str:
                  f"supply_temp_mode={st.get('supply_temp_mode')}, "
                  f"priority={'on' if st.get('priority', True) else 'off'}, "
                  f"thermal cap {summary.get('thermal_cap_C')} C")
+    pv = summary.get("provenance") or {}
+    if pv:
+        lines.append(f"Made with ThermaSched {pv.get('thermasched_version')} ({pv.get('made_with')}"
+                     + (f", commit {pv['git_commit']}" if pv.get("git_commit") else "")
+                     + f"), scenario fingerprint {pv.get('scenario_fingerprint')}")
     extra = []
     if st.get("zone_map"):
         extra.append(f"zone map {st['zone_map']}")

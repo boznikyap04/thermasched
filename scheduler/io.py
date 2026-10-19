@@ -13,6 +13,7 @@ from pathlib import Path
 
 import numpy as np
 
+from scheduler.build import scenario_fingerprint
 from scheduler.types import (
     ColdPlateSpec, Constants, Placement, RunSettings, Scenario, Schedule, Server, Workload,
 )
@@ -125,7 +126,8 @@ def load_scenario(name: str, scenarios_dir: str | Path = "scenarios") -> Scenari
 
     sc = Scenario(name=name, T=T, dt_seconds=dt, workloads=workloads, servers=servers,
                   n_zones=n_zones, CI_g_per_kWh=ci, constants=constants, cold_plate=cold_plate,
-                  AV=AV)
+                  AV=AV, fingerprint=scenario_fingerprint(d),
+                  built_with=params.get("built_with", {}).get("thermasched"))
     settings_dt = params.get("settings", {}).get("dt_seconds")
     if settings_dt is not None and float(settings_dt) != dt:
         raise ValueError(f"{d / 'params.json'}: time.dt_seconds={dt} does not match "

@@ -5,7 +5,7 @@ from __future__ import annotations
 import pandas as pd
 import streamlit as st
 
-from dashboard import charts, state
+from dashboard import charts, data, state
 
 
 def render() -> None:
@@ -24,6 +24,14 @@ def render() -> None:
         st.info("No runs for this scenario.")
         return
 
+    builds = sorted(df["scenario_build"].dropna().unique())
+    if len(builds) > 1:
+        st.warning(
+            f"These runs were solved on {len(builds)} different builds of `{scenario}` "
+            f"({', '.join(f'`{b}`' for b in builds)}). A build is made by one release from "
+            "one set of settings and data; savings are comparable only between runs of the "
+            "same build. See the *Scenario build* column.", icon=":material/difference:")
+
     st.subheader("Carbon saved")
     state.chart(charts.compare_saved(df, pal))
     st.subheader("Total carbon, baseline vs optimized")
@@ -34,6 +42,10 @@ def render() -> None:
     shown["H_min_C"] = shown["H_min_C"].map(lambda h: "default" if pd.isna(h) else f"{h:g}")
     st.dataframe(shown, hide_index=True, column_config={
         "run": st.column_config.TextColumn("Run", pinned=True),
+        "scenario_build": st.column_config.TextColumn(
+            "Scenario build", help="Fingerprint of the scenario inputs the run was solved on; "
+                                   f"`{data.UNKNOWN_BUILD}` for runs made {data.UNVERSIONED}."),
+        "version": "Release", "made_with": "Made with",
         "baseline_rule": "Baseline rule",
         "baseline_supply_C": st.column_config.NumberColumn("Baseline supply (°C)", format="%g"),
         "reassignment": "Reassignment", "supply_temp": "Supply temp.",

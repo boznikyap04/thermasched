@@ -113,19 +113,34 @@ def parse_args(argv=None) -> tuple[RunSettings, argparse.Namespace]:
 
 
 def default_run_name(settings: RunSettings) -> str:
-    """Run folder name built from the switches, e.g. ``least_loaded_base18_free_optimize``."""
-    st = settings
+    """Run folder name built from the switches, e.g. ``least_loaded_base18_free_optimize``.
+
+    Every switch that can change the result and differs from its default is in the name,
+    so two runs with different switches never share a folder."""
+    st, d = settings, RunSettings()
     fixed_temp = st.optimized_fixed_supply_temp_C()
+    cp_fixed = st.cold_plates and st.cp_mode == "fixed"
+    fixed_cp = (None if (st.fixed_cp_flow_Lmin, st.fixed_cp_coolant_C) == (None, None)
+                else st.optimized_fixed_cp())
+    cp_values = ((st.baseline_cp_flow_Lmin, st.baseline_cp_coolant_C)
+                 != (d.baseline_cp_flow_Lmin, d.baseline_cp_coolant_C))
     return "_".join([
         st.baseline_rule, f"base{st.baseline_supply_temp_C:g}", st.reassignment,
         st.supply_temp_mode if st.supply_temp_mode == "optimize" else f"fixed{fixed_temp:g}",
     ] + ([] if not st.cold_plates else
          ["cp" if st.cold_plate_count is None else f"cp{st.cold_plate_count}"])
-      + (["cpfixed"] if st.cold_plates and st.cp_mode == "fixed" else [])
+      + ([f"bcp{st.baseline_cp_flow_Lmin:g}-{st.baseline_cp_coolant_C:g}"]
+         if st.cold_plates and cp_values else [])
+      + ([] if not cp_fixed else
+         ["cpfixed" if fixed_cp is None else f"cpfixed{fixed_cp[0]:g}-{fixed_cp[1]:g}"])
       + (["noprio"] if not st.priority else [])
       + ([f"zones{''.join(map(str, st.zone_map))}"] if st.zone_map else [])
       + (["ciflat"] if st.ci_flat else [])
-      + ([f"ci-{Path(st.carbon_file).stem}"] if st.carbon_file else []))
+      + ([f"ci-{Path(st.carbon_file).stem}"] if st.carbon_file else [])
+      + ([f"hmin{st.H_min_C:g}"] if st.H_min_C is not None else [])
+      + ([f"seed{st.seed}"] if st.baseline_rule == "random" else [])
+      + ([f"tl{st.time_limit_s:g}"] if st.time_limit_s != d.time_limit_s else [])
+      + ([f"gap{st.mip_rel_gap:g}"] if st.mip_rel_gap != d.mip_rel_gap else []))
 
 
 def solve_staged(scenario, original, settings, base_sched, base_supply, warm_start, log):
@@ -209,7 +224,7 @@ def format_checks(checks: dict) -> str:
 
 def run(settings: RunSettings, *, scenarios_dir="scenarios", results_dir="results",
         baseline_only=False, warm_start=True, diagnosis_time_limit_s=120.0,
-        solver_log=False, quiet=False) -> dict:
+        solver_log=False, quiet=False, made_with="command line") -> dict:
     """Run one comparison and write its results. Returns the summary dict."""
     settings.validate()
     scenario = apply_overrides(load_scenario(settings.scenario, scenarios_dir), settings)
@@ -249,7 +264,8 @@ def run(settings: RunSettings, *, scenarios_dir="scenarios", results_dir="result
     out_dir = Path(results_dir) / settings.scenario / settings.run_name
     summary = write_results(
         out_dir, scenario, settings, original, base_sched, base_eval,
-        result.schedule if result else None, opt_eval, result, infeasibility, checks)
+        result.schedule if result else None, opt_eval, result, infeasibility, checks,
+        made_with=made_with)
     if not quiet:
         print(format_summary(summary))
         print("\n" + format_checks(checks))

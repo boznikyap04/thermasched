@@ -207,3 +207,28 @@ def test_switch_run_names():
     st, _ = parse_args(["--cold-plates", "--cp-mode", "fixed", "--fixed-cp-flow", "0.2",
                         "--fixed-cp-coolant", "30"])
     assert st.optimized_fixed_cp() == (0.2, 30.0)
+
+
+def test_run_names_differ_for_every_switch_that_changes_the_result():
+    """A sweep over any one switch writes each run to its own folder."""
+    variants = [[], ["--h-min", "5"], ["--h-min", "15"], ["--time-limit", "120"],
+                ["--mip-gap", "0.01"], ["--baseline-rule", "random", "--seed", "1"],
+                ["--baseline-rule", "random", "--seed", "2"], ["--cold-plates"],
+                ["--cold-plates", "--baseline-cp-flow", "0.2"],
+                ["--cold-plates", "--cp-mode", "fixed"],
+                ["--cold-plates", "--cp-mode", "fixed", "--fixed-cp-flow", "0.2"]]
+    names = [parse_args(v)[0].run_name for v in variants]
+    assert len(set(names)) == len(names), names
+    assert names[1] == "least_loaded_base18_free_optimize_hmin5"
+
+
+def test_summary_records_provenance(tmp_path):
+    """Every run says which release made it and which scenario build it was solved on."""
+    from scheduler.version import SCHEMA_VERSION, VERSION
+    st = RunSettings(scenario="small", run_name="t", reassignment="none", time_limit_s=60.0)
+    pv = run(st, results_dir=tmp_path, quiet=True, made_with="notebook")["provenance"]
+    assert pv["schema_version"] == SCHEMA_VERSION and pv["thermasched_version"] == VERSION
+    assert pv["made_with"] == "notebook"
+    assert pv["scenario_fingerprint"] == load_scenario("small").fingerprint
+    assert pv["scenario_built_with"] == VERSION
+    assert pv["highspy"] and pv["created_utc"].endswith("Z")

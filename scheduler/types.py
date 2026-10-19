@@ -183,6 +183,8 @@ class Scenario:
     constants: Constants
     cold_plate: ColdPlateSpec = field(default_factory=ColdPlateSpec)
     AV: np.ndarray | None = None      # (S, T) 0/1 availability, Eq. (11); None: all 1
+    fingerprint: str | None = None    # build.scenario_fingerprint of the folder it was read from
+    built_with: str | None = None     # release that built the folder (params.json built_with)
 
     @property
     def I(self) -> int:

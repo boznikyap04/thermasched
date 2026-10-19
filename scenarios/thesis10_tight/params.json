@@ -130,5 +130,8 @@
         "dt_slack_max": 24
       }
     }
+  },
+  "built_with": {
+    "thermasched": "1.0.0"
   }
 }

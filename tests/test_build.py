@@ -3,7 +3,7 @@ import shutil
 
 import pytest
 
-from scheduler.build import build_scenario, derive_scenario
+from scheduler.build import build_running_variant, build_scenario, derive_scenario, scenario_fingerprint
 from scheduler.io import load_scenario
 
 FILES = ("servers.csv", "workloads.csv", "carbon.csv", "baseline_schedule.csv", "params.json")
@@ -83,3 +83,28 @@ def test_derive_does_not_overwrite_other_folders(scen_dir):
     (scen_dir / "mine").mkdir()
     with pytest.raises(ValueError, match="not built by derive_scenario"):
         derive_scenario("mine", "small", scenarios_dir=scen_dir, clean_dir="data/clean")
+
+
+def test_build_running_variant_reproduces_small_running(tmp_path):
+    """data_prep.ipynb makes small_running from small by rule, as shipped."""
+    shutil.copytree("scenarios/small", tmp_path / "small")
+    build_running_variant("small_running", "small", [3, 5], {"server": 3, "periods": [37, 48]},
+                          scenarios_dir=tmp_path)
+    for f in FILES + ("availability.csv",):
+        assert (tmp_path / "small_running" / f).read_bytes() == \
+            open(f"scenarios/small_running/{f}", "rb").read(), f
+
+
+def test_fingerprint_follows_content_not_release_or_line_endings(tmp_path):
+    shutil.copytree("scenarios/small", tmp_path / "a")
+    fp = scenario_fingerprint(tmp_path / "a")
+    assert fp == scenario_fingerprint("scenarios/small") == load_scenario("small").fingerprint
+    params = json.loads((tmp_path / "a" / "params.json").read_text())
+    params["built_with"] = {"thermasched": "9.9.9"}
+    (tmp_path / "a" / "params.json").write_text(json.dumps(params))
+    carbon = tmp_path / "a" / "carbon.csv"
+    carbon.write_bytes(carbon.read_bytes().replace(b"\r\n", b"\n"))
+    assert scenario_fingerprint(tmp_path / "a") == fp
+    carbon.write_bytes(carbon.read_bytes().replace(b"621", b"622", 1))
+    assert scenario_fingerprint(tmp_path / "a") != fp
+    assert scenario_fingerprint(tmp_path / "missing") is None

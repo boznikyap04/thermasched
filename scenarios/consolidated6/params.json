@@ -132,5 +132,8 @@
         ]
       }
     }
+  },
+  "built_with": {
+    "thermasched": "1.0.0"
   }
 }

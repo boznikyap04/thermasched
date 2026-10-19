@@ -19,6 +19,9 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
+from scheduler.build import scenario_fingerprint
+from scheduler.version import SCHEMA_VERSION, VERSION
+
 REPO_ROOT = Path(__file__).resolve().parents[1]
 RESULTS_DIR = Path(os.environ.get("THERMASCHED_RESULTS_DIR", REPO_ROOT / "results"))
 SCENARIOS_DIR = Path(os.environ.get("THERMASCHED_SCENARIOS_DIR", REPO_ROOT / "scenarios"))
@@ -220,6 +223,10 @@ class Run:
     @property
     def solver(self) -> dict:
         return self.summary.get("solver") or {}
+
+    @property
+    def provenance(self) -> dict:
+        return provenance(self.summary)
 
     @property
     def has_optimized(self) -> bool:
@@ -542,6 +549,49 @@ def throttled_servers(run: Run) -> pd.DataFrame:
             .agg(periods_throttled=("t", "size"), min_DPF=("DPF", "min")))
 
 
+UNVERSIONED = "before 1.0.0"     # runs made before summary.json had a provenance block
+UNKNOWN_BUILD = "unknown"
+
+
+def provenance(summary: dict) -> dict:
+    """summary.json's provenance block; empty for runs made before release 1.0.0."""
+    p = summary.get("provenance")
+    return p if isinstance(p, dict) else {}
+
+
+def provenance_caption(summary: dict) -> str:
+    """One line on what made a run: release, where, when, and the scenario build."""
+    p = provenance(summary)
+    if not p:
+        return (f"Made {UNVERSIONED}: this run records no release or scenario build, so it "
+                "cannot be checked against other runs.")
+    where = {"command line": "from the command line", "dashboard": "on the New run page"}.get(
+        p.get("made_with"), f"in the {p.get('made_with')}")
+    when = str(p.get("created_utc", "")).replace("T", " ").replace("Z", " UTC")
+    return (f"Made with ThermaSched {p.get('thermasched_version')} {where}"
+            + (f" on {when}" if when else "")
+            + (f" (commit {p['git_commit']})" if p.get("git_commit") else "")
+            + f" · scenario build `{p.get('scenario_fingerprint') or UNKNOWN_BUILD}`")
+
+
+def provenance_warnings(summary: dict, scenarios_dir: str | Path = SCENARIOS_DIR) -> list[str]:
+    """Reasons to be careful with a run: a newer summary layout than this dashboard reads,
+    or a scenario build that differs from the one in ``scenarios_dir``."""
+    p, out = provenance(summary), []
+    if int(p.get("schema_version", 0)) > SCHEMA_VERSION:
+        out.append(f"This run was made with ThermaSched {p.get('thermasched_version')}, newer "
+                   f"than this dashboard ({VERSION}). Some figures may be missing until the "
+                   "dashboard is updated.")
+    name = (summary.get("scenario") or {}).get("name")
+    run_fp = p.get("scenario_fingerprint")
+    here = scenario_fingerprint(Path(scenarios_dir) / name) if name and run_fp else None
+    if run_fp and here and run_fp != here:
+        out.append(f"This run was solved on a different build of `{name}` (run: `{run_fp}`, "
+                   f"this dashboard: `{here}`), for example one made with other settings or "
+                   "other data. Compare it only with runs of the same build.")
+    return out
+
+
 def compare_runs(runs: list[RunRef]) -> pd.DataFrame:
     """One row per run (summary.json only): settings, solver and key metrics."""
     rows = []
@@ -559,8 +609,12 @@ def compare_runs(runs: list[RunRef]) -> pd.DataFrame:
                   else "optimized")
         b_c, o_c = base.get("carbon_kg"), opt.get("carbon_kg")
         b_e, o_e = base.get("E_total_kWh"), opt.get("E_total_kWh")
+        pv = provenance(s)
         rows.append(dict(
             scenario=ref.scenario, run=ref.name,
+            scenario_build=pv.get("scenario_fingerprint") or UNKNOWN_BUILD,
+            version=pv.get("thermasched_version") or UNVERSIONED,
+            made_with=pv.get("made_with"),
             baseline_rule=st.get("baseline_rule"),
             baseline_supply_C=st.get("baseline_supply_temp_C"),
             reassignment=st.get("reassignment"), supply_temp=supply,

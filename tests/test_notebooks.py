@@ -6,7 +6,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tools"))
 import sync_notebooks  # noqa: E402
 
-NOTEBOOKS = ("notebooks/data_prep.ipynb", "notebooks/solver.ipynb")
+NOTEBOOKS = ("notebooks/data_prep.ipynb", "notebooks/solver.ipynb", "notebooks/batch.ipynb")
 
 
 def test_notebooks_hold_the_current_package_code():
@@ -38,3 +38,17 @@ def test_data_prep_names_nothing_outside_itself():
     found = [(i, line) for i, cell in enumerate(nb["cells"])
              for line in "".join(cell["source"]).split("\n") if outside.search(line)]
     assert not found, found
+
+
+def test_solver_notebooks_name_no_repository_file_or_command():
+    """The thesis group gets the notebooks and the site, not the repository: outside the
+    generated model code, the solver and batch notebooks point to no repository file, tool or
+    command line. They may name each other and the cleaning notebook."""
+    outside = re.compile(r"README|\.md\b|(?<!__init__)\.py\b|scheduler/|tools/|docs/|archive/|\buv (run|sync)\b|"
+                         r"pytest|--[a-z]+(-[a-z]+)*\b|command.line|repository")
+    for rel in ("notebooks/solver.ipynb", "notebooks/batch.ipynb"):
+        nb = json.loads(Path(rel).read_text())
+        found = [(i, line) for i, cell in enumerate(nb["cells"])
+                 if "generated_from" not in cell.get("metadata", {}).get("thermasched", {})
+                 for line in "".join(cell["source"]).split("\n") if outside.search(line)]
+        assert not found, (rel, found)
