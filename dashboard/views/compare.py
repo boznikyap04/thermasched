@@ -11,7 +11,7 @@ from dashboard import charts, data, state
 def render() -> None:
     pal = state.pal()
     runs = state.discover_runs()
-    scenarios = sorted({r.scenario for r in runs})
+    scenarios = sorted({r.scenario for r in runs}, key=data.scenario_order)
     current = st.session_state.get("scenario", scenarios[0])
     st.title("Compare runs")
     st.caption("Sensitivity analysis: how the switches of a run change what the optimizer "

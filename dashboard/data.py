@@ -69,13 +69,32 @@ class RunRef:
         return f"{self.scenario}/{self.name}"
 
 
+# Folders under results/ named "archive-<scenario>" hold runs set aside (made before release
+# 1.0.0). They are listed after the current scenarios; their summary.json still names the
+# real scenario, whose servers.csv and carbon.csv they use.
+ARCHIVE_PREFIX = "archive-"
+
+
+def is_archive(scenario: str) -> bool:
+    return scenario.startswith(ARCHIVE_PREFIX)
+
+
+def scenario_order(scenario: str) -> tuple:
+    """Current scenarios first, then the archived ones, each alphabetically."""
+    return is_archive(scenario), scenario
+
+
+def run_order(ref: RunRef) -> tuple:
+    return scenario_order(ref.scenario) + (ref.name,)
+
+
 def discover_runs(results_dir: str | Path = RESULTS_DIR) -> list[RunRef]:
     """Every ``<results_dir>/<scenario>/<run>/summary.json``, sorted by scenario and run."""
     root = Path(results_dir)
     if not root.is_dir():
         return []
-    return sorted(RunRef(p.parent.parent.name, p.parent.name, p.parent)
-                  for p in root.glob("*/*/summary.json"))
+    return sorted((RunRef(p.parent.parent.name, p.parent.name, p.parent)
+                   for p in root.glob("*/*/summary.json")), key=run_order)
 
 
 def load_summary(run_dir: str | Path) -> dict:

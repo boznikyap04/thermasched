@@ -14,6 +14,14 @@ run.
   section 4 shows which scenarios differ from before), then solve again. The site warns when
   a run was solved on a different scenario build than the one it holds.
 
+## 1.0.1 (2026-10-19)
+
+**Re-run:** nothing. Runs made with 1.0.0 stay valid: the scenarios and the model are unchanged.
+
+- The site lists the runs made before release 1.0.0 as `archive-<scenario>` (for example
+  `archive-thesis10`), after the current scenarios, so they are never compared with new runs.
+- A zip of an archived run holds it under its real scenario name.
+
 ## 1.0.0 (2026-10-19)
 
 First release to the thesis group.

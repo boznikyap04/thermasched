@@ -118,7 +118,13 @@ confirmation box.
 
 ## 4. Keep old results or view another folder
 
-To set old results aside without deleting them, move them into a dated folder under
+**On the site, next to the current runs:** rename the scenario folder under `results/` to
+`archive-<scenario>`, for example `results/archive-thesis10/`. Its runs are listed as their
+own scenario, after the current ones, and compared only with each other; the sidebar marks
+them as archived. They keep reading server names and clock times from the scenario named in
+their `summary.json`. The runs made before release 1.0.0 are kept this way.
+
+**Off the site:** to set old results aside without deleting them, move them into a dated folder under
 `archive/`, keeping the same `<scenario>/<run-name>/` structure:
 
 ```

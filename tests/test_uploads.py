@@ -11,9 +11,10 @@ import pytest
 from dashboard import data, uploads
 
 RUNS = {r.key: r for r in data.discover_runs()}
-KEY = "small/least_loaded_base18_free_optimize"
+KEY = "small/least_loaded_base18_free_optimize"          # as named by its summary.json
+SOURCE = "archive-small/least_loaded_base18_free_optimize"  # where it sits under results/
 
-pytestmark = pytest.mark.skipif(KEY not in RUNS, reason="no run outputs under results/")
+pytestmark = pytest.mark.skipif(SOURCE not in RUNS, reason="no run outputs under results/")
 
 
 def _zip(files: dict[str, bytes | str]) -> io.BytesIO:
@@ -26,7 +27,7 @@ def _zip(files: dict[str, bytes | str]) -> io.BytesIO:
 
 
 def _run_files(prefix: str) -> dict[str, bytes]:
-    ref = RUNS[KEY]
+    ref = RUNS[SOURCE]
     return {f"{prefix}{f.relative_to(ref.path).as_posix()}": f.read_bytes()
             for f in ref.path.rglob("*") if f.is_file()}
 
@@ -36,7 +37,7 @@ def _import(tmp_path, source, **kw):
 
 
 def test_round_trip_keeps_names_and_clock(tmp_path):
-    ref = RUNS[KEY]
+    ref = RUNS[SOURCE]
     blob = uploads.runs_zip([(ref, data.SCENARIOS_DIR)])
     names = zipfile.ZipFile(io.BytesIO(blob)).namelist()
     assert f"{KEY}/summary.json" in names and "small/servers.csv" in names

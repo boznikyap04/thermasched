@@ -203,9 +203,9 @@ Keep the printed output of a long run with `... | tee logs/runs/<name>.log`.
 - **No fallback when there is no valid schedule.** Every limit is a hard constraint. If
   the model is infeasible, the run says so and re-solves with each group of limits relaxed
   in turn (deadlines, thermal cap, capacity, cooling capacity, priority) to show which group
-  causes it (see `results/small/infeasible_demo_hmin20`). If the solver finds no schedule within
+  causes it (see `results/archive-small/infeasible_demo_hmin20`). If the solver finds no schedule within
   the time limit, the status is `no_solution`, which does not prove infeasibility (see
-  `results/small/fastest_first_base27_free_optimize`).
+  `results/archive-small/fastest_first_base27_free_optimize`).
 - **The baseline is not guaranteed to be valid.** A baseline with a warm supply
   temperature (for example 27 °C) can exceed the thermal cap. `summary.json` lists its
   violations.

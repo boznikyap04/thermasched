@@ -176,9 +176,21 @@ def _extract(zf: zipfile.ZipFile, info: zipfile.ZipInfo, target: Path) -> None:
         shutil.copyfileobj(src, dst)
 
 
+def _inputs_scenario(ref: RunRef) -> str:
+    """The scenario whose files a run uses: the name in its summary.json, which differs
+    from its folder for an archived run (``archive-<scenario>``)."""
+    try:
+        name = (json.loads((ref.path / "summary.json").read_text()).get("scenario") or {}).get("name")
+    except (OSError, ValueError, AttributeError):
+        name = None
+    return name or ref.scenario
+
+
 def runs_zip(runs: list[tuple[RunRef, Path]]) -> bytes:
     """Zip of ``(run, scenarios_dir)`` pairs laid out as ``<scenario>/<run>/...``.
 
+    ``<scenario>`` is the scenario named in the run's summary.json, so an archived run
+    (``archive-<scenario>/``) is zipped under its real scenario, where import puts it too.
     The scenario's servers.csv and carbon.csv are added as ``<scenario>/<file>`` so the
     zip shows server names and clock times on a machine without that scenario.
     """
@@ -186,13 +198,17 @@ def runs_zip(runs: list[tuple[RunRef, Path]]) -> bytes:
     added: set[str] = set()
     with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
         for ref, scenarios_dir in runs:
+            scenario = _inputs_scenario(ref)
+            if f"{scenario}/{ref.name}/" in added:      # an archived and a current run share a name
+                scenario = ref.scenario
+            added.add(f"{scenario}/{ref.name}/")
             for f in sorted(ref.path.rglob("*")):
                 if f.is_file() and not f.name.startswith("."):
                     rel = f.relative_to(ref.path).as_posix()
-                    zf.write(f, f"{ref.scenario}/{ref.name}/{rel}")
+                    zf.write(f, f"{scenario}/{ref.name}/{rel}")
             for fname in SCENARIO_FILES:
-                arc = f"{ref.scenario}/{fname}"
-                src = Path(scenarios_dir) / ref.scenario / fname
+                arc = f"{scenario}/{fname}"
+                src = Path(scenarios_dir) / _inputs_scenario(ref) / fname
                 if arc not in added and src.is_file():
                     zf.write(src, arc)
                     added.add(arc)

@@ -72,7 +72,7 @@ def uploaded_runs() -> list[data.RunRef]:
 
 def discover_runs() -> list[data.RunRef]:
     """Runs under results/ plus the runs uploaded in this session."""
-    return sorted(disk_runs() + uploaded_runs())
+    return sorted(disk_runs() + uploaded_runs(), key=data.run_order)
 
 
 def is_uploaded(ref: data.RunRef) -> bool:

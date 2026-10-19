@@ -75,6 +75,8 @@ def _sidebar(runs: list[data.RunRef]) -> None:
             st.sidebar.badge("summary.json unreadable", color="red")
         if ref.key in uploaded:
             st.sidebar.caption("📤 Uploaded in this session")
+        if data.is_archive(ref.scenario):
+            st.sidebar.caption("🗄️ Archived run, made before release 1.0.0")
         st.sidebar.download_button(
             "Download run (.zip)", data=lambda: state.run_zip([ref]),
             file_name=f"{ref.scenario}__{ref.name}.zip", mime="application/zip",

@@ -10,10 +10,10 @@ from dashboard import data
 
 RUNS = data.discover_runs()
 BY_KEY = {r.key: r for r in RUNS}
-INFEASIBLE = "small/infeasible_demo_hmin20"
-CONSOLIDATED6_FREE = "consolidated6/least_loaded_base18_free_optimize"
-SMALL_FREE = "small/least_loaded_base18_free_optimize"
-FASTEST = "small/fastest_first_base27_free_optimize"
+INFEASIBLE = "archive-small/infeasible_demo_hmin20"
+CONSOLIDATED6_FREE = "archive-consolidated6/least_loaded_base18_free_optimize"
+SMALL_FREE = "archive-small/least_loaded_base18_free_optimize"
+FASTEST = "archive-small/fastest_first_base27_free_optimize"
 
 pytestmark = pytest.mark.skipif(not RUNS, reason="no run outputs under results/")
 
@@ -88,7 +88,7 @@ def test_infeasible_run_derived_views(loaded):
 
 
 def test_compare_runs_handles_infeasible(loaded):
-    df = data.compare_runs([r for r in RUNS if r.scenario == "small"]).set_index("run")
+    df = data.compare_runs([r for r in RUNS if r.scenario == "archive-small"]).set_index("run")
     assert np.isnan(df.loc["infeasible_demo_hmin20", "carbon_saved_pct"])
     assert df.loc["infeasible_demo_hmin20", "status"] == "infeasible"
     assert df.loc["least_loaded_base18_free_optimize", "carbon_saved_pct"] > 0
@@ -228,7 +228,7 @@ def test_unzipped_export_carries_its_scenario(tmp_path):
 
     from dashboard import uploads
 
-    src = data.RESULTS_DIR / "small"
+    src = data.RESULTS_DIR / "archive-small"
     run_dir = next(p.parent for p in sorted(src.glob("*/summary.json")))
     ref = data.RunRef("small", run_dir.name, run_dir)
     zipfile.ZipFile(io.BytesIO(uploads.runs_zip([(ref, data.SCENARIOS_DIR)]))).extractall(
@@ -268,3 +268,21 @@ def test_provenance_warnings():
     assert "different build of `small`" in data.provenance_warnings(other)[0]
     newer = {**summary, "provenance": {**summary["provenance"], "schema_version": 99}}
     assert "newer" in data.provenance_warnings(newer)[0]
+
+
+def test_archived_scenarios_come_last_and_use_the_real_scenario(tmp_path):
+    """results/archive-<scenario>/ is listed after the current scenarios, and its runs read
+    server names and the clock from the scenario named in summary.json."""
+    import shutil
+    from dashboard.uploads import runs_zip
+    import zipfile, io
+    src = BY_KEY[SMALL_FREE].path
+    shutil.copytree(src, tmp_path / "small" / "new_run")
+    shutil.copytree(src, tmp_path / "archive-small" / "old_run")
+    refs = data.discover_runs(tmp_path)
+    assert [r.scenario for r in refs] == ["small", "archive-small"]
+    run = data.load_run(refs[1].path)
+    assert not run.servers["name"].str.startswith("server ").any()
+    names = zipfile.ZipFile(io.BytesIO(runs_zip([(refs[1], data.SCENARIOS_DIR)]))).namelist()
+    assert "small/old_run/summary.json" in names
+    assert "small/servers.csv" in names and "small/carbon.csv" in names
