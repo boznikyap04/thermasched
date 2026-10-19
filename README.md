@@ -196,7 +196,8 @@ Run every command from the repository root.
 │   ├── PRD.md                 product requirements: what the model must do and output
 │   ├── PROJECT_CONTEXT.md     full model specification, equations and every decision
 │   ├── DATA_PREP_REPORT.md    what the data cleaning found and decided
-│   └── references/            thesis source documents (PDF)
+│   └── references/            thesis source documents (PDF): NOT in the repository; the group's
+│                              unpublished work, kept locally only (ask the thesis group)
 │       ├── thesisb.pdf                    Base Run Model: source of truth for the equations
 │       ├── writeups_THIES4A-5.pdf         thesis write-up (Ch. I problem and scope, Ch. IV formulation)
 │       ├── Findings_10-11.pdf             group findings: full model and expected results

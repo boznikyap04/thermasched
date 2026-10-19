@@ -14,3 +14,7 @@ data/raw/*
 
 # Run zips written by notebooks/solver.ipynb (upload them, or unzip into results/)
 exports/
+
+# Thesis source documents: the group's unpublished manuscript and working papers. Kept
+# locally only, never committed (a public copy could match their thesis in Turnitin).
+docs/references/*.pdf
