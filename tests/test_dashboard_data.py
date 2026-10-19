@@ -33,9 +33,11 @@ def loaded():
 
 def test_discovers_every_run_folder_with_a_summary():
     on_disk = sorted(p.parent for p in data.RESULTS_DIR.glob("*/*/summary.json"))
-    assert [r.path for r in RUNS] == on_disk
+    assert sorted(r.path for r in RUNS) == on_disk
     assert {INFEASIBLE, CONSOLIDATED6_FREE, SMALL_FREE, FASTEST} <= set(BY_KEY)
-    assert RUNS == sorted(RUNS)
+    assert RUNS == sorted(RUNS, key=data.run_order)        # current scenarios, then archives
+    archived = [data.is_archive(r.scenario) for r in RUNS]
+    assert archived == sorted(archived)
     assert all(r.key == f"{r.scenario}/{r.name}" for r in RUNS)
 
 

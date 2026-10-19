@@ -1,0 +1,17 @@
+--scenario thesis10
+--scenario thesis10 --zone-map 1,1,1,1,2,2,2,2,2,2
+--scenario thesis10 --reassignment same_zone
+--scenario thesis10 --cold-plates --cp-mode fixed
+--scenario thesis10 --cold-plates --supply-temp-mode fixed
+--scenario thesis10 --h-min 5
+--scenario thesis10 --h-min 15
+--scenario thesis10 --reassignment none
+--scenario thesis10 --ci-flat --time-limit 1800
+--scenario consolidated6
+--scenario consolidated6 --reassignment none
+--scenario thesis10_tight
+--scenario thesis10_tight --reassignment none
+--scenario thesis10_swing
+--scenario thesis10_swing --reassignment none
+--scenario thesis10_warm
+--scenario thesis10_warm --reassignment none
