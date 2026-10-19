@@ -1,4 +1,4 @@
-# Viewing results in the dashboard
+# Dashboard: viewing results
 
 The dashboard shows every model run saved under `results/`, plus any zipped runs you
 upload in the browser (*Upload results* page). It only reads files, except on the
@@ -6,7 +6,7 @@ optional *New run* page, which can start a run.
 
 ## 1. Start the dashboard
 
-From the repository root (after `uv sync`, see `README.md`):
+From the repository root (after `uv sync`, see the [main README](../README.md#setup)):
 
 ```sh
 uv run streamlit run dashboard/app.py
@@ -32,8 +32,8 @@ results/
 ```
 
 **If you ran the model yourself**, you don't need to do anything.
-`uv run python -m scheduler.run ...` (and the *New run* page) writes this structure for
-you.
+`uv run python -m scheduler.run ...` (see the [solver guide](../scheduler/README.md)) and the
+*New run* page write this structure for you.
 
 **If you got results from someone else** (for example a zip of a run made on another
 laptop), the easiest way is to open the **Upload results** page and drop the zip there
@@ -57,9 +57,9 @@ permanently instead:
 - **No scenario folder.** Putting the run directly in `results/my_run/` doesn't work.
   It must be inside a scenario folder.
 - **Scenario missing from `scenarios/`.** The dashboard reads the server names and the
-  clock times from `scenarios/<scenario>/`. If a run comes from a custom scenario,
-  copy that scenario's folder into `scenarios/` as well. Otherwise servers show as
-  "server 1, 2, ..." and the times may be wrong.
+  clock times from `scenarios/<scenario>/`, else from `servers.csv` and `carbon.csv` in
+  `results/<scenario>/`, next to the run folders (where an unzipped run zip puts them). If
+  neither has them, servers show as "server 1, 2, ..." and the clock starts at 00:00.
 
 **Sending your results to someone**: pick the run in the sidebar and press
 **Download run (.zip)**, or use **Download all these runs (.zip)** on *Compare runs* for
@@ -118,28 +118,63 @@ confirmation box.
 
 ## 4. Keep old results or view another folder
 
-To set old results aside without deleting them, move them into a dated folder, keeping
-the same `<scenario>/<run-name>/` structure:
+To set old results aside without deleting them, move them into a dated folder under
+`archive/`, keeping the same `<scenario>/<run-name>/` structure:
 
 ```
-results_archive/2026-10-13/base/least_loaded_base18_free_optimize/summary.json
+archive/results_2026-10-13/base/least_loaded_base18_free_optimize/summary.json
 ```
 
 To view any folder with that structure, point the dashboard at it:
 
 ```sh
 # macOS / Linux
-THERMASCHED_RESULTS_DIR=results_archive/2026-10-13 uv run streamlit run dashboard/app.py
+THERMASCHED_RESULTS_DIR=archive/results_2026-10-13 uv run streamlit run dashboard/app.py
 ```
 
 ```powershell
 # Windows PowerShell
-$env:THERMASCHED_RESULTS_DIR = "results_archive/2026-10-13"
+$env:THERMASCHED_RESULTS_DIR = "archive/results_2026-10-13"
 uv run streamlit run dashboard/app.py
 ```
 
 If the scenarios are stored somewhere other than `scenarios/`, set
 `THERMASCHED_SCENARIOS_DIR` the same way.
+
+## 5. Deploy on Streamlit Community Cloud
+
+The deployed dashboard shows the runs committed to `results/`, plus any zip a visitor
+uploads (for that browser session only).
+
+**Set up once** (at <https://share.streamlit.io>, signed in with the GitHub account that
+owns the repository):
+
+1. *Create app* › *Yup, I have an app*.
+2. Repository `boznikyap04/thermasched`, branch `main`, main file path `dashboard/app.py`.
+3. Under *Advanced settings*, keep Python 3.12 (the default) or later, then *Save*.
+4. Deploy. Community Cloud installs `dashboard/requirements.txt` (it looks next to
+   `app.py` before the repository root, so the root `uv.lock` is not used): Streamlit,
+   pandas, plotly and numpy only. The theme comes from `.streamlit/config.toml`.
+
+Without the solver installed, the *New run* page is not offered: runs are made with the
+notebook or the command line, not on the shared server.
+
+The repository is private, so the app is private too: only you see it until you invite
+viewers by email (*Share* at the top right of the app, or *App settings › Sharing*). A
+Community Cloud account can have only one private app at a time.
+
+**Add a run for good:**
+
+1. Make the run: `solver.ipynb` (locally or on Colab) writes
+   `exports/<scenario>__<run>.zip`; for a command-line run, use the *Download run (.zip)*
+   button in the local dashboard.
+2. Unzip it into the repository's `results/` folder, so that you get
+   `results/<scenario>/<run>/summary.json`, plus `results/<scenario>/servers.csv` and
+   `carbon.csv`.
+3. Commit and push. Community Cloud redeploys the app with the new run within a few minutes.
+
+**Show a run for a while:** drop the zip on the deployed dashboard's *Upload results* page.
+Nothing is committed and only that browser tab sees it.
 
 ## Troubleshooting
 
@@ -151,3 +186,4 @@ If the scenarios are stored somewhere other than `scenarios/`, set
 | Servers show as "server 1, 2, ..." | Add the run's scenario folder to `scenarios/` |
 | Optimized charts are empty | The run had no optimized schedule (infeasible, no solution, or `--baseline-only`). The Overview page explains why |
 | Port 8501 already in use | Another dashboard is running. Stop it, or add `--server.port 8502` to the command |
+| No *Enable New run page* toggle | The solver (`highspy`) is not installed, as on Community Cloud. Run `uv sync` for a local dashboard that can solve |

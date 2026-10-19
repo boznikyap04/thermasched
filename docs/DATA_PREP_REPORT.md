@@ -22,14 +22,15 @@ refer to the open questions in `PROJECT_CONTEXT.md`, section 7.
   usage rows). The earlier project notes were based on a partial skim.
 - One notebook, `data_prep.ipynb`, cleans both datasets and builds the scenarios. It is
   the project's only cleaning code. Run it top to bottom, or without opening it:
-  `uv run jupyter-execute --inplace data_prep.ipynb`. It runs in under a minute.
+  `uv run jupyter-execute --inplace notebooks/data_prep.ipynb`. It runs in under a minute.
 - **Servers:** 45 of 81 UniMelb servers have a usable power curve and thermal response.
 - **Workloads:** 502 of 2,800 UFCG virtual machines qualify as finite workloads.
 - Three scenario instances were generated: `base` (tuned to make the model's trade-offs
   visible), `thesis10` (the ten-server fleet the thesis text implies), and `small` (for
   solver debugging).
 - Several questions the thesis leaves open had to be decided to make the data fit. All
-  are listed in section 5, and all are single values in `config.toml`.
+  are listed in section 5, and all are single values in
+  the Settings cell of `notebooks/data_prep.ipynb`.
 - Two findings matter for what the model will be able to show (section 8): idle power
   is 82% of baseline IT energy, and the thesis still has no temperature equation.
 
@@ -39,8 +40,8 @@ refer to the open questions in `PROJECT_CONTEXT.md`, section 7.
 
 | Item | State before this work |
 |---|---|
-| `Data/UniMelb.csv` (613 MB) | Raw. Named by the thesis as the server dataset |
-| `UFCG/*.csv` (about 8 GB, 7 files) | Raw. Chosen by the project owner as the workload dataset, replacing Bitbrains |
+| `data/raw/UniMelb.csv` (613 MB) | Raw. Named by the thesis as the server dataset |
+| `data/raw/UFCG/*.csv` (about 8 GB, 7 files) | Raw. Chosen by the project owner as the workload dataset, replacing Bitbrains |
 | `old_notebook.ipynb` | Colab data preparation built around Bitbrains; no optimization code |
 | `PROJECT_CONTEXT.md` | Full model specification and a list of open questions; datasets only skimmed |
 
@@ -96,7 +97,7 @@ Four UFCG files (`servers_ownerships`, `user_projects`, `projects_quota`,
 
 ## 4. Cleaning as implemented
 
-### 4.1 Servers: `data_prep.ipynb` part 1 → `Data/clean/servers.csv`
+### 4.1 Servers: `data_prep.ipynb` part 1 → `data/clean/servers.csv`
 
 | Step | Before | After |
 |---|---|---|
@@ -148,7 +149,7 @@ server was fitted with a first-order response from consecutive 10-minute records
 The inlet coefficient is fixed at 1. A first attempt fitted it freely and got negative
 values on many servers, because inlet temperature barely varies in the data.
 
-### 4.2 Workloads: `data_prep.ipynb` part 2 → `Data/clean/workloads.csv`, `workload_usage.parquet`
+### 4.2 Workloads: `data_prep.ipynb` part 2 → `data/clean/workloads.csv`, `workload_usage.parquet`
 
 A workload is defined as **one VM whose whole life lies inside the trace**.
 
@@ -176,7 +177,7 @@ was running, so an outage does not count against a VM. Usage is clipped to 100% 
 vCPU. The kind of each slot is in the `fill` column of `workload_usage.parquet`.
 
 VMs on unmonitored hosts can instead be kept with imputed usage. This is the
-`impute_unmonitored` switch in `config.toml`, off by default. When it is on, each such
+`impute_unmonitored` switch in the Settings cell of `notebooks/data_prep.ipynb`, off by default. When it is on, each such
 VM takes the mean usage of a measured VM of the same flavor and similar lifetime, and is
 flagged `usage_imputed`. It recovers 239 workloads, 99 of them inside the scenario
 runtime limits. `base` then reaches its 60% load target with 330 workloads, 96 of them
@@ -211,7 +212,7 @@ workloads need fewer than 3 periods, and 99 need more than a full day.
 
 ## 5. Alignment decisions
 
-Each is one value in `config.toml`. None comes from the thesis; they are
+Each is one value in the Settings cell of `notebooks/data_prep.ipynb`. None comes from the thesis; they are
 project decisions and are also recorded in `PROJECT_CONTEXT.md`, section 10.
 
 | # | Question | Decision | Basis |
@@ -314,23 +315,22 @@ included, and the baseline ignores temperature entirely.
 | Path | Contents |
 |---|---|
 | `pyproject.toml` | Dependencies (DuckDB, NumPy), run through `uv` |
-| `config.toml` | Every decision and scenario setting, commented |
-| `data_prep.ipynb` | The cleaning and scenario pipeline, step by step, with outputs and checks |
-| `before_after_missing_data_fixes.ipynb` | Compares outputs before and after the 2026-10-10 fixes (section 10) |
-| `Data/archive/2026-10-09_before_missing_data_fixes/` | Cleaned tables and scenarios as they were before those fixes |
-| `Data/clean/servers.csv` | All 81 servers with parameters and an `eligible` flag |
-| `Data/clean/workloads.csv` | The 502 workloads |
-| `Data/clean/workload_usage.parquet` | $U^{CPU}_{it}$ for every workload and slot, with how each slot was filled |
-| `Data/clean/cleaning_log_*.csv` | Before and after counts for every cleaning step |
+| `notebooks/data_prep.ipynb` | The cleaning and scenario pipeline, step by step, with outputs and checks. Its first code cell holds every decision and scenario setting, commented |
+| `archive/notebooks/before_after_missing_data_fixes.ipynb` | Compares outputs before and after the 2026-10-10 fixes (section 10) |
+| `archive/data_2026-10-09_before_missing_data_fixes/` | Cleaned tables and scenarios as they were before those fixes |
+| `data/clean/servers.csv` | All 81 servers with parameters and an `eligible` flag |
+| `data/clean/workloads.csv` | The 502 workloads |
+| `data/clean/workload_usage.parquet` | $U^{CPU}_{it}$ for every workload and slot, with how each slot was filled |
+| `data/clean/cleaning_log_*.csv` | Before and after counts for every cleaning step |
 | `scenarios/<name>/servers.csv` | Chosen servers with zone, frequency, cold plate, thermal fit |
 | `scenarios/<name>/workloads.csv` | $A_i$, $D_i$, $AD_i$, $ET^{base}_i$, $RT_i$, $B_i$, $X^0$, $C^{req}_i$, $M^{req}_i$, $W_i$ |
 | `scenarios/<name>/carbon.csv` | $CI_t$ per period |
 | `scenarios/<name>/baseline_schedule.csv` | The reference schedule |
 | `scenarios/<name>/params.json` | Settings, thesis constants as printed, conventions, diagnostics |
-| `PROJECT_CONTEXT.md`, section 10 | The decisions in section 5, added to the project notes |
+| `docs/PROJECT_CONTEXT.md`, section 10 | The decisions in section 5, added to the project notes |
 
-To re-run: open `data_prep.ipynb` and run all cells, or
-`uv run jupyter-execute --inplace data_prep.ipynb`. Raw data files were not modified.
+To re-run: open `notebooks/data_prep.ipynb` and run all cells, or
+`uv run jupyter-execute --inplace notebooks/data_prep.ipynb`. Raw data files were not modified.
 The original Python package `dataprep/` was retired on 2026-10-10; the notebook
 replaces it and writes identical files.
 

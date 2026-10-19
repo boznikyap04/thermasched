@@ -218,3 +218,26 @@ def test_throttling_and_checks(loaded):
     assert data.throttled_servers(loaded(BASE_FREE)).empty
     checks = data.checks_frame(loaded(BASE_FREE).summary)
     assert checks["passed"].tolist() == [True, True, True]
+
+
+def test_unzipped_export_carries_its_scenario(tmp_path):
+    """A run export unzipped into results/ shows server names and clock times even when
+    the scenario is not in scenarios/ (a scenario built in a notebook elsewhere)."""
+    import io
+    import zipfile
+
+    from dashboard import uploads
+
+    src = data.RESULTS_DIR / "small"
+    run_dir = next(p.parent for p in sorted(src.glob("*/summary.json")))
+    ref = data.RunRef("small", run_dir.name, run_dir)
+    zipfile.ZipFile(io.BytesIO(uploads.runs_zip([(ref, data.SCENARIOS_DIR)]))).extractall(
+        tmp_path / "results")
+    empty = tmp_path / "scenarios"
+    empty.mkdir()
+
+    run = data.load_run(tmp_path / "results" / "small" / run_dir.name, empty)
+    expected = data.load_run(run_dir)
+    assert run.servers["name"].tolist() == expected.servers["name"].tolist()
+    assert run.period["clock"].tolist() == expected.period["clock"].tolist()
+    assert run.period["clock"].iloc[0] == "12:02"

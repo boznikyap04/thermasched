@@ -8,6 +8,7 @@ New run page is switched on in the sidebar), plus zipped runs uploaded in the br
 
 from __future__ import annotations
 
+import importlib.util
 import sys
 from pathlib import Path
 
@@ -26,6 +27,9 @@ from dashboard.views import (  # noqa: E402
 st.set_page_config(page_title="ThermaSched results", page_icon="🌡️", layout="wide")
 
 NEW_RUN_FLAG = "enable_new_run"
+# The New run page needs the solver (HiGHS). A deployment with only dashboard/requirements.txt
+# installed has no solver, so the page is not offered there.
+SOLVER_INSTALLED = importlib.util.find_spec("highspy") is not None
 
 
 def _sidebar(runs: list[data.RunRef]) -> None:
@@ -91,8 +95,9 @@ def main() -> None:
                      help="Re-scan results/ and drop cached data"):
             st.cache_data.clear()
             st.rerun()
-        st.toggle("Enable *New run* page", key=NEW_RUN_FLAG,
-                  help="Adds a page that solves a new run and writes it under results/.")
+        if SOLVER_INSTALLED:
+            st.toggle("Enable *New run* page", key=NEW_RUN_FLAG,
+                      help="Adds a page that solves a new run and writes it under results/.")
 
     upload_page = st.Page(upload.render, title="Upload results", icon=":material/upload:",
                           url_path="upload", default=not runs)
@@ -121,7 +126,7 @@ def main() -> None:
     else:
         state.OVERVIEW_PAGE = None
     pages["Files"] = [upload_page]
-    if st.session_state.get(NEW_RUN_FLAG):
+    if SOLVER_INSTALLED and st.session_state.get(NEW_RUN_FLAG):
         pages.setdefault("Solve", []).append(
             st.Page(new_run.render, title="New run", icon=":material/play_circle:",
                     url_path="new-run"))

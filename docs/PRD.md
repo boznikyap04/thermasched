@@ -267,7 +267,7 @@ G3–G12 were closed on 2026-10-18 except where marked; G1, G2 and S4 T2 wait on
 | G2 | CRAC airflow is not modeled (Eq. 41, 44, 45) | Open, blocked on §10.2 |
 | G3 | Priority ordering $O_{ij}$ (Eq. 56–57) | Done. Pairs with $O_{ij}=1$ come from (56) and (57). They are linked to the schedule by: on a shared server, j may not start while i waits ($A_i \le ST_j \Rightarrow ST_i \le ST_j$). Big-M rows over $ST_i$ in `optimize.py`; inversions are counted by the evaluator. On by default, `--no-priority` turns it off, and it is a family in the infeasibility diagnosis. EDF within a type is not in the equations, so it is not modelled. The thesis should state this link, because the PDF has none (PROJECT_CONTEXT A6) |
 | G4 | $AV_{st}$ (Eq. 11) and $B_i$ (Eq. 29) never tested | Done. Optional `availability.csv` (`s, t, AV`), enforced by the baseline, optimizer and evaluator. New scenario `small_running`: 4 running workloads and server 3 down 15:00–16:00. Check `running_workloads_not_reassigned`. A running workload keeps its server but may still be shifted in time (Eq. 29 fixes only the server) |
-| G5 | `F_throttle` 0.662 → 0.622 | Done in `config.toml`, `data_prep.ipynb` and every `params.json` |
+| G5 | `F_throttle` 0.662 → 0.622 | Done in `data_prep.ipynb` and every `params.json` |
 
 **Outputs (§8)**
 | # | Gap | Status |

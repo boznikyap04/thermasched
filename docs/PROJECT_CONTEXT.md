@@ -15,9 +15,9 @@ read of the sources below; equation pages were re-checked at higher zoom.
 | `thesisb.pdf` (25 pp., "Base Run Model") | **Source of truth** for the model | Every symbol, value, and equation in sections 2 to 4 is taken from it, cited as "tb p.N" |
 | `writeups_THIES4A-5.pdf`, Ch. I (PDF pp. 9-61) | Problem, scope, assumptions | Section 1 |
 | `writeups_THIES4A-5.pdf`, Ch. IV (PDF pp. 111-134, printed pp. 103-126) | Reasoning behind the formulation | Explanations only; **superseded** as a definition |
-| `old_notebook.ipynb` | Earlier implementation attempt | Cross-reference, section 8 |
-| `Data/UniMelb.csv` | **Server data** (decided, see below) | Section 9.1 |
-| `UFCG/*.csv` | **Workload data** (decided, see below) | Section 9.2 |
+| `archive/notebooks/old_notebook.ipynb` | Earlier implementation attempt | Cross-reference, section 8 |
+| `data/raw/UniMelb.csv` | **Server data** (decided, see below) | Section 9.1 |
+| `data/raw/UFCG/*.csv` | **Workload data** (decided, see below) | Section 9.2 |
 
 **Data decision (project owner, 2026-10-09): Bitbrains is scrapped. Servers come from
 UniMelb and workloads come from UFCG.** This is a project decision, not something either
@@ -1232,7 +1232,7 @@ only its UniMelb server-side work (server selection, idle and maximum power) is 
 relevant.
 
 What it does:
-- Loads the UniMelb combined dataset (same 18 columns as `Data/UniMelb.csv`; it reports
+- Loads the UniMelb combined dataset (same 18 columns as `data/raw/UniMelb.csv`; it reports
   2,748,525 rows and 81 servers, matching the file here) and selects 10 servers
   stratified by mean CPU load: 3 low, 4 medium, 3 high, seed 42, requiring 90% row
   completeness.
@@ -1275,7 +1275,7 @@ Other things to know:
 
 Skimmed for columns and basic shape only. Neither dataset has been validated.
 
-### 9.1 `Data/UniMelb.csv` (613 MB; 2,748,525 data rows)
+### 9.1 `data/raw/UniMelb.csv` (613 MB; 2,748,525 data rows)
 
 Physical server telemetry at 10-minute intervals, starting 2018-10-09. The notebook
 reports 81 servers. This is the dataset `thesisb.pdf` names.
@@ -1297,7 +1297,7 @@ reports 81 servers. This is the dataset `thesisb.pdf` names.
 Does not provide: CPU frequency (hence the literature values in (15)), any workload-level
 data, zone membership, or cooling equipment data.
 
-### 9.2 `UFCG/*.csv` (about 8 GB across seven files): the workload dataset
+### 9.2 `data/raw/UFCG/*.csv` (about 8 GB across seven files): the workload dataset
 
 An OpenStack cloud trace: virtual machine instances, their flavors, owners, and usage.
 In OpenStack terms a "server" is a VM, so **a UFCG `server_id` corresponds to a workload
@@ -1341,9 +1341,9 @@ UFCG only after the definitional questions in A10 are answered.
 
 ## 10. Data preparation as implemented (added 2026-10-09)
 
-`data_prep.ipynb` turns the raw datasets into model inputs (run all cells, or `uv run jupyter-execute --inplace data_prep.ipynb`). It replaced the `dataprep/` package on 2026-10-10.
-Every alignment decision is a commented value in `config.toml`; cleaned tables
-are in `Data/clean/` (with a log of what each step removed) and ready-to-solve instances
+`data_prep.ipynb` turns the raw datasets into model inputs (run all cells, or `uv run jupyter-execute --inplace notebooks/data_prep.ipynb`). It replaced the `dataprep/` package on 2026-10-10.
+Every alignment decision is a commented value in the notebook's Settings cell; cleaned tables
+are in `data/clean/` (with a log of what each step removed) and ready-to-solve instances
 in `scenarios/<name>/`. This section records the decisions that settle open questions
 above. They are project decisions, not statements from either PDF.
 
@@ -1355,18 +1355,18 @@ above. They are project decisions, not statements from either PDF.
 | $C_s$ and $C^{req}_i$ unit (D1) | cores; one vCPU occupies one core | |
 | E4, 10- to 5-minute adjustment | not needed | UniMelb supplies only static per-server parameters |
 | A10, what a workload is; C6, $T^W_i$ | one UFCG VM whose whole life is inside the trace; $T^W_i$ is its observed slots, gaps of up to 3 slots (interpolated), and collector-outage slots (at the VM's mean usage). Longer gaps while the collector was up are left out | 502 VMs survive cleaning |
-| Missing usage (`NA`, 22% of rows) | host-level: 26 of 102 UFCG hosts never report usage. Their VMs are dropped by default; same-flavor imputation is available behind `impute_unmonitored` in `config.toml`, and imputed workloads are flagged `usage_imputed` | Checked 2026-10-10. Other hosts are about 0.4% `NA` |
+| Missing usage (`NA`, 22% of rows) | host-level: 26 of 102 UFCG hosts never report usage. Their VMs are dropped by default; same-flavor imputation is available behind `impute_unmonitored` in the notebook's Settings cell, and imputed workloads are flagged `usage_imputed` | Checked 2026-10-10. Other hosts are about 0.4% `NA` |
 | A10, units of work | one vCPU at 100% = 2,400 MHz | UFCG reports percent of a vCPU |
 | B9 and E3, $ET^{base}_i$ | $W_i / (C^{req}_i \cdot f_{ref})$: a workload is served by its own requested cores | With (39) as printed most workloads finish in under one period |
 | B2, Eq. (22) | equality | |
 | B3, Eq. (36) lag | 12 periods (one hour at $\Delta t = 5$ min), not the printed 20. Applies for $t = 13,\dots,T$. The 3-period lag of Eq. (35) is unchanged | Confirmed by the thesis group, 2026-10-10 |
 | $D_i$, $RT_i$, zones, $CT_s$, which servers get which $f_s$, daily shape of $CI_t$ | generated by rule in `data_prep.ipynb` part 3; listed in each scenario's `params.json` under `assumed_not_from_data` | No dataset supplies them |
-| A1, temperature equation | $T^{pred}_{st} = \alpha_s T^{pred}_{s,t-1} + (1-\alpha_s)\,[CRAC^{temp}_{zt} + a_s + R_s(P^{IT}_{st} - Q^{cp,rem}_{st})]$ for the zone $z$ of $s$, with $T^{pred}_{s,0} = T^0_s$. $\alpha_s$, $a_s$, $R_s$ are the per-server fit in `servers.csv` | Approved by the thesis group, `Findings_10:11.pdf` (2026-10-12). Cited to Lin et al. (2024) |
-| A2, zone temperature | $T^{zone}_{zt} = CRAC^{temp}_{zt}$; CRAC supply air = server inlet air | Approved, `Findings_10:11.pdf` |
-| A3, heat balance | $Q^{crac,rem}_{zt} \ge \sum_s Z_{sz}(Q^{heat}_{st} - Q^{cp,rem}_{st})$. The group's second line reads $0 \le Q^{crac,rem}_{st} \le Q^{heat}_{st}$, probably meaning $Q^{cp,rem}$; not yet confirmed | Approved, `Findings_10:11.pdf` |
+| A1, temperature equation | $T^{pred}_{st} = \alpha_s T^{pred}_{s,t-1} + (1-\alpha_s)\,[CRAC^{temp}_{zt} + a_s + R_s(P^{IT}_{st} - Q^{cp,rem}_{st})]$ for the zone $z$ of $s$, with $T^{pred}_{s,0} = T^0_s$. $\alpha_s$, $a_s$, $R_s$ are the per-server fit in `servers.csv` | Approved by the thesis group, `Findings_10-11.pdf` (2026-10-12). Cited to Lin et al. (2024) |
+| A2, zone temperature | $T^{zone}_{zt} = CRAC^{temp}_{zt}$; CRAC supply air = server inlet air | Approved, `Findings_10-11.pdf` |
+| A3, heat balance | $Q^{crac,rem}_{zt} \ge \sum_s Z_{sz}(Q^{heat}_{st} - Q^{cp,rem}_{st})$. The group's second line reads $0 \le Q^{crac,rem}_{st} \le Q^{heat}_{st}$, probably meaning $Q^{cp,rem}$; not yet confirmed | Approved, `Findings_10-11.pdf` |
 | Cold-plate heat removal | Per server $s$ with $n_s$ plates and period $t$: $Q^{cp}_{st} \le n_s \cdot 0.3$ kW, $Q^{cp}_{st} \le Q^{heat}_{st}$, $Q^{cp}_{st} \le n_s (T^{pred}_{s,t-1} - CP^{temp}_{st}) / R^{cp}(CP^{flow}_{st})$ (all "$\le$"; previous period's temperature, $T^0_s$ in period 1). The evaluator takes the largest value these allow. $CP^{flow}_{st}$ is chosen from 0.10, 0.15, 0.20, 0.25, 0.30 L/min with $R^{cp}$ = 0.1543, 0.1143, 0.0943, 0.0843, 0.0793 °C/W; 0.05 and 0.35 L/min are only the limits of (47). Pump power (48) uses 0.657 **mW** at 0.264 L/min as its reference, and 0.264 L/min is not one of the settings. Coolant temperature is 20 to 39.95 °C (the printed kelvin values), water at 1 kg/L and $c_{pw}$ = 4182 J/(kg·°C), and the conductance is capped by the water's heat capacity rate. Plates per server: `n_cold_plates` in `servers.csv` (editable; 0 = none, which also gives $E^{cp} = 0$), or `--cold-plate-count N` for every server. Each plate is identical with its own pump. The baseline runs its plates at 0.30 L/min and 20 °C. Linearized with a one-hot flow choice and the temperature difference split across the settings. Off unless `--cold-plates` is passed | Thesis group, `IE_Thesis_Master_Document.pdf` and follow-up, 2026-10-14. $R^{cp}$ is from Wang et al. (2026), Fig. 10(a), CPU 1: $(T_{cpu,max} - T_{in})/P_{cpu}$ at 200 W. Pump power is from Wang and Tao (2025) |
-| Minimum cold-plate flow | 0.05 L/min. The parameter table's 0.005 is a typo. `config.toml`, `data_prep.ipynb` and the scenarios' `params.json` now say 0.05 | Thesis group, 2026-10-14; they will correct the table |
+| Minimum cold-plate flow | 0.05 L/min. The parameter table's 0.005 is a typo. `data_prep.ipynb` and the scenarios' `params.json` now say 0.05 | Thesis group, 2026-10-14; they will correct the table |
 | **FLAGGED**: cold-plate settings carry almost no cost | Pump power is at most about 1 mW per plate, and no equation charges energy for cooling the water. The optimizer therefore runs flow and coolant wherever they remove the most heat. Where the 0.3 kW limit or $Q^{heat}$ binds (88 of 96 periods on `small`), the reported flow and coolant values are arbitrary, so the expected "how the optimizer adjusts coolant temperature" output carries no information yet. **Decision:** explain this in the writeup and revisit after the first prototype, for example with a chiller or CDU energy term. Every cold-plate run prints this flag | Thesis group, 2026-10-14 |
-| Server on/off | Not modelled. All servers stay on for the whole horizon and draw idle power; Eq. (20) unchanged | Decided by the thesis group, `Findings_10:11.pdf` |
-| Infeasibility | All constraints are hard; no fallback. If no schedule satisfies them, the program reports that no solution exists and which limits cause it | Decided by the thesis group, `Findings_10:11.pdf` |
-| Required outputs | Tables and charts listed under "expected results" in `Findings_10:11.pdf`, including baseline versus proposed emissions per period | Thesis group, 2026-10-12 |
+| Server on/off | Not modelled. All servers stay on for the whole horizon and draw idle power; Eq. (20) unchanged | Decided by the thesis group, `Findings_10-11.pdf` |
+| Infeasibility | All constraints are hard; no fallback. If no schedule satisfies them, the program reports that no solution exists and which limits cause it | Decided by the thesis group, `Findings_10-11.pdf` |
+| Required outputs | Tables and charts listed under "expected results" in `Findings_10-11.pdf`, including baseline versus proposed emissions per period | Thesis group, 2026-10-12 |

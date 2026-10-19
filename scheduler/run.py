@@ -97,19 +97,8 @@ def parse_args(argv=None) -> tuple[RunSettings, argparse.Namespace]:
         except ValueError:
             p.error(f"--zone-map must be comma-separated zone numbers, got {a.zone_map!r}")
 
-    run_name = a.run_name or "_".join([
-        a.baseline_rule, f"base{a.baseline_supply_temp:g}", a.reassignment,
-        a.supply_temp_mode if a.supply_temp_mode == "optimize" else
-        f"fixed{(a.baseline_supply_temp if a.fixed_supply_temp is None else a.fixed_supply_temp):g}",
-    ] + ([] if not cold_plates else
-         ["cp" if a.cold_plate_count is None else f"cp{a.cold_plate_count}"])
-      + (["cpfixed"] if cold_plates and a.cp_mode == "fixed" else [])
-      + (["noprio"] if a.no_priority else [])
-      + ([f"zones{''.join(map(str, zone_map))}"] if zone_map else [])
-      + (["ciflat"] if a.ci_flat else [])
-      + ([f"ci-{Path(a.carbon_file).stem}"] if a.carbon_file else []))
     settings = RunSettings(
-        scenario=a.scenario, run_name=run_name, baseline_rule=a.baseline_rule, seed=a.seed,
+        scenario=a.scenario, baseline_rule=a.baseline_rule, seed=a.seed,
         baseline_supply_temp_C=a.baseline_supply_temp, reassignment=a.reassignment,
         supply_temp_mode=a.supply_temp_mode, fixed_supply_temp_C=a.fixed_supply_temp,
         H_min_C=a.h_min, time_limit_s=a.time_limit, mip_rel_gap=a.mip_gap,
@@ -119,10 +108,27 @@ def parse_args(argv=None) -> tuple[RunSettings, argparse.Namespace]:
         priority=not a.no_priority, zone_map=zone_map, carbon_file=a.carbon_file,
         ci_flat=a.ci_flat, fan_power=a.fan_power,
     )
+    settings.run_name = a.run_name or default_run_name(settings)
     return settings, a
 
 
-def _solve_staged(scenario, original, settings, base_sched, base_supply, warm_start, log):
+def default_run_name(settings: RunSettings) -> str:
+    """Run folder name built from the switches, e.g. ``least_loaded_base18_free_optimize``."""
+    st = settings
+    fixed_temp = st.optimized_fixed_supply_temp_C()
+    return "_".join([
+        st.baseline_rule, f"base{st.baseline_supply_temp_C:g}", st.reassignment,
+        st.supply_temp_mode if st.supply_temp_mode == "optimize" else f"fixed{fixed_temp:g}",
+    ] + ([] if not st.cold_plates else
+         ["cp" if st.cold_plate_count is None else f"cp{st.cold_plate_count}"])
+      + (["cpfixed"] if st.cold_plates and st.cp_mode == "fixed" else [])
+      + (["noprio"] if not st.priority else [])
+      + ([f"zones{''.join(map(str, st.zone_map))}"] if st.zone_map else [])
+      + (["ciflat"] if st.ci_flat else [])
+      + ([f"ci-{Path(st.carbon_file).stem}"] if st.carbon_file else []))
+
+
+def solve_staged(scenario, original, settings, base_sched, base_supply, warm_start, log):
     """Solve the optimized model, offering the solver a starting schedule.
 
     The start is the baseline. When servers may change, the same model is first solved
@@ -157,6 +163,50 @@ def _solve_staged(scenario, original, settings, base_sched, base_supply, warm_st
     return result
 
 
+def optimized_checks(scenario, settings, original, base_eval, result, opt_eval) -> dict:
+    """Checks on an optimized schedule: the solver's objective equals the evaluator's carbon,
+    the evaluator finds no broken limit, running workloads stay put, and with nothing to
+    optimise but timing the result is no worse than a valid baseline."""
+    out: dict = {}
+    diff = abs(result.objective_g - opt_eval.total_carbon_g)
+    out["optimizer_objective_equals_evaluator_carbon"] = {
+        "passed": diff <= OBJECTIVE_REL_TOL * abs(opt_eval.total_carbon_g),
+        "optimizer_objective_g": result.objective_g,
+        "evaluator_carbon_g": opt_eval.total_carbon_g,
+        "relative_difference": diff / abs(opt_eval.total_carbon_g)}
+    out["optimized_schedule_valid_under_evaluator"] = {
+        "passed": opt_eval.valid, "violations": opt_eval.compliance["violations"]}
+    running = [w.i for w in scenario.workloads if w.B == 1]
+    if running:
+        moved = [i for i in running
+                 if result.schedule.placements[i - 1].server != original[i]]
+        out["running_workloads_not_reassigned"] = {
+            "passed": not moved, "running": len(running), "moved": moved}
+    same_temp = (settings.supply_temp_mode == "fixed" and
+                 settings.optimized_fixed_supply_temp_C() == settings.baseline_supply_temp_C)
+    if settings.reassignment == "none" and same_temp:
+        name = "optimized_no_worse_than_valid_baseline"
+        if base_eval.valid:
+            out[name] = {
+                "passed": opt_eval.total_carbon_g <=
+                base_eval.total_carbon_g * (1 + NO_WORSE_REL_TOL),
+                "baseline_carbon_g": base_eval.total_carbon_g,
+                "optimized_carbon_g": opt_eval.total_carbon_g}
+        else:
+            out[name] = {"passed": None, "not_applicable":
+                         "the baseline breaks limits, so it is not a valid schedule"}
+    return out
+
+
+def format_checks(checks: dict) -> str:
+    lines = ["Checks:"]
+    for name, c in checks.items():
+        state = {True: "PASS", False: "FAIL", None: "n/a"}.get(c.get("passed"), "info")
+        detail = {k: v for k, v in c.items() if k != "passed"}
+        lines.append(f"  [{state}] {name}" + (f"  {detail}" if detail else ""))
+    return "\n".join(lines)
+
+
 def run(settings: RunSettings, *, scenarios_dir="scenarios", results_dir="results",
         baseline_only=False, warm_start=True, diagnosis_time_limit_s=120.0,
         solver_log=False, quiet=False) -> dict:
@@ -185,41 +235,16 @@ def run(settings: RunSettings, *, scenarios_dir="scenarios", results_dir="result
             "reason": f"the baseline could not place workloads {unplaced}, so they have no "
                       "original server"}
     else:
-        result = _solve_staged(scenario, original, settings, base_sched, base_supply,
-                               warm_start, solver_log)
+        result = solve_staged(scenario, original, settings, base_sched, base_supply,
+                              warm_start, solver_log)
         if result.status == STATUS_INFEASIBLE:
             infeasibility = diagnose_infeasibility(scenario, original, settings,
                                                    time_limit_s=diagnosis_time_limit_s)
         if result.has_schedule:
             opt_eval = evaluate(scenario, result.schedule, result.supply_temp_C, settings,
                                 result.cold_plate_ops)
-            diff = abs(result.objective_g - opt_eval.total_carbon_g)
-            checks["optimizer_objective_equals_evaluator_carbon"] = {
-                "passed": diff <= OBJECTIVE_REL_TOL * abs(opt_eval.total_carbon_g),
-                "optimizer_objective_g": result.objective_g,
-                "evaluator_carbon_g": opt_eval.total_carbon_g,
-                "relative_difference": diff / abs(opt_eval.total_carbon_g)}
-            checks["optimized_schedule_valid_under_evaluator"] = {
-                "passed": opt_eval.valid, "violations": opt_eval.compliance["violations"]}
-            running = [w.i for w in scenario.workloads if w.B == 1]
-            if running:
-                moved = [i for i in running
-                         if result.schedule.placements[i - 1].server != original[i]]
-                checks["running_workloads_not_reassigned"] = {
-                    "passed": not moved, "running": len(running), "moved": moved}
-            same_temp = (settings.supply_temp_mode == "fixed" and
-                         settings.optimized_fixed_supply_temp_C() == settings.baseline_supply_temp_C)
-            if settings.reassignment == "none" and same_temp:
-                name = "optimized_no_worse_than_valid_baseline"
-                if base_eval.valid:
-                    checks[name] = {
-                        "passed": opt_eval.total_carbon_g <=
-                        base_eval.total_carbon_g * (1 + NO_WORSE_REL_TOL),
-                        "baseline_carbon_g": base_eval.total_carbon_g,
-                        "optimized_carbon_g": opt_eval.total_carbon_g}
-                else:
-                    checks[name] = {"passed": None, "not_applicable":
-                                    "the baseline breaks limits, so it is not a valid schedule"}
+            checks.update(optimized_checks(scenario, settings, original, base_eval,
+                                           result, opt_eval))
 
     out_dir = Path(results_dir) / settings.scenario / settings.run_name
     summary = write_results(
@@ -227,11 +252,7 @@ def run(settings: RunSettings, *, scenarios_dir="scenarios", results_dir="result
         result.schedule if result else None, opt_eval, result, infeasibility, checks)
     if not quiet:
         print(format_summary(summary))
-        print(f"\nChecks:")
-        for name, c in checks.items():
-            state = {True: "PASS", False: "FAIL", None: "n/a"}.get(c.get("passed"), "info")
-            detail = {k: v for k, v in c.items() if k != "passed"}
-            print(f"  [{state}] {name}" + (f"  {detail}" if detail else ""))
+        print("\n" + format_checks(checks))
         print(f"\nResults written to {out_dir}/")
     return summary
 

@@ -84,15 +84,26 @@ def load_summary(run_dir: str | Path) -> dict:
 # Scenario inputs: servers and clock
 # ---------------------------------------------------------------------------
 
+def scenario_file(scenario: str, name: str, scenarios_dir: str | Path = SCENARIOS_DIR,
+                  run_dir: str | Path | None = None) -> Path | None:
+    """``scenarios/<scenario>/<name>``, else ``<name>`` next to the run folders
+    (``results/<scenario>/<name>``, where an unzipped run export puts it), else None."""
+    for path in (Path(scenarios_dir) / scenario / name,
+                 Path(run_dir).parent / name if run_dir is not None else None):
+        if path is not None and path.is_file():
+            return path
+    return None
+
+
 def load_servers(scenario: str, run_dir: str | Path | None = None,
                  scenarios_dir: str | Path = SCENARIOS_DIR) -> pd.DataFrame:
     """Columns s, name, zone, label, zone_label; sorted by zone then s (display order).
 
-    Names come from ``scenarios/<scenario>/servers.csv``, else from the run's
-    ``compliance_servers.csv``, else "server <s>".
+    Names come from the scenario's ``servers.csv`` (see ``scenario_file``), else from the
+    run's ``compliance_servers.csv``, else "server <s>".
     """
-    path = Path(scenarios_dir) / scenario / "servers.csv"
-    if path.is_file():
+    path = scenario_file(scenario, "servers.csv", scenarios_dir, run_dir)
+    if path is not None:
         df = pd.read_csv(path, usecols=["s", "server", "zone"]).rename(columns={"server": "name"})
     else:
         df = pd.DataFrame(columns=["s", "name", "zone"])
@@ -127,15 +138,17 @@ def hours_to_clock(hour_local: pd.Series) -> pd.Series:
 
 
 def load_clock(scenario: str, T: int, dt_seconds: float,
-               scenarios_dir: str | Path = SCENARIOS_DIR) -> pd.DataFrame:
+               scenarios_dir: str | Path = SCENARIOS_DIR,
+               run_dir: str | Path | None = None) -> pd.DataFrame:
     """Columns t, hour_local, time, clock for t = 1..T.
 
-    ``time`` is the local time at the middle of period t (``carbon.csv:hour_local``); a
-    period covers ``time +/- dt/2``. Without carbon.csv the clock starts at 00:00.
+    ``time`` is the local time at the middle of period t (``carbon.csv:hour_local``, found
+    by ``scenario_file``); a period covers ``time +/- dt/2``. Without carbon.csv the clock
+    starts at 00:00.
     """
-    path = Path(scenarios_dir) / scenario / "carbon.csv"
+    path = scenario_file(scenario, "carbon.csv", scenarios_dir, run_dir)
     t = pd.DataFrame({"t": np.arange(1, T + 1)})
-    if path.is_file():
+    if path is not None:
         carbon = pd.read_csv(path, usecols=["t", "hour_local"])
         t = t.merge(carbon, on="t", how="left")
     else:
@@ -258,7 +271,7 @@ def load_run(run_dir: str | Path, scenarios_dir: str | Path = SCENARIOS_DIR) -> 
         servers = _with_zones(servers, zones)
     dt = float(sc.get("dt_seconds", 300.0))
     T = int(sc.get("T") or _max_t(run_dir / "baseline" / "period.csv"))
-    clock = load_clock(scenario, T, dt, scenarios_dir)
+    clock = load_clock(scenario, T, dt, scenarios_dir, run_dir)
     tcols = clock[["t", "time", "clock"]]
 
     def with_time(df: pd.DataFrame) -> pd.DataFrame:

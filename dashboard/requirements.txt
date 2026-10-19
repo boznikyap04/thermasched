@@ -1,0 +1,8 @@
+# Streamlit Community Cloud installs this file: it looks next to the entrypoint
+# (dashboard/app.py) before the repository root, so the root uv.lock is not used there.
+# Only what the dashboard needs; without the solver (highspy) the New run page is hidden.
+# Versions match uv.lock.
+streamlit==1.65.0
+pandas==3.0.6
+plotly==7.1.0
+numpy>=2.0

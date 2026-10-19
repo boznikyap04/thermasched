@@ -8,6 +8,9 @@ __pycache__/
 # macOS
 .DS_Store
 
-# Raw datasets (too large for GitHub; see PROJECT_CONTEXT.md section 9)
-Data/UniMelb.csv
-UFCG/*.csv
+# Raw datasets (too large for GitHub; see data/raw/README.md)
+data/raw/*
+!data/raw/README.md
+
+# Run zips written by notebooks/solver.ipynb (upload them, or unzip into results/)
+exports/

@@ -1,7 +1,7 @@
 """Shared data structures for the thermal-aware scheduling prototype.
 
 This file is the contract between the loader, the baseline, the evaluator, the
-optimizer, and the report writer. Equation numbers refer to PROJECT_CONTEXT.md.
+optimizer, and the report writer. Equation numbers refer to docs/PROJECT_CONTEXT.md.
 
 Conventions (all modules):
 - Periods are numbered 1..T as in the scenario files. Arrays over periods have length T
@@ -90,7 +90,7 @@ class Server:
 
 @dataclass(frozen=True)
 class Constants:
-    """Constants of PROJECT_CONTEXT.md section 4.1 (params.json, constants_as_printed)."""
+    """Constants of docs/PROJECT_CONTEXT.md section 4.1 (params.json, constants_as_printed)."""
     R_dvfs: float
     F_throttle: float
     T_max_server_C: float
@@ -110,7 +110,7 @@ class Constants:
 
 @dataclass(frozen=True)
 class ColdPlateSpec:
-    """Cold-plate model agreed with the thesis group (PROJECT_CONTEXT.md section 10).
+    """Cold-plate model agreed with the thesis group (docs/PROJECT_CONTEXT.md section 10).
 
     Every plate is identical and has its own pump. Per plate and period the heat removed
     is the least of: Q_max_per_plate_W, the server's heat P_IT, and
@@ -315,7 +315,7 @@ def priority_pairs(scenario: Scenario) -> list[tuple[int, int]]:
     workloads of the same type and deadline, the earlier arrival goes first.
 
     O_ij is linked to the schedule as follows (the thesis prints no link, see
-    PROJECT_CONTEXT.md A6): if i and j run on the same server and j starts while i is
+    docs/PROJECT_CONTEXT.md A6): if i and j run on the same server and j starts while i is
     waiting (A_i <= ST_j), then ST_i <= ST_j. Workloads on different servers do not
     compete, and j may start before i arrives.
     """

@@ -1,6 +1,6 @@
 """MILP optimizer (HiGHS) for thermal-aware workload scheduling.
 
-Equation numbers refer to PROJECT_CONTEXT.md section 2. This module builds the
+Equation numbers refer to docs/PROJECT_CONTEXT.md section 2. This module builds the
 constraints itself and shares no code with evaluate.py (the independent referee) or
 baseline.py.
 

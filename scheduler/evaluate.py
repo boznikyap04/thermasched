@@ -4,7 +4,7 @@ Given a Scenario, a Schedule, supply temperatures and (with cold plates on) the 
 flow and coolant temperatures, it recomputes, from scratch, utilisation, IT power,
 cold-plate heat and pump power, server temperature, DPF, work delivered, CRAC heat /
 power, energy, carbon, and every compliance check. A schedule is never rejected; every
-limit is measured and reported. Equation numbers refer to PROJECT_CONTEXT.md.
+limit is measured and reported. Equation numbers refer to docs/PROJECT_CONTEXT.md.
 
 This module must not import from baseline.py or optimize.py.
 """
