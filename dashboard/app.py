@@ -22,7 +22,7 @@ import streamlit as st  # noqa: E402
 from dashboard import data, state  # noqa: E402
 from scheduler.version import VERSION  # noqa: E402
 from dashboard.views import (  # noqa: E402
-    compare, compliance, cooling, energy, new_run, overview, schedule, thermal, upload,
+    chapter6, compare, compliance, cooling, energy, new_run, overview, schedule, thermal, upload,
 )
 
 st.set_page_config(page_title="ThermaSched results", page_icon="🌡️", layout="wide")
@@ -38,6 +38,7 @@ def _sidebar(runs: list[data.RunRef]) -> None:
     for r in runs:
         by_scenario.setdefault(r.scenario, []).append(r.key)
     uploaded = {r.key for r in runs if state.is_uploaded(r)}
+    labels = state.thesis_labels()
 
     # A run just uploaded (or solved) asks to be selected before the widgets draw.
     pending = st.session_state.pop(state.PENDING_RUN, None)
@@ -58,9 +59,10 @@ def _sidebar(runs: list[data.RunRef]) -> None:
     options = by_scenario[scenario]
     if st.session_state.get(state.RUN_KEY) not in options:
         st.session_state[state.RUN_KEY] = options[0]
+    # A Chapter 6 run shows its thesis label first, then its own name.
     st.sidebar.selectbox("Run", options, key=state.RUN_KEY,
                          format_func=lambda k: ("📤 " if k in uploaded else "")
-                         + k.split("/", 1)[1])
+                         + (f"{labels[k]} · " if k in labels else "") + k.split("/", 1)[1])
     st.query_params["run"] = st.session_state[state.RUN_KEY]
 
     ref = state.selected_ref()
@@ -126,6 +128,8 @@ def main() -> None:
         pages["Across runs"] = [
             st.Page(compare.render, title="Compare runs", icon=":material/compare_arrows:",
                     url_path="compare"),
+            st.Page(chapter6.render, title="Chapter 6 results", icon=":material/table_view:",
+                    url_path="chapter6"),
         ]
     else:
         state.OVERVIEW_PAGE = None

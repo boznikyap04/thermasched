@@ -130,6 +130,6 @@
     "purpose": "exercise Eq. (11) and (29), which are never binding in the other scenarios"
   },
   "built_with": {
-    "thermasched": "1.0.1"
+    "thermasched": "1.1.0"
   }
 }

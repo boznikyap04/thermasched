@@ -7,6 +7,7 @@
     uv run python -m scheduler.run --scenario consolidated6 --zone-map 1,1,1,2,2,2
     uv run python -m scheduler.run --scenario consolidated6 --cold-plates --cp-mode fixed
     uv run python -m scheduler.run --scenario consolidated6 --ci-flat
+    uv run python -m scheduler.run --scenario small --thermal-blind
 
 Both schedules are scored by the shared evaluator; only its numbers are compared.
 """
@@ -31,6 +32,7 @@ from scheduler.types import (
 OBJECTIVE_REL_TOL = 1e-6    # optimizer objective against the evaluator's carbon
 NO_WORSE_REL_TOL = 1e-9     # optimized carbon against the baseline's
 STAGE_SHARE = 0.2           # share of the time limit for the fixed-server first stage
+BLIND_SHARE = 0.7           # thermal-blind placement: share of the time limit for pass 1
 
 
 def parse_args(argv=None) -> tuple[RunSettings, argparse.Namespace]:
@@ -45,6 +47,9 @@ def parse_args(argv=None) -> tuple[RunSettings, argparse.Namespace]:
     p.add_argument("--baseline-supply-temp", type=float, default=d.baseline_supply_temp_C,
                    help="fixed supply air temperature of the baseline, degC")
     p.add_argument("--reassignment", choices=REASSIGNMENT_MODES, default=d.reassignment)
+    p.add_argument("--thermal-blind", action="store_true",
+                   help="choose servers with server temperature left out, then set start times "
+                        "and cooling on those servers with every thermal limit (two passes)")
     p.add_argument("--supply-temp-mode", choices=SUPPLY_TEMP_MODES, default=d.supply_temp_mode)
     p.add_argument("--fixed-supply-temp", type=float, default=None,
                    help="supply temperature when --supply-temp-mode fixed "
@@ -100,6 +105,7 @@ def parse_args(argv=None) -> tuple[RunSettings, argparse.Namespace]:
     settings = RunSettings(
         scenario=a.scenario, baseline_rule=a.baseline_rule, seed=a.seed,
         baseline_supply_temp_C=a.baseline_supply_temp, reassignment=a.reassignment,
+        placement="thermal_blind" if a.thermal_blind else d.placement,
         supply_temp_mode=a.supply_temp_mode, fixed_supply_temp_C=a.fixed_supply_temp,
         H_min_C=a.h_min, time_limit_s=a.time_limit, mip_rel_gap=a.mip_gap,
         cold_plates=cold_plates, cold_plate_count=a.cold_plate_count,
@@ -127,7 +133,7 @@ def default_run_name(settings: RunSettings) -> str:
     return "_".join([
         st.baseline_rule, f"base{st.baseline_supply_temp_C:g}", st.reassignment,
         st.supply_temp_mode if st.supply_temp_mode == "optimize" else f"fixed{fixed_temp:g}",
-    ] + ([] if not st.cold_plates else
+    ] + (["tblind"] if st.placement == "thermal_blind" else []) + ([] if not st.cold_plates else
          ["cp" if st.cold_plate_count is None else f"cp{st.cold_plate_count}"])
       + ([f"bcp{st.baseline_cp_flow_Lmin:g}-{st.baseline_cp_coolant_C:g}"]
          if st.cold_plates and cp_values else [])
@@ -176,6 +182,47 @@ def solve_staged(scenario, original, settings, base_sched, base_supply, warm_sta
     if stage_note:
         result.notes.append(stage_note)
     return result
+
+
+def solve_thermal_blind(scenario, original, settings, base_sched, base_supply, warm_start, log):
+    """Thermal-blind placement in two passes. Returns the result and the (servers, settings)
+    the result was solved with, for the infeasibility diagnosis.
+
+    Pass 1 solves the model with server temperature left out (no recursion, no thermal cap,
+    DPF = 1) and keeps only the server of each workload. Pass 2 fixes every workload to that
+    server and solves the full model, every thermal limit included, for start times and
+    cooling. If pass 2 has no valid schedule, that is the result: no fallback.
+    """
+    t1 = BLIND_SHARE * settings.time_limit_s
+    pass1 = solve(scenario, original, settings, ignore_temperature=True,
+                  warm_start=base_sched if warm_start else None,
+                  warm_start_supply_temp_C=base_supply if warm_start else None,
+                  time_limit_s=t1, log=log)
+    gap = "-" if pass1.mip_gap is None else f"{pass1.mip_gap:.2%}"
+    if not pass1.has_schedule:
+        pass1.notes.append(
+            f"Thermal-blind placement: pass 1 (servers chosen with server temperature left out) "
+            f"ended with status {pass1.status} after {pass1.solve_time_s:.1f} s and no schedule, "
+            "so pass 2 was not run.")
+        return pass1, (original, settings)
+    servers = pass1.schedule.server_of()
+    moved = sum(1 for i, sv in servers.items() if sv != original[i])
+    fixed = replace(settings, reassignment="none")
+    pass2 = solve(scenario, servers, fixed,
+                  warm_start=pass1.schedule if warm_start else None,
+                  warm_start_supply_temp_C=pass1.supply_temp_C if warm_start else None,
+                  time_limit_s=max(1.0, settings.time_limit_s - pass1.solve_time_s), log=log)
+    pass2.solve_time_s += pass1.solve_time_s
+    pass2.notes.append(
+        f"Thermal-blind placement, pass 1: servers chosen with server temperature left out "
+        f"(no temperature recursion, no thermal cap, DPF = 1); {pass1.status}, "
+        f"{pass1.objective_g:,.2f} g, gap {gap}, {pass1.solve_time_s:.1f} s; {moved} workload(s) "
+        f"on another server than the baseline's.")
+    pass2.notes.append(
+        "Thermal-blind placement, pass 2: every workload fixed to its pass-1 server; start times "
+        "and cooling solved with every thermal limit. The status, gap and objective above are "
+        "pass 2's; the solve time includes pass 1.")
+    return pass2, (servers, fixed)
 
 
 def optimized_checks(scenario, settings, original, base_eval, result, opt_eval) -> dict:
@@ -250,10 +297,15 @@ def run(settings: RunSettings, *, scenarios_dir="scenarios", results_dir="result
             "reason": f"the baseline could not place workloads {unplaced}, so they have no "
                       "original server"}
     else:
-        result = solve_staged(scenario, original, settings, base_sched, base_supply,
-                              warm_start, solver_log)
+        if settings.placement == "thermal_blind":
+            result, (diag_servers, diag_settings) = solve_thermal_blind(
+                scenario, original, settings, base_sched, base_supply, warm_start, solver_log)
+        else:
+            result = solve_staged(scenario, original, settings, base_sched, base_supply,
+                                  warm_start, solver_log)
+            diag_servers, diag_settings = original, settings
         if result.status == STATUS_INFEASIBLE:
-            infeasibility = diagnose_infeasibility(scenario, original, settings,
+            infeasibility = diagnose_infeasibility(scenario, diag_servers, diag_settings,
                                                    time_limit_s=diagnosis_time_limit_s)
         if result.has_schedule:
             opt_eval = evaluate(scenario, result.schedule, result.supply_temp_C, settings,

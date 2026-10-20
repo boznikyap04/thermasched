@@ -237,6 +237,73 @@ def test_thermal_cap_prefers_cool_placement():
     assert pinned.objective_g > res.objective_g
 
 
+def blind_scenario(R1):
+    """Server 1 draws less power (P_max 380 W against 400 W) but runs hot (R1); server 2
+    stays 10 degC above supply at 400 W. Cap 65 degC (H_min 25), alpha = 0."""
+    servers = [server(1, p_max=380.0, R=R1, alpha=0.0, T0=30.0),
+               server(2, p_max=400.0, R=0.025, alpha=0.0, T0=30.0)]
+    return scenario([work(1, 2, 6, 0, 4, 4)], servers, [100.0] * 6)
+
+
+def blind_settings(**kw):
+    return settings(supply_temp_mode="optimize", fixed_supply_temp_C=None, H_min_C=25.0,
+                    reassignment="free", placement="thermal_blind", **kw)
+
+
+def test_thermal_blind_picks_the_server_temperature_would_rule_out():
+    from scheduler.run import solve_thermal_blind
+    # R1 = 0.1184: 45 degC above supply at 380 W, so supply <= 20 while server 1 is loaded.
+    # Per loaded hour: server 1 costs 480 W IT + 480/COP(20); server 2 costs 500 W IT +
+    # 500/COP(27), which is less. With temperature left out the supply could stay at 27 and
+    # server 1 (480 + 480/COP(27)) would be cheaper.
+    sc = blind_scenario(R1=0.1184)
+    st = blind_settings()
+    aware = solve(sc, {1: 1}, dataclasses.replace(st, placement="thermal_aware"))
+    assert placements(aware)[1][0] == 2
+    pass1 = solve(sc, {1: 1}, st, ignore_temperature=True)
+    assert placements(pass1)[1][0] == 1
+    assert np.all(pass1.supply_temp_C == 27.0)
+    res, (servers, fixed) = solve_thermal_blind(sc, {1: 1}, st, None, None, False, False)
+    assert res.status == STATUS_OPTIMAL
+    assert servers == {1: 1} and fixed.reassignment == "none"
+    assert placements(res)[1][0] == 1                      # pass 2 keeps pass 1's server
+    assert np.all(res.supply_temp_C[0][1:5] <= 20.0)       # ... and cools it within the cap
+    assert np.all(res.model_values["T_C"] <= 65.0 + 1e-6)
+    assert res.objective_g > aware.objective_g
+    assert any("pass 1" in n for n in res.notes)
+    e = evaluate_or_skip(sc, res, st)
+    assert e.valid
+    assert e.total_carbon_g == pytest.approx(res.objective_g, rel=1e-6)
+
+
+def test_thermal_blind_reports_an_unsafe_placement_as_infeasible():
+    from scheduler.run import solve_thermal_blind
+    # R1 = 0.13: 49.4 degC above supply at 380 W, over the 65 degC cap even at 18 degC.
+    sc = blind_scenario(R1=0.13)
+    st = blind_settings()
+    aware = solve(sc, {1: 1}, dataclasses.replace(st, placement="thermal_aware"))
+    assert aware.status == STATUS_OPTIMAL and placements(aware)[1][0] == 2
+    res, (servers, fixed) = solve_thermal_blind(sc, {1: 1}, st, None, None, False, False)
+    assert res.status == STATUS_INFEASIBLE and not res.has_schedule
+    assert servers == {1: 1}
+    assert diagnose_infeasibility(sc, servers, fixed, time_limit_s=20)[RELAX_THERMAL] == "feasible"
+
+
+def test_thermal_blind_without_reassignment_matches_thermal_aware():
+    from scheduler.run import solve_thermal_blind
+    sc = blind_scenario(R1=0.1184)
+    st = blind_settings()
+    st = dataclasses.replace(st, reassignment="none")
+    res, _ = solve_thermal_blind(sc, {1: 2}, st, None, None, False, False)
+    aware = solve(sc, {1: 2}, dataclasses.replace(st, placement="thermal_aware"))
+    assert res.objective_g == pytest.approx(aware.objective_g, rel=1e-9)
+
+
+def test_placement_is_validated():
+    with pytest.raises(ValueError, match="placement"):
+        RunSettings(placement="sideways").validate()
+
+
 @pytest.mark.parametrize("R, expected_periods", [(0.145, 5), (0.10, 4)])
 def test_derating_lengthens_run(R, expected_periods):
     """Supply 20 degC, alpha = 0: T = 20 + R * 400 under load. R = 0.145 gives 78 degC,

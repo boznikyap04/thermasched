@@ -208,9 +208,9 @@ is compared against the base run.
 | # | Question | Variants | Key metrics |
 |---|---|---|---|
 | S1 | How does server zoning interact with reassignment? | Base (mixed zones); T1: group similar servers into the same zone (change $Z_{sz}$); T2: reassignment allowed only within the original zone | number of reassignments, original/new server and zone, cross-zone moves, utilization, CRAC energy per zone, total energy, carbon, deadline satisfaction, $T^{pred}$ |
-| S2 | Which cooling system lowers server temperature more? | Base; T1: change CRAC temperature and airflow (cold plate fixed); T2: change coolant temperature and flow (CRAC fixed) | average and max $T^{pred}$, average headroom, CRAC energy, CP energy, total cooling energy, carbon |
+| S2 | Which cooling system lowers server temperature more? | Base; T1: change the CRAC supply air temperature; airflow is not modelled (cold plate fixed); T2: change coolant temperature and flow (CRAC fixed) | average and max $T^{pred}$, average headroom, CRAC energy, CP energy, total cooling energy, carbon |
 | S3 | Does a larger thermal margin hurt QoS? | $H^{min}$ = 10 °C (base) vs high, medium and low values (to be decided) | execution, waiting and completion time; missed deadlines (count and %); average and max $T^{pred}$; DPF by server; number of throttled servers; energy; carbon |
-| S4 | Does thermal-aware reassignment reduce carbon? | Base (capacity + thermal + $PC^{eff}$); T1: no reassignment ($r_{is}=0$); T2: reassignment ignores temperature; T3: base with a different $CI_t$ profile | number of reassignments, servers, IT/CRAC/CP energy, carbon, completion and waiting time, missed deadlines, temperatures, DPF |
+| S4 | Does thermal-aware reassignment reduce carbon? | Base (capacity + thermal + $PC^{eff}$); T1: no reassignment ($r_{is}=0$); T2: reassignment ignores temperature, in two passes: servers are chosen with server temperature left out, then start times and cooling are solved on those servers with every thermal limit (`placement = "thermal_blind"`); T3: base with a different $CI_t$ profile | number of reassignments, servers, IT/CRAC/CP energy, carbon, completion and waiting time, missed deadlines, temperatures, DPF |
 
 ## 10. Open questions
 
@@ -222,12 +222,14 @@ divides by COP, and the minimum cold-plate flow is 0.05 L/min.
    0.1–0.3 L/min, and they describe CPU1's combined cooling, not the cold plate alone.
    Which list is final? If it's the seven settings, how should $R^{cp}$ be filled in for
    the three new flows (interpolate or extrapolate)?
-2. **CRAC airflow.** The PDF has no fan-power equation, so airflow changes neither the
-   objective nor any binding constraint. Either add a fan-power equation, or keep airflow
-   as a reported value only and drop it from S2 T1.
-3. **Thermal-blind reassignment (S4 T2).** "Ignoring thermal conditions" needs a
-   definition. For example: solve without the temperature constraints, then score the
-   schedule with the full thermal model.
+2. **CRAC airflow.** Decided 2026-10-21: airflow is not modelled and is dropped from S2 T1.
+   The PDF has no fan-power equation, so airflow would change neither the objective nor any
+   binding constraint. See `PRD_CH6_RESULTS.md` D3.
+3. **Thermal-blind reassignment (S4 T2).** Decided 2026-10-21: two passes. Pass 1 chooses
+   servers with server temperature left out (no temperature recursion, no safety cap,
+   DPF = 1). Pass 2 fixes those servers and solves start times and cooling with every
+   thermal limit. If pass 2 is infeasible, that is the result. See `PRD_CH6_RESULTS.md` R4
+   and D2.
 4. **S3 headroom values.** The high, medium and low $H^{min}$ values are still to be
    decided.
 5. **Ch. 5 data checks.**
@@ -259,13 +261,14 @@ Most of §7 is already built in `scheduler/`. That includes the Q&A equations (s
 temperature recursion, CRAC heat balance, zone temperature = supply temperature,
 cold-plate "≤" limits using last period's temperature), the ramp limits, discretized
 COP and pump power, DPF, the reassignment modes, and the infeasibility diagnosis.
-G3–G12 were closed on 2026-10-18 except where marked; G1, G2 and S4 T2 wait on §10.
+G3–G12 were closed on 2026-10-18 except where marked; G1 waits on §10. G2 and S4 T2 were
+decided on 2026-10-21 (§10.2, §10.3).
 
 **Model**
 | # | Gap | Status |
 |---|---|---|
 | G1 | Cold-plate flow settings are 0.10–0.30 (5 settings), not the 7 settings in `thesisb.pdf` | Open, blocked on §10.1 |
-| G2 | CRAC airflow is not modeled (Eq. 41, 44, 45) | Open, blocked on §10.2 |
+| G2 | CRAC airflow is not modeled (Eq. 41, 44, 45) | Closed by decision (§10.2): not modelled, removed from S2 T1 |
 | G3 | Priority ordering $O_{ij}$ (Eq. 56–57) | Done. Pairs with $O_{ij}=1$ come from (56) and (57). They are linked to the schedule by: on a shared server, j may not start while i waits ($A_i \le ST_j \Rightarrow ST_i \le ST_j$). Big-M rows over $ST_i$ in `optimize.py`; inversions are counted by the evaluator. On by default, `--no-priority` turns it off, and it is a family in the infeasibility diagnosis. EDF within a type is not in the equations, so it is not modelled. The thesis should state this link, because the PDF has none (PROJECT_CONTEXT A6) |
 | G4 | $AV_{st}$ (Eq. 11) and $B_i$ (Eq. 29) never tested | Done. Optional `availability.csv` (`s, t, AV`), enforced by the baseline, optimizer and evaluator. New scenario `small_running`: 4 running workloads and server 3 down 15:00–16:00. Check `running_workloads_not_reassigned`. A running workload keeps its server but may still be shifted in time (Eq. 29 fixes only the server) |
 | G5 | `F_throttle` 0.662 → 0.622 | Done in `data_prep.ipynb` and every `params.json` |
@@ -282,8 +285,8 @@ G3–G12 were closed on 2026-10-18 except where marked; G1, G2 and S4 T2 wait on
 | # | Gap | Status |
 |---|---|---|
 | G10 | S1 T1 zone regrouping | Done: `--zone-map 1,1,1,2,2,2` (any map, one zone per server) |
-| G11 | S2 T2: fix the optimized run's cold plates | Done: `--cp-mode fixed [--fixed-cp-flow F --fixed-cp-coolant C]`. When the coolant is warmer than the server, the drive is $\max(0, T_{s,t-1} - CP^{temp})$, which costs one binary per server-period. S2 T1 airflow still depends on G2 |
-| G12 | S4 T3 carbon-intensity switch; S4 T2 thermal-blind mode | T3 done: `--carbon-file <csv>` or `--ci-flat`. T2 is open, blocked on §10.3 |
+| G11 | S2 T2: fix the optimized run's cold plates | Done: `--cp-mode fixed [--fixed-cp-flow F --fixed-cp-coolant C]`. When the coolant is warmer than the server, the drive is $\max(0, T_{s,t-1} - CP^{temp})$, which costs one binary per server-period. S2 T1 changes the supply air temperature only (G2) |
+| G12 | S4 T3 carbon-intensity switch; S4 T2 thermal-blind mode | T3 done: `--carbon-file <csv>` or `--ci-flat`. T2 done: `--thermal-blind`, `placement="thermal_blind"` (two passes, §10.3) |
 
 Results under `results/` were produced before these changes. They lack the new tables,
 and they were solved without priority and with $F^{throttle}$ = 0.662. Re-run them before

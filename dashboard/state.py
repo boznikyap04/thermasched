@@ -132,10 +132,35 @@ def compare_runs(keys: tuple[str, ...], _refs: tuple[data.RunRef, ...], stamp: f
     return data.compare_runs(list(_refs))
 
 
+def _summaries_stamp(refs: list[data.RunRef]) -> float:
+    return sum(_mtime(r.path / "summary.json") for r in refs)
+
+
 def runs_frame(refs: list[data.RunRef]) -> pd.DataFrame:
-    stamp = sum(_mtime(r.path / "summary.json") for r in refs)
     # Paths, not keys: two sessions can upload different runs under the same key.
-    return compare_runs(tuple(str(r.path) for r in refs), tuple(refs), stamp)
+    return compare_runs(tuple(str(r.path) for r in refs), tuple(refs), _summaries_stamp(refs))
+
+
+@st.cache_data(show_spinner="Reading the Chapter 6 runs…")
+def _chapter6(keys: tuple[str, ...], _refs: tuple[data.RunRef, ...], stamp: float):
+    return data.chapter6_table(list(_refs)), data.chapter6_runs(list(_refs))
+
+
+def chapter6(refs: list[data.RunRef]):
+    """The Chapter 6 table and, per entry, the run used and every matching run."""
+    return _chapter6(tuple(str(r.path) for r in refs), tuple(refs), _summaries_stamp(refs))
+
+
+@st.cache_data(show_spinner=False)
+def _thesis_labels(keys: tuple[str, ...], _refs: tuple[data.RunRef, ...],
+                   stamp: float) -> dict[str, str]:
+    return data.thesis_label_texts(list(_refs))
+
+
+def thesis_labels() -> dict[str, str]:
+    """Run key -> thesis label text, for every run of this session that has one."""
+    refs = discover_runs()
+    return _thesis_labels(tuple(str(r.path) for r in refs), tuple(refs), _summaries_stamp(refs))
 
 
 def selected_ref() -> data.RunRef | None:
@@ -167,7 +192,9 @@ def chart(fig, key: str | None = None) -> None:
 
 def page_header(title: str, run: data.Run, caption: str | None = None) -> None:
     st.title(title)
-    st.caption(f"`{run.ref.scenario}` / `{run.ref.name}`" + (f" · {caption}" if caption else ""))
+    label = thesis_labels().get(run.ref.key)
+    st.caption((f"**{label}** · " if label else "") + f"`{run.ref.scenario}` / `{run.ref.name}`"
+               + (f" · {caption}" if caption else ""))
 
 
 def no_optimized_note(run: data.Run) -> None:

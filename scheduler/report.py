@@ -494,6 +494,7 @@ def format_summary(summary: dict) -> str:
                  f"Z={sc['Z']} zones, T={sc['T']} periods of {sc['dt_seconds']:g} s")
     lines.append(f"Run '{st.get('run_name')}': baseline={st.get('baseline_rule')} at "
                  f"{st.get('baseline_supply_temp_C')} C, reassignment={st.get('reassignment')}, "
+                 f"placement={st.get('placement', 'thermal_aware')}, "
                  f"supply_temp_mode={st.get('supply_temp_mode')}, "
                  f"priority={'on' if st.get('priority', True) else 'off'}, "
                  f"thermal cap {summary.get('thermal_cap_C')} C")

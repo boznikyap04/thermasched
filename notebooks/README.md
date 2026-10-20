@@ -222,10 +222,11 @@ unattended, on Colab or a laptop.
 
 - **The list:** `RUNS` in the first code cell, one entry per run: a label and the switches that
   differ from their defaults (the fields of `RunSettings`, as in `solver.ipynb`). It comes set
-  to the thesis set: `thesis10` under each thesis scenario (the switches of
+  to the thesis set: the 11 Chapter 6 runs on `thesis10`, labelled as on the site, each with a
+  1800 s time limit (the switches of
   [section 5 of the solver guide](../scheduler/README.md#5-thesis-scenarios-ch-6)), then each
-  experiment with and without reassignment, 17 runs and about two hours. `DEFAULTS` applies
-  switches to every run, for example a longer time limit.
+  experiment with and without reassignment at the default 600 s: 19 runs and about six hours.
+  `DEFAULTS` applies switches to every run, for example a longer time limit.
 - **Plan first:** section 1 validates every entry, checks that its scenario exists and that no
   two entries are the same run, and prints the plan with an upper bound on the time, before
   anything is solved.

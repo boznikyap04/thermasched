@@ -42,6 +42,9 @@ def render() -> None:
     shown["H_min_C"] = shown["H_min_C"].map(lambda h: "default" if pd.isna(h) else f"{h:g}")
     st.dataframe(shown, hide_index=True, column_config={
         "run": st.column_config.TextColumn("Run", pinned=True),
+        "thesis_label": st.column_config.TextColumn(
+            "Thesis label", help="The Chapter 6 runs of the thesis this run stands for, "
+                                 "matched by its settings."),
         "scenario_build": st.column_config.TextColumn(
             "Scenario build", help="Fingerprint of the scenario inputs the run was solved on; "
                                    f"`{data.UNKNOWN_BUILD}` for runs made {data.UNVERSIONED}."),

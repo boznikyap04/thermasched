@@ -266,7 +266,9 @@ def _allowed_servers(scenario: Scenario, original_server: dict[int, int],
 
 
 def _build(scenario: Scenario, original_server: dict[int, int], settings: RunSettings,
-           relax: tuple[str, ...], feasibility_only: bool):
+           relax: tuple[str, ...], feasibility_only: bool, ignore_temperature: bool = False):
+    """``ignore_temperature`` leaves server temperature out: no temperature recursion, no
+    thermal cap, DPF = 1. Pass 1 of the thermal-blind placement uses it to choose servers."""
     settings.validate()
     for fam in relax:
         if fam not in RELAX_FAMILIES:
@@ -312,7 +314,7 @@ def _build(scenario: Scenario, original_server: dict[int, int], settings: RunSet
 
     # Highest temperature the T columns may take; the linear DPF bound holds up to T_throttle.
     cap_eff = c.T_throttle_C if relax_therm else cap
-    derating = cap_eff > c.T_dvfs_C + _EPS     # DPF can fall below 1 somewhere
+    derating = cap_eff > c.T_dvfs_C + _EPS and not ignore_temperature   # DPF can fall below 1
     slope = c.R_dvfs / (c.T_throttle_C - c.T_dvfs_C)
     dpf_cap = min(1.0, 1.0 - slope * (cap_eff - c.T_dvfs_C)) if derating else 1.0
 
@@ -357,6 +359,7 @@ def _build(scenario: Scenario, original_server: dict[int, int], settings: RunSet
     built.derating = derating
     built.relax = relax
     built.feasibility_only = feasibility_only
+    built.ignore_temperature = ignore_temperature
     if empty_workloads:
         return built
 
@@ -444,7 +447,7 @@ def _build(scenario: Scenario, original_server: dict[int, int], settings: RunSet
     Q_cp, P_cp, cp_cols = _add_cold_plate_terms(lp, scenario, plates, cp_d_max, ci_w_to_g,
                                                 cp_fixed)
     P_fan = _add_fan_terms(lp, scenario, ci_kw_to_g)
-    T_ub = cap_eff
+    T_ub = _INF if ignore_temperature else cap_eff
     Tcol = [[lp.col(-_INF, T_ub) for t in range(T)] for _ in servers]
     # Loss L = 1 - DPF (only where some workload has tail periods, i.e. where DPF matters),
     # and its running sum CL, per server and period.
@@ -610,6 +613,8 @@ def _build(scenario: Scenario, original_server: dict[int, int], settings: RunSet
                     lp.row(cpu, -_INF, 1.0)
                 if mem_sum > 1.0 + 1e-12:                                              # (13)
                     lp.row(mem, -_INF, 1.0)
+            if ignore_temperature:
+                continue
             # temperature recursion (approved)
             terms = [(Tcol[k][t - 1], 1.0), (Tsup[z - 1][t - 1], -(1 - alpha)),
                      (P_IT[k][t - 1], -(1 - alpha) * R), (Q_cp[k][t - 1], (1 - alpha) * R)]
@@ -727,6 +732,11 @@ def _model_notes(scenario: Scenario, settings: RunSettings, built: _Built) -> li
                      "with one on/off binary per server and period.")
     else:
         n.append("Cold plates are off: Q_cp and P_cp are columns fixed at zero.")
+    if getattr(built, "ignore_temperature", False):
+        n.append("Server temperature ignored (pass 1 of the thermal-blind placement): no temperature "
+                 "recursion, no thermal cap T <= T_max - H_min and DPF = 1, so temperature plays no part "
+                 "in choosing servers. Cold plates may remove up to min(P_IT, n*0.3 kW) whatever the "
+                 "server temperature.")
     if built.feasibility_only:
         n.append("Feasibility-only solve (diagnosis): zero objective and the supply fixed at the lowest "
                  "whole degree, which gives the same feasibility as optimising it (lowest temperatures, "
@@ -800,10 +810,12 @@ def _warm_start_values(scenario: Scenario, built: _Built, schedule: Schedule,
 def _solve_impl(scenario: Scenario, original_server: dict[int, int], settings: RunSettings, *,
                 relax: tuple[str, ...], warm_start: Schedule | None,
                 warm_start_supply_temp_C: np.ndarray | None, time_limit_s: float | None,
-                log: bool, feasibility_only: bool) -> SolveResult:
+                log: bool, feasibility_only: bool,
+                ignore_temperature: bool = False) -> SolveResult:
     relax = tuple(relax)
     t_build0 = time.perf_counter()
-    built = _build(scenario, original_server, settings, relax, feasibility_only)
+    built = _build(scenario, original_server, settings, relax, feasibility_only,
+                   ignore_temperature)
     notes = _model_notes(scenario, settings, built)
     built.notes[:] = notes
     if built.empty_workloads:
@@ -949,11 +961,16 @@ def _extract_cold_plate_ops(scenario: Scenario, built: _Built, x: np.ndarray) ->
 def solve(scenario: Scenario, original_server: dict[int, int], settings: RunSettings, *,
           relax: tuple[str, ...] = (), warm_start: Schedule | None = None,
           warm_start_supply_temp_C: np.ndarray | None = None,
-          time_limit_s: float | None = None, log: bool = False) -> SolveResult:
-    """Build and solve the MILP. See the module docstring for the model."""
+          time_limit_s: float | None = None, log: bool = False,
+          ignore_temperature: bool = False) -> SolveResult:
+    """Build and solve the MILP. See the module docstring for the model.
+
+    ``ignore_temperature`` solves it without server temperature (no recursion, no thermal
+    cap, DPF = 1); its schedule is not checked against the thermal limits."""
     return _solve_impl(scenario, original_server, settings, relax=relax, warm_start=warm_start,
                        warm_start_supply_temp_C=warm_start_supply_temp_C,
-                       time_limit_s=time_limit_s, log=log, feasibility_only=False)
+                       time_limit_s=time_limit_s, log=log, feasibility_only=False,
+                       ignore_temperature=ignore_temperature)
 
 
 def diagnose_infeasibility(scenario: Scenario, original_server: dict[int, int],

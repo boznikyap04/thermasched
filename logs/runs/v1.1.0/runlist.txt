@@ -1,0 +1,10 @@
+--scenario thesis10 --time-limit 1800
+--scenario thesis10 --zone-map 1,1,1,1,2,2,2,2,2,2 --time-limit 1800
+--scenario thesis10 --reassignment same_zone --time-limit 1800
+--scenario thesis10 --cold-plates --time-limit 1800
+--scenario thesis10 --cold-plates --cp-mode fixed --time-limit 1800
+--scenario thesis10 --cold-plates --supply-temp-mode fixed --time-limit 1800
+--scenario thesis10 --h-min 5 --time-limit 1800
+--scenario thesis10 --h-min 15 --time-limit 1800
+--scenario thesis10 --reassignment none --time-limit 1800
+--scenario thesis10 --thermal-blind --time-limit 1800

@@ -30,7 +30,7 @@ uv run python -m scheduler.run --scenario small
 The run prints a summary and a list of checks, then writes its outputs to
 `results/<scenario>/<run-name>/`. If you don't pass `--run-name`, the name is built from
 the switches, for example `least_loaded_base18_free_optimize`, with a suffix for every other
-switch that differs from its default (`_hmin15`, `_tl180`, `_gap0.01`, `_seed3` for the
+switch that differs from its default (`_hmin15`, `_tblind`, `_tl180`, `_gap0.01`, `_seed3` for the
 random rule, cold-plate values), so runs with different switches never share a folder. A
 run with the same name overwrites the old one.
 
@@ -89,6 +89,7 @@ One period is 5 minutes. Scenarios built in `notebooks/solver.ipynb` (see
 | `--baseline-rule` | `least_loaded` | `least_loaded`, `fastest_first` or `random` (uses `--seed`) |
 | `--baseline-supply-temp` | `18` | the baseline's fixed CRAC supply air temperature, °C |
 | `--reassignment` | `free` | where the optimizer may move workloads: `free` (any server), `same_zone`, or `none` (baseline server) |
+| `--thermal-blind` | off | `placement = "thermal_blind"`: choose servers with server temperature left out, then solve start times and cooling on those servers with every thermal limit (two passes, the time limit split between them), for S4 T2 |
 | `--supply-temp-mode` | `optimize` | `optimize` picks a supply temperature per zone and period; `fixed` holds it at `--fixed-supply-temp` (default: the baseline's) |
 | `--h-min` | `10` (from scenario) | minimum thermal headroom, °C. The server temperature cap is 90 − H_min |
 | `--time-limit` | `600` | solver time limit, seconds |
@@ -136,9 +137,14 @@ The thesis scenarios are run switches, applied to the main scenario (`--scenario
 | Scenario | Command switches |
 |---|---|
 | S1 base / T1 / T2 | default / `--zone-map 1,1,1,1,2,2,2,2,2,2` (the 2.1 GHz tier in zone 1, the faster tiers in zone 2) / `--reassignment same_zone` |
-| S2 T1 / T2 | `--cold-plates --cp-mode fixed` (CRAC optimized) / `--cold-plates --supply-temp-mode fixed` (cold plates optimized). Airflow is not modelled |
+| S2 base / T1 / T2 | `--cold-plates` (both optimized) / `--cold-plates --cp-mode fixed` (CRAC optimized) / `--cold-plates --supply-temp-mode fixed` (cold plates optimized). Airflow is not modelled |
 | S3 | `--h-min <value>` |
-| S4 base / T1 / T3 | default / `--reassignment none` / `--ci-flat` or `--carbon-file <csv>`. T2 (thermal-blind reassignment) is not defined yet |
+| S4 base / T1 / T2 / T3 | default / `--reassignment none` / `--thermal-blind` / `--ci-flat` or `--carbon-file <csv>` |
+
+Since 1.1.0 every Chapter 6 run is solved with `--time-limit 1800`
+(`logs/runs/v1.1.0/runlist.txt`). With `--thermal-blind`, if no schedule on the servers chosen
+in the first pass meets the thermal limits, the run is infeasible and the diagnosis names the
+limits; there is no fallback.
 
 The command exits with code 1 if any check fails, for example if the optimized schedule
 breaks a limit when the evaluator re-checks it.

@@ -288,3 +288,177 @@ def test_archived_scenarios_come_last_and_use_the_real_scenario(tmp_path):
     names = zipfile.ZipFile(io.BytesIO(runs_zip([(refs[1], data.SCENARIOS_DIR)]))).namelist()
     assert "small/old_run/summary.json" in names
     assert "small/servers.csv" in names and "small/carbon.csv" in names
+
+
+# -- Chapter 6 labels and results table --------------------------------------------------
+
+BASE = "thesis10/least_loaded_base18_free_optimize"
+# docs/PRD_CH6_RESULTS.md §1.1: the 1.0.1 runs of thesis10 and their labels.
+THESIS10_LABELS = {
+    BASE: ["6.1 Base", "6.3 Base 10 °C safety margin", "6.4 Reassignment allowed"],
+    "thesis10/least_loaded_base18_free_optimize_zones1111222222": ["6.1 Regrouped zones"],
+    "thesis10/least_loaded_base18_same_zone_optimize": ["6.1 Same-zone moves only"],
+    "thesis10/least_loaded_base18_free_optimize_cp_cpfixed":
+        ["6.2 CRAC changed, cold plates fixed"],
+    "thesis10/least_loaded_base18_free_fixed18_cp": ["6.2 Cold plates changed, CRAC fixed"],
+    "thesis10/least_loaded_base18_free_optimize_hmin5": ["6.3 Low 5 °C safety margin"],
+    "thesis10/least_loaded_base18_free_optimize_hmin15": ["6.3 High 15 °C safety margin"],
+    "thesis10/least_loaded_base18_none_optimize": ["6.4 No reassignment"],
+    "thesis10/least_loaded_base18_free_optimize_ciflat_tl1800": ["6.4 Flat carbon intensity"],
+}
+needs_thesis10 = pytest.mark.skipif(not set(THESIS10_LABELS) <= set(BY_KEY),
+                                    reason="the 1.0.1 thesis10 runs are not under results/")
+
+
+def _titles(key: str) -> list[str]:
+    ref = BY_KEY[key]
+    return [tr.title for tr in data.thesis_labels(data.load_summary(ref.path), ref.scenario)]
+
+
+@needs_thesis10
+@pytest.mark.parametrize("key", sorted(THESIS10_LABELS))
+def test_thesis10_runs_get_their_labels(key):
+    assert _titles(key) == THESIS10_LABELS[key]
+
+
+@needs_thesis10
+def test_label_text_and_map():
+    texts = data.thesis_label_texts(RUNS)
+    assert texts[BASE] == "6.1 Base / 6.3 Base 10 °C safety margin / 6.4 Reassignment allowed"
+    assert {k for k, r in BY_KEY.items() if r.scenario != "thesis10"}.isdisjoint(texts)
+    row = data.compare_runs([BY_KEY[BASE]]).iloc[0]
+    assert row["thesis_label"] == texts[BASE]
+    assert list(data.compare_runs([BY_KEY[BASE]]).columns[:3]) == ["scenario", "run",
+                                                                  "thesis_label"]
+
+
+def test_archived_and_other_scenarios_get_no_label():
+    others = [k for k, r in BY_KEY.items() if r.scenario != "thesis10"]
+    assert any(data.is_archive(BY_KEY[k].scenario) for k in others)
+    assert any(BY_KEY[k].scenario == "consolidated6" for k in others)
+    for key in others:
+        assert _titles(key) == [], key
+    # An archived thesis10 run carries thesis10 in its summary.json; the folder decides.
+    archived = BY_KEY.get("archive-thesis10/least_loaded_base18_free_optimize")
+    if archived is not None:
+        summary = data.load_summary(archived.path)
+        assert data.thesis_labels(summary, archived.scenario) == []
+
+
+def test_labels_match_settings_not_names():
+    blind = {"scenario": {"name": "thesis10"}, "settings": {"placement": "thermal_blind"}}
+    assert [tr.title for tr in data.thesis_labels(blind)] == \
+        ["6.4 Temperature ignored when choosing servers"]
+    # A run made before a switch existed (no "placement", no "ci_flat") is at the defaults.
+    old = {"scenario": {"name": "thesis10"},
+           "settings": {"reassignment": "free", "time_limit_s": 1800, "run_name": "x"}}
+    assert [tr.title for tr in data.thesis_labels(old)] == \
+        ["6.1 Base", "6.3 Base 10 °C safety margin", "6.4 Reassignment allowed"]
+    two = {"scenario": {"name": "thesis10"},
+           "settings": {"reassignment": "none", "H_min_C": 5}}
+    assert data.thesis_labels(two) == []                   # two switches: no label
+    assert data.thesis_labels({"scenario": {"name": "consolidated6"}, "settings": {}}) == []
+    assert data.thesis_labels(blind, "archive-thesis10") == []
+
+
+@needs_thesis10
+def test_chapter6_table_rows_and_columns():
+    table = data.chapter6_table(RUNS)
+    assert len(table) == len(data.THESIS_RUNS) == 13
+    assert list(table.columns) == list(data.CHAPTER6_COLUMNS)
+    assert list(zip(table["section"], table["label"])) == \
+        [(tr.section, tr.label) for tr in data.THESIS_RUNS]
+    assert table["section"].tolist() == sorted(table["section"])
+    # One base run is the reference (first row) of 6.1, 6.3 and 6.4; which one is the newest
+    # match, so a later rerun of the base may take the place of BASE.
+    firsts = table.groupby("section", sort=False)["run"].first()
+    assert firsts["6.1"] == firsts["6.3"] == firsts["6.4"]
+    assert "6.1 Base" in _titles(f"thesis10/{firsts['6.1']}")
+    for _, row in table.iterrows():
+        if row["run"] is None or pd.isna(row["run"]):
+            assert row["status"] == data.NOT_RUN_YET
+            assert row[list(data.CHAPTER6_METRICS)].isna().all()
+        else:
+            assert row["status"] != data.NOT_RUN_YET
+
+
+@needs_thesis10
+def test_chapter6_base_row_matches_summary_and_schedule():
+    ref = BY_KEY[BASE]
+    summary = data.load_summary(ref.path)
+    row = data.chapter6_row(ref, summary)
+    tot, met = summary["optimized"]["totals"], summary["optimized"]["metrics"]
+    assert row["release"] == summary["provenance"]["thermasched_version"]
+    assert [row["E_crac_zone1_kWh"], row["E_crac_zone2_kWh"]] == tot["E_crac_by_zone_kWh"][:2]
+    assert row["E_IT_kWh"] == tot["E_IT_kWh"] and row["E_total_kWh"] == tot["E_total_kWh"]
+    assert row["E_cp_Wh"] == pytest.approx(tot["E_cp_kWh"] * 1000)
+    assert row["carbon_kg"] == pytest.approx(31.017, abs=1e-3) == tot["carbon_kg"]
+    assert row["T_mean_C"] == met["mean_T_C"]
+    assert row["T_max_C"] == pytest.approx(73.3, abs=0.05) == met["hottest_T_C"]
+    assert row["n_moved_server"] == met["n_reassigned"]
+    assert row["n_moved_zone"] == met["n_cross_zone"]
+    assert row["n_late"] == met["n_late"] and row["n_throttled_servers"] == \
+        met["n_throttled_servers"]
+    assert row["pct_late"] == pytest.approx(met["n_late"] / summary["scenario"]["I"] * 100)
+    assert (row["status"], row["mip_gap"]) == (summary["solver"]["status"],
+                                               summary["solver"]["mip_gap"])
+    assert row["time_limit_s"] == summary["settings"]["time_limit_s"]
+
+    # By hand from schedule.csv: wait and finish - arrival, in 5-minute periods.
+    sch = pd.read_csv(ref.path / "optimized" / "schedule.csv")
+    placed = sch[sch["placed"] == 1]
+    assert row["n_unplaced"] == len(sch) - len(placed) == 0
+    assert (placed["wait"] == placed["start"] - placed["arrival"]).all()
+    assert row["wait_mean_min"] == pytest.approx(placed["wait"].mean() * 5)
+    assert row["wait_max_min"] == placed["wait"].max() * 5
+    turnaround = placed["finish"] - placed["arrival"]
+    assert row["turnaround_mean_min"] == pytest.approx(turnaround.mean() * 5)
+    assert row["turnaround_max_min"] == turnaround.max() * 5
+    assert row["wait_mean_min"] == pytest.approx(71.28, abs=0.01)
+    assert row["turnaround_mean_min"] == pytest.approx(229.94, abs=0.01)
+
+
+@needs_thesis10
+def test_chapter6_changes_against_section_reference():
+    table = data.chapter6_table(RUNS)
+    changes = data.chapter6_changes(table)
+    metrics = list(data.CHAPTER6_METRICS)
+    for _, idx in table.groupby("section", sort=False).groups.items():
+        ref = changes.loc[idx[0], metrics]
+        if table.loc[idx[0], "status"] != data.NOT_RUN_YET:
+            assert (ref.dropna() == 0).all() and ref.notna().any()
+    # Non-metric columns are left as they are.
+    others = [c for c in table.columns if c not in metrics]
+    pd.testing.assert_frame_equal(changes[others], table[others])
+    zones = table.index[table["label"] == "Regrouped zones"][0]
+    assert changes.at[zones, "E_crac_zone1_kWh"] == pytest.approx(
+        (table.at[zones, "E_crac_zone1_kWh"] / table.at[0, "E_crac_zone1_kWh"] - 1) * 100)
+
+
+def test_chapter6_uses_the_newest_matching_run(tmp_path):
+    """Several runs match a label: the table shows the newest, and lists every match."""
+    import json
+    import shutil
+    if BASE not in BY_KEY:
+        pytest.skip("the thesis10 base run is not under results/")
+    for name, created in (("old", "2026-01-01T00:00:00Z"), ("new", "2026-12-01T00:00:00Z")):
+        dst = tmp_path / "thesis10" / name
+        shutil.copytree(BY_KEY[BASE].path, dst)
+        summary = json.loads((dst / "summary.json").read_text())
+        summary["provenance"]["created_utc"] = created
+        (dst / "summary.json").write_text(json.dumps(summary))
+    runs = data.discover_runs(tmp_path)
+    entries = {tr.title: (used, found) for tr, used, found in data.chapter6_runs(runs)}
+    used, found = entries["6.1 Base"]
+    assert used.name == "new" and [r.name for r in found] == ["old", "new"]
+    assert entries["6.1 Regrouped zones"] == (None, [])
+    table = data.chapter6_table(runs)
+    assert table.loc[table["label"] == "Base", "run"].tolist() == ["new"]
+    assert (table.loc[table["run"].isna(), "status"] == data.NOT_RUN_YET).all()
+
+
+def test_chapter6_row_of_a_run_without_optimized_schedule(loaded):
+    run = loaded(INFEASIBLE)
+    row = data.chapter6_row(run.ref, run.summary)
+    assert row["status"] == "infeasible"
+    assert not set(data.CHAPTER6_METRICS) & set(row)

@@ -27,6 +27,9 @@ BASELINE_RULES = ("least_loaded", "fastest_first", "random")
 REASSIGNMENT_MODES = ("free", "same_zone", "none")
 SUPPLY_TEMP_MODES = ("optimize", "fixed")
 COLD_PLATE_MODES = ("optimize", "fixed")
+# thermal_blind: servers are chosen with server temperature left out, then the full model sets
+# start times and cooling on those servers (two passes, see run.solve_thermal_blind).
+PLACEMENT_MODES = ("thermal_aware", "thermal_blind")
 
 # Constraint families that the infeasibility diagnosis relaxes one at a time.
 RELAX_DEADLINES = "deadlines_and_waiting"   # (27), (28): windows widened to the horizon
@@ -223,6 +226,7 @@ class RunSettings:
     baseline_supply_temp_C: float = 18.0
     # optimized model
     reassignment: str = "free"
+    placement: str = "thermal_aware"
     supply_temp_mode: str = "optimize"
     fixed_supply_temp_C: float | None = None   # None: use baseline_supply_temp_C
     H_min_C: float | None = None               # None: use the scenario constant
@@ -250,6 +254,8 @@ class RunSettings:
             raise ValueError(f"baseline_rule must be one of {BASELINE_RULES}")
         if self.reassignment not in REASSIGNMENT_MODES:
             raise ValueError(f"reassignment must be one of {REASSIGNMENT_MODES}")
+        if self.placement not in PLACEMENT_MODES:
+            raise ValueError(f"placement must be one of {PLACEMENT_MODES}")
         if self.supply_temp_mode not in SUPPLY_TEMP_MODES:
             raise ValueError(f"supply_temp_mode must be one of {SUPPLY_TEMP_MODES}")
         if self.cp_mode not in COLD_PLATE_MODES:

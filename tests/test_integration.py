@@ -216,10 +216,14 @@ def test_run_names_differ_for_every_switch_that_changes_the_result():
                 ["--baseline-rule", "random", "--seed", "2"], ["--cold-plates"],
                 ["--cold-plates", "--baseline-cp-flow", "0.2"],
                 ["--cold-plates", "--cp-mode", "fixed"],
-                ["--cold-plates", "--cp-mode", "fixed", "--fixed-cp-flow", "0.2"]]
+                ["--cold-plates", "--cp-mode", "fixed", "--fixed-cp-flow", "0.2"],
+                ["--thermal-blind"]]
     names = [parse_args(v)[0].run_name for v in variants]
     assert len(set(names)) == len(names), names
     assert names[1] == "least_loaded_base18_free_optimize_hmin5"
+    assert names[-1] == "least_loaded_base18_free_optimize_tblind"
+    assert parse_args(["--thermal-blind"])[0].placement == "thermal_blind"
+    assert parse_args([])[0].placement == "thermal_aware"
 
 
 def test_summary_records_provenance(tmp_path):
