@@ -238,3 +238,43 @@ Decided on 2026-10-21.
   and it passes every safety check, or it reports which limits make it infeasible.
 - No 6.2 text on the site or in the docs mentions airflow as a decision.
 - `uv run pytest` passes, including the notebook sync and standalone checks.
+
+## 6. Results of the 1.1.0 runs (2026-10-21)
+
+Ten runs solved from the command line at 1800 s (`logs/runs/v1.1.0/`), plus the 1.0.1 flat-carbon
+run, which already had 1800 s. Every check passes. The 600 s runs stay in `results/thesis10/`; the
+site uses the newest run for each label.
+
+| Section | Run | Carbon (kg) | MIP gap | Moved |
+|---|---|---|---|---|
+| 6.1 / 6.3 / 6.4 | Base | 31.017 | 1.6% | 0 |
+| 6.1 | Regrouped zones | 31.017 | 1.6% | 0 |
+| 6.1 | Same-zone moves only | 31.017 | 26% | 0 |
+| 6.2 | Base, both cooling systems optimized | 29.624 | 2.4% | 0 |
+| 6.2 | CRAC changed, cold plates fixed | 29.623 | 2.4% | 0 |
+| 6.2 | Cold plates changed, CRAC fixed | 33.519 | 2.9% | 0 |
+| 6.3 | Low 5 °C safety margin | 31.017 | 1.6% | 0 |
+| 6.3 | High 15 °C safety margin | 31.017 | 1.5% | 0 |
+| 6.4 | No reassignment | 31.017 | optimal | 0 |
+| 6.4 | Temperature ignored when choosing servers | 31.017 | optimal (pass 1: 1.6%) | 0 |
+| 6.4 | Flat carbon intensity | 31.112 | 1.6% | 0 |
+
+What they show:
+- **D1 settled the question in §1.2.** With 1800 s the base run is within 1.6% of the best
+  possible schedule and still moves nothing, and the no-reassignment run is proven optimal at the
+  same carbon. Reassignment can save at most about 1.6% here, and the solver finds no move that
+  saves anything.
+- **6.1:** regrouping the zones moves CRAC electricity between them (3.15 / 4.62 kWh against
+  3.97 / 3.80) but not the total. Same-zone moves give the base result, at a 26% gap.
+- **6.2:** almost all of the cooling saving comes from the CRAC supply temperature. Optimizing the
+  cold plates on top of a fixed CRAC saves nothing (29.624 against 29.623 kg, within the gap). With
+  the CRAC held at 18 °C, carbon is 33.519 kg. Pump electricity is 0.07 Wh in every cold-plate run.
+- **6.3:** the margin never binds. The CRAC sits at 27 °C all day and the hottest server stays at
+  73.3 °C, below even the 15 °C margin's cap of 75 °C.
+- **6.4:** with temperature left out, pass 1 finds the same placement as the base (no moves,
+  31,016.83 g, 1.6% gap), so temperature does not steer server choice in `thesis10`. Pass 1 first
+  ran without its fixed-server stage and stalled on the baseline (36,114.84 g after 1260 s); it now
+  starts from that stage, like every other run (commit `5ab87d4`). Flat carbon intensity keeps the
+  energy the same, and carbon is 0.3% higher because there are no low-carbon periods to shift
+  work into. With every period equally clean, starting late costs nothing, so average waiting
+  rises by 34 min.
