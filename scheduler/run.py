@@ -149,22 +149,27 @@ def default_run_name(settings: RunSettings) -> str:
       + ([f"gap{st.mip_rel_gap:g}"] if st.mip_rel_gap != d.mip_rel_gap else []))
 
 
-def solve_staged(scenario, original, settings, base_sched, base_supply, warm_start, log):
+def solve_staged(scenario, original, settings, base_sched, base_supply, warm_start, log,
+                 time_limit_s=None, ignore_temperature=False):
     """Solve the optimized model, offering the solver a starting schedule.
 
     The start is the baseline. When servers may change, the same model is first solved
     with every server fixed (a much smaller problem whose solutions are all valid for
     the full one) and its schedule is offered instead. A start only gives the solver a
-    first incumbent; it does not change the model or its optimum.
+    first incumbent; it does not change the model or its optimum. ``time_limit_s``
+    (default: the run's) covers both stages; ``ignore_temperature`` is passed to solve.
     """
+    limit = settings.time_limit_s if time_limit_s is None else time_limit_s
     if not warm_start:
-        return solve(scenario, original, settings, log=log)
+        return solve(scenario, original, settings, time_limit_s=limit, log=log,
+                     ignore_temperature=ignore_temperature)
     start_sched, start_supply = base_sched, base_supply
     stage_time, stage_note = 0.0, None
     if settings.reassignment != "none":
         stage = solve(scenario, original, replace(settings, reassignment="none"),
                       warm_start=base_sched, warm_start_supply_temp_C=base_supply,
-                      time_limit_s=STAGE_SHARE * settings.time_limit_s, log=log)
+                      time_limit_s=STAGE_SHARE * limit, log=log,
+                      ignore_temperature=ignore_temperature)
         stage_time = stage.solve_time_s
         if stage.has_schedule:
             start_sched, start_supply = stage.schedule, stage.supply_temp_C
@@ -177,7 +182,8 @@ def solve_staged(scenario, original, settings, base_sched, base_supply, warm_sta
                           f"ended with status {stage.status} after {stage_time:.1f} s).")
     result = solve(scenario, original, settings, warm_start=start_sched,
                    warm_start_supply_temp_C=start_supply,
-                   time_limit_s=max(1.0, settings.time_limit_s - stage_time), log=log)
+                   time_limit_s=max(1.0, limit - stage_time), log=log,
+                   ignore_temperature=ignore_temperature)
     result.solve_time_s += stage_time
     if stage_note:
         result.notes.append(stage_note)
@@ -193,11 +199,9 @@ def solve_thermal_blind(scenario, original, settings, base_sched, base_supply, w
     server and solves the full model, every thermal limit included, for start times and
     cooling. If pass 2 has no valid schedule, that is the result: no fallback.
     """
-    t1 = BLIND_SHARE * settings.time_limit_s
-    pass1 = solve(scenario, original, settings, ignore_temperature=True,
-                  warm_start=base_sched if warm_start else None,
-                  warm_start_supply_temp_C=base_supply if warm_start else None,
-                  time_limit_s=t1, log=log)
+    pass1 = solve_staged(scenario, original, settings, base_sched, base_supply, warm_start, log,
+                         time_limit_s=BLIND_SHARE * settings.time_limit_s,
+                         ignore_temperature=True)
     gap = "-" if pass1.mip_gap is None else f"{pass1.mip_gap:.2%}"
     if not pass1.has_schedule:
         pass1.notes.append(
@@ -217,7 +221,9 @@ def solve_thermal_blind(scenario, original, settings, base_sched, base_supply, w
         f"Thermal-blind placement, pass 1: servers chosen with server temperature left out "
         f"(no temperature recursion, no thermal cap, DPF = 1); {pass1.status}, "
         f"{pass1.objective_g:,.2f} g, gap {gap}, {pass1.solve_time_s:.1f} s; {moved} workload(s) "
-        f"on another server than the baseline's.")
+        f"on another server than the baseline's."
+        + "".join(f" Pass 1 {n[0].lower()}{n[1:]}" for n in pass1.notes
+                  if n.startswith("Starting schedule")))
     pass2.notes.append(
         "Thermal-blind placement, pass 2: every workload fixed to its pass-1 server; start times "
         "and cooling solved with every thermal limit. The status, gap and objective above are "
