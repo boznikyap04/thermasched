@@ -14,6 +14,15 @@ run.
   section 4 shows which scenarios differ from before), then solve again. The site warns when
   a run was solved on a different scenario build than the one it holds.
 
+## 1.2.1 (2026-10-22)
+
+**Re-run:** nothing. Only the site changed.
+
+- Fix: after the 1.2.0 update the site stopped with `AttributeError: module 'dashboard.state'
+  has no attribute 'run_statuses'`. Community Cloud pulls a new release into the running app,
+  which kept the previous release's code loaded next to the new page script. The site now
+  reloads its own code whenever it changes on disk, so an update no longer needs a reboot.
+
 ## 1.2.0 (2026-10-22)
 
 **Re-run:** nothing. The model is unchanged, so runs made with 1.0.0 to 1.1.0 stay valid. The

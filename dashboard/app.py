@@ -19,6 +19,31 @@ if str(ROOT) not in sys.path:
 
 import streamlit as st  # noqa: E402
 
+PROJECT_PACKAGES = ("dashboard", "scheduler")
+
+
+def _drop_stale_modules() -> None:
+    """Load the project's code afresh when it changed on disk.
+
+    Streamlit runs this script again on every rerun, but modules it imported stay cached in
+    the process. Community Cloud pulls a new commit into the running process, so without
+    this the new app.py would run against the old dashboard and scheduler modules (an
+    AttributeError for anything the release added). The first run of a process, or the first
+    after the source changed, drops those modules and the data cached from them."""
+    stamp = tuple(sorted((str(p), p.stat().st_mtime_ns)
+                         for pkg in PROJECT_PACKAGES for p in (ROOT / pkg).rglob("*.py")))
+    if getattr(sys, "_thermasched_code_stamp", None) == stamp:
+        return
+    stale = [m for m in sys.modules if m.split(".")[0] in PROJECT_PACKAGES]
+    for name in stale:
+        del sys.modules[name]
+    if stale:
+        st.cache_data.clear()
+    sys._thermasched_code_stamp = stamp
+
+
+_drop_stale_modules()
+
 from dashboard import data, state  # noqa: E402
 from scheduler.version import VERSION  # noqa: E402
 from dashboard.views import (  # noqa: E402

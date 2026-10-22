@@ -8,5 +8,5 @@ SCHEMA_VERSION is the layout of summary.json. Raise it when a field is renamed o
 and keep the dashboard able to read every earlier layout.
 """
 
-VERSION = "1.2.0"
+VERSION = "1.2.1"
 SCHEMA_VERSION = 1
