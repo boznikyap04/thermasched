@@ -1,0 +1,3 @@
+Server,Cores,CPU use (%),Supply temperature (°C),H_min (°C),T_dvfs (°C),Periods at full speed,Solver status,Hottest temperature during the run (°C),Lowest DPF during the run,Periods run,Execution time (min),Work delivered / required,Valid under the evaluator,Pass
+qh2-rcc183,48,75.0,18.0,5.0,75.0,6,Proven best,73.32,1.0,6,30.0,1.0,True,True
+qh2-rcc183,48,75.0,27.0,5.0,75.0,6,Proven best,81.06,0.9084,7,35.0,1.1239,True,True

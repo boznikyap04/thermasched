@@ -1,0 +1,82 @@
+{
+  "scenario": "thesis10",
+  "scenario_fingerprint": "5be6aaa02df9",
+  "thermasched_version": "1.2.0",
+  "created_utc": "2026-10-22T07:41:30Z",
+  "period_1_local_hour": 6,
+  "dt_seconds": 300.0,
+  "checks": {
+    "workload_inputs": {
+      "rows": 238,
+      "passed": null
+    },
+    "power": {
+      "rows": 30,
+      "passed": true
+    },
+    "execution_time": {
+      "rows": 8,
+      "passed": true,
+      "equal_periods": {
+        "servers": [
+          "qh2-rcc165",
+          "qh2-rcc183"
+        ],
+        "workloads": 238,
+        "same_periods": 7,
+        "examples": [
+          5,
+          7,
+          145,
+          146,
+          163,
+          167,
+          235
+        ]
+      }
+    },
+    "server_choice": {
+      "rows": 8,
+      "passed": null
+    },
+    "reassignment": {
+      "rows": 4,
+      "passed": true
+    },
+    "crac": {
+      "rows": 4,
+      "passed": null
+    },
+    "crac_supply": {
+      "rows": 1728,
+      "passed": null
+    },
+    "crac_cop": {
+      "rows": 10,
+      "passed": null
+    },
+    "slowdown": {
+      "rows": 2,
+      "passed": true
+    },
+    "throttled_servers": {
+      "rows": 1,
+      "passed": null,
+      "note": "thesis10_warm/least_loaded_base18_free_optimize"
+    },
+    "throttled_workloads": {
+      "rows": 10,
+      "passed": null,
+      "note": "thesis10_warm/least_loaded_base18_free_optimize"
+    },
+    "cold_plates": {
+      "rows": 3,
+      "passed": true,
+      "note": "thesis10/least_loaded_base18_free_optimize_cp_tl1800"
+    },
+    "solver": {
+      "rows": 24,
+      "passed": null
+    }
+  }
+}

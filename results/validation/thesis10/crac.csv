@@ -1,0 +1,5 @@
+H_min (°C),Thermal cap (°C),Solver status,"Zone 1 supply, lowest (°C)",Zone 1 periods below 27 °C,"Zone 2 supply, lowest (°C)",Zone 2 periods below 27 °C,Hottest server (°C),Carbon (kg CO2),Lower supply in
+10.0,80.0,Proven best,27.0,0,27.0,0,73.27,31.0168,none
+18.0,72.0,Proven best,27.0,0,27.0,0,71.9,31.0169,none
+19.0,71.0,Proven best,27.0,0,18.0,2,70.95,31.0267,"zone 2, period 1: 18 °C; zone 2, period 4: 23 °C"
+20.0,70.0,No valid schedule (proven),,,,,,,no valid schedule; feasible only without: thermal_cap

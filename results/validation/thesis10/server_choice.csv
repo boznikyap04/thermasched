@@ -1,0 +1,9 @@
+Workload,Cores,Server,Speed (MHz),Execution time (min),Server electricity during the run (kWh),of which idle (kWh),of which added by the workload (kWh),"Fleet idle electricity, whole day (kWh)","Fleet IT electricity, whole day (kWh)",Meets deadline
+211,8,qh2-rcc165,2100.0,545.0,1.6827,1.49711,0.18558,37.361,37.54662,True
+211,8,qh2-rcc183,3000.0,380.0,1.1499,0.96989,0.18002,37.361,37.54106,True
+232,1,qh2-rcc165,2100.0,540.0,1.50637,1.48338,0.02299,37.361,37.38254,False
+232,1,qh2-rcc183,3000.0,380.0,0.99239,0.96989,0.0225,37.361,37.38354,True
+9,2,qh2-rcc165,2100.0,25.0,0.0708,0.06867,0.00213,37.361,37.36317,True
+9,2,qh2-rcc183,3000.0,15.0,0.04006,0.03828,0.00178,37.361,37.36282,True
+5,8,qh2-rcc165,2100.0,15.0,0.04631,0.0412,0.00511,37.361,37.36615,True
+5,8,qh2-rcc183,3000.0,15.0,0.04539,0.03828,0.00711,37.361,37.36815,True

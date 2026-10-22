@@ -1,0 +1,9 @@
+Workload,Type,Cores,Work required (MHz·s),Server,Speed (MHz),Lowest DPF during the run,"Periods, exact","Periods, rounded up",Execution time (min),Start (period),Start (clock),Finish (period),Finish (clock),Deadline (period),Deadline (clock),Meets deadline,Pass
+211,delay-tolerant,8,544823712.0,qh2-rcc165,2100.0,1.0,108.1,109,545.0,149,18:20,258,03:25,289,06:00,True,True
+211,delay-tolerant,8,544823712.0,qh2-rcc183,3000.0,1.0,75.67,76,380.0,149,18:20,225,00:40,289,06:00,True,True
+232,time-sensitive,1,67876198.6,qh2-rcc165,2100.0,1.0,107.74,108,540.0,188,21:35,296,06:35,289,06:00,False,True
+232,time-sensitive,1,67876198.6,qh2-rcc183,3000.0,1.0,75.42,76,380.0,188,21:35,264,03:55,289,06:00,True,True
+9,time-sensitive,2,5068152.0,qh2-rcc165,2100.0,1.0,4.02,5,25.0,35,08:50,40,09:15,40,09:15,True,True
+9,time-sensitive,2,5068152.0,qh2-rcc183,3000.0,1.0,2.82,3,15.0,35,08:50,38,09:05,40,09:15,True,True
+5,delay-tolerant,8,14609592.0,qh2-rcc165,2100.0,1.0,2.9,3,15.0,30,08:25,33,08:40,57,10:40,True,True
+5,delay-tolerant,8,14609592.0,qh2-rcc183,3000.0,1.0,2.03,3,15.0,30,08:25,33,08:40,57,10:40,True,True

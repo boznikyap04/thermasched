@@ -1,0 +1,25 @@
+Run,Release,Reassignment,CRAC supply,Cold plates,H_min (°C),Time limit (s),Solver status,MIP gap (%),Solve time (s),Carbon (kg CO2),Lower bound (kg CO2),Most a better schedule could save (kg CO2),Workloads moved
+least_loaded_base18_free_fixed18_cp,1.0.1,free,fixed 18 °C,True,,600.0,Stopped at time limit,23.466,601.6,33.5185,25.6529,7.8656,0
+least_loaded_base18_free_fixed18_cp_tl1800,1.1.0,free,fixed 18 °C,True,,1800.0,Stopped at time limit,2.914,1801.5,33.5185,32.5416,0.9769,0
+least_loaded_base18_free_fixed27_tl1800,1.2.0,free,fixed 27 °C,False,,1800.0,Stopped at time limit,1.574,1844.5,31.0168,30.5287,0.4881,0
+least_loaded_base18_free_optimize,1.0.1,free,optimized,False,,600.0,Stopped at time limit,25.917,601.1,31.0168,22.9782,8.0386,0
+least_loaded_base18_free_optimize_ciflat_tl1800,1.0.1,free,optimized,False,,1800.0,Stopped at time limit,1.626,1801.8,31.1116,30.6057,0.5058,0
+least_loaded_base18_free_optimize_cp_cpfixed,1.0.1,free,optimized,True,,600.0,Stopped at time limit,23.287,606.2,29.6233,22.7249,6.8984,0
+least_loaded_base18_free_optimize_cp_cpfixed_tl1800,1.1.0,free,optimized,True,,1800.0,Stopped at time limit,2.378,1825.4,29.6233,28.919,0.7043,0
+least_loaded_base18_free_optimize_cp_tl1800,1.1.0,free,optimized,True,,1800.0,Stopped at time limit,2.377,1831.6,29.6236,28.9196,0.7041,0
+least_loaded_base18_free_optimize_hmin15,1.0.1,free,optimized,False,15.0,600.0,Stopped at time limit,1.495,603.7,31.0168,30.5531,0.4637,0
+least_loaded_base18_free_optimize_hmin15_tl1800,1.1.0,free,optimized,False,15.0,1800.0,Stopped at time limit,1.495,1892.5,31.0168,30.5532,0.4637,0
+least_loaded_base18_free_optimize_hmin5,1.0.1,free,optimized,False,5.0,600.0,Stopped at time limit,25.764,601.6,31.0168,23.0256,7.9913,0
+least_loaded_base18_free_optimize_hmin5_tl1800,1.1.0,free,optimized,False,5.0,1800.0,Stopped at time limit,1.637,2217.1,31.0168,30.5092,0.5076,0
+least_loaded_base18_free_optimize_tblind_tl1800,1.1.0,free,optimized,False,,1800.0,Proven best (servers fixed in pass 2),0.0,1263.7,31.0168,31.0167,0.0001,0
+least_loaded_base18_free_optimize_tl1800,1.1.0,free,optimized,False,,1800.0,Stopped at time limit,1.604,1933.8,31.0168,30.5194,0.4974,0
+least_loaded_base18_free_optimize_zones1111222222,1.0.1,free,optimized,False,,600.0,Stopped at time limit,25.917,601.1,31.0168,22.9782,8.0386,0
+least_loaded_base18_free_optimize_zones1111222222_tl1800,1.1.0,free,optimized,False,,1800.0,Stopped at time limit,1.621,1801.1,31.0168,30.5141,0.5028,0
+least_loaded_base18_none_fixed27_tl1800,1.2.0,none,fixed 27 °C,False,,1800.0,Proven best,0.0,5.3,31.0168,31.0168,0.0,0
+least_loaded_base18_none_optimize,1.0.1,none,optimized,False,,600.0,Proven best,0.0,23.5,31.0168,31.0168,0.0,0
+least_loaded_base18_none_optimize_hmin18_tl1800,1.2.0,none,optimized,False,18.0,1800.0,Proven best,0.0,4.5,31.0169,31.0169,0.0,0
+least_loaded_base18_none_optimize_hmin19_tl1800,1.2.0,none,optimized,False,19.0,1800.0,Proven best,0.0,6.0,31.0267,31.0267,0.0,0
+least_loaded_base18_none_optimize_tl1800,1.1.0,none,optimized,False,,1800.0,Proven best,0.0,14.6,31.0168,31.0168,0.0,0
+least_loaded_base18_same_zone_fixed27_tl1800,1.2.0,same zone,fixed 27 °C,False,,1800.0,Stopped at time limit,1.41,1803.6,31.0168,30.5794,0.4374,0
+least_loaded_base18_same_zone_optimize,1.0.1,same zone,optimized,False,,600.0,Stopped at time limit,25.975,600.6,31.0168,22.9602,8.0566,0
+least_loaded_base18_same_zone_optimize_tl1800,1.1.0,same zone,optimized,False,,1800.0,Stopped at time limit,25.975,1800.9,31.0168,22.9602,8.0566,0

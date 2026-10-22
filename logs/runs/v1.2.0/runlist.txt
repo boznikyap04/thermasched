@@ -1,0 +1,5 @@
+--scenario thesis10 --supply-temp-mode fixed --fixed-supply-temp 27 --time-limit 1800
+--scenario thesis10 --reassignment same_zone --supply-temp-mode fixed --fixed-supply-temp 27 --time-limit 1800
+--scenario thesis10 --reassignment none --supply-temp-mode fixed --fixed-supply-temp 27 --time-limit 1800
+--scenario thesis10 --reassignment none --h-min 18 --time-limit 1800
+--scenario thesis10 --reassignment none --h-min 19 --time-limit 1800

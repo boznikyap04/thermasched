@@ -1,0 +1,5 @@
+Case,Workload type,Cores,Starts on,Other server,Reassignment,Solver status,Runs on,Moved,Start (period),Finish (period),Deadline (period),Carbon (g CO2),Expected,Pass
+Move needed,time-sensitive,8,qh2-rcc165,qh2-rcc183,none,No valid schedule (proven),,,,,6,,no valid schedule,True
+Move needed,time-sensitive,8,qh2-rcc165,qh2-rcc183,free,Proven best,qh2-rcc183,True,2,6,6,457.815,"moves to qh2-rcc183, on time",True
+Move helps,delay-tolerant,16,qh2-rcc127,qh2-rcc133,none,Proven best,qh2-rcc127,False,7,25,25,486.569,stays on qh2-rcc127,True
+Move helps,delay-tolerant,16,qh2-rcc127,qh2-rcc133,free,Proven best,qh2-rcc133,True,13,25,25,469.7,"moves to qh2-rcc133, less carbon",True

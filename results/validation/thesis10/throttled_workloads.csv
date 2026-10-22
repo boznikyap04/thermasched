@@ -1,0 +1,11 @@
+Workload,Server,Periods slowed,Periods at full speed,Periods run,Extra periods,Spare work from rounding up (%),Work delivered / required,Finish (period),Deadline (period)
+16,qh2-rcc183,3,9,9,0,3.83,1.0266,75,77
+31,qh2-rcc183,3,10,10,0,1.07,1.0005,75,90
+38,qh2-rcc183,5,8,8,0,2.04,1.0005,81,88
+47,qh2-rcc183,3,8,8,0,1.86,1.0058,75,92
+51,qh2-rcc183,6,10,10,0,5.57,1.0375,78,97
+59,qh2-rcc183,6,10,10,0,3.14,1.0137,78,105
+60,qh2-rcc183,6,50,50,0,1.35,1.01,116,224
+62,qh2-rcc183,6,16,16,0,3.4,1.0229,83,127
+76,qh2-rcc183,6,7,7,0,13.14,1.1035,78,103
+77,qh2-rcc183,6,76,76,0,1.04,1.0081,147,190

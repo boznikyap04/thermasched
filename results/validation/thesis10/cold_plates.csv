@@ -1,0 +1,4 @@
+Server,Cold plates,Peak heat removed (W),Peak server heat (W),Heat removed over the day (kWh),Flow used (L/min),Coolant used (°C),Pump electricity (Wh),Hottest temperature (°C),Hottest without cold plates (°C),Heat removed ≤ server heat,Heat removed ≤ 300 W per plate,Flow is one of the settings,Coolant within limits,Pass
+qh2-rcc133,1,213.7,223.44,4.1318,0.3,20–20,0.02314,36.95,65.5,True,True,True,True,True
+qh2-rcc183,1,214.34,224.2,4.1488,0.3,20–20,0.02314,59.32,73.27,True,True,True,True,True
+qh2-rcc174,1,221.74,221.74,3.9494,0.3,20–20,0.02314,70.06,71.69,True,True,True,True,True
