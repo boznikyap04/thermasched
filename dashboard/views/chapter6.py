@@ -16,7 +16,7 @@ FORMATS = {
     "T_mean_C": "%.1f", "T_max_C": "%.1f",
     "n_moved_server": "%d", "n_moved_zone": "%d", "n_late": "%d", "pct_late": "%.2f%%",
     "n_throttled_servers": "%d", "n_unplaced": "%d",
-    "mip_gap": "percent", "time_limit_s": "%d",
+    "mip_gap": "percent", "solve_time_s": "%.0f", "time_limit_s": "%d",
 }
 PINNED = ("section", "label", "run")
 COUNTS = [k for k in FORMATS if k.startswith("n_")]
@@ -49,6 +49,9 @@ def _titles(rows: pd.DataFrame) -> str:
 
 def _csv(df: pd.DataFrame, headers: dict[str, str]) -> bytes:
     # utf-8-sig: Excel then reads the °C and other non-ASCII headers correctly.
+    df = df.copy()
+    run = df["status"] != data.NOT_RUN_YET
+    df.loc[run, "status"] = df.loc[run, "status"].map(data.status_text)
     return df.rename(columns=headers).to_csv(index=False).encode("utf-8-sig")
 
 
@@ -87,7 +90,7 @@ def render() -> None:
     shown = data.chapter6_changes(table) if changes else table.copy()
     not_run = shown["status"] == data.NOT_RUN_YET
     shown.loc[not_run, "run"] = f"— {data.NOT_RUN_YET} —"
-    shown["status"] = shown["status"].str.replace("_", " ")
+    shown.loc[~not_run, "status"] = shown.loc[~not_run, "status"].map(data.status_text)
     st.dataframe(shown, hide_index=True, column_config=_column_config(changes))
 
     if not_run.any():
@@ -96,9 +99,14 @@ def render() -> None:
     unproven = table[(table["status"] == "time_limit") & (gap > GAP_WARN)]
     if not unproven.empty:
         st.warning(
-            f"Not proven optimal: {_titles(unproven)} stopped at the time limit with a MIP gap "
+            f"Not proven best: {_titles(unproven)} stopped at the time limit with a MIP gap "
             f"above {GAP_WARN:.0%}. Differences between these rows may be the solver's, not "
             "the model's.", icon=":material/hourglass_bottom:")
+    st.caption(
+        "**Solver status.** *Proven best*: no valid schedule emits less carbon. *Stopped at "
+        "time limit*: the best schedule found in the time allowed, within the MIP gap of the "
+        "best possible, but not proven best. The *Validation* page explains why no run moves "
+        "a workload.")
     unplaced = pd.to_numeric(table["n_unplaced"], errors="coerce").fillna(0)
     if (unplaced > 0).any():
         st.caption("Unplaced workloads, left out of the time columns: " + ", ".join(

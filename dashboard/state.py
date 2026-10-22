@@ -163,6 +163,18 @@ def thesis_labels() -> dict[str, str]:
     return _thesis_labels(tuple(str(r.path) for r in refs), tuple(refs), _summaries_stamp(refs))
 
 
+@st.cache_data(show_spinner=False)
+def _run_statuses(keys: tuple[str, ...], _refs: tuple[data.RunRef, ...],
+                  stamp: float) -> dict[str, str]:
+    return data.run_status_texts(list(_refs))
+
+
+def run_statuses() -> dict[str, str]:
+    """Run key -> the solver's outcome in a few words, for every run of this session."""
+    refs = discover_runs()
+    return _run_statuses(tuple(str(r.path) for r in refs), tuple(refs), _summaries_stamp(refs))
+
+
 def selected_ref() -> data.RunRef | None:
     runs = {r.key: r for r in discover_runs()}
     return runs.get(st.session_state.get(RUN_KEY))

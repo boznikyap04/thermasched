@@ -94,8 +94,10 @@ Good to know:
 
 ## 3. Use the dashboard
 
-In the sidebar, pick a **Scenario** and then a **Run**. A badge shows the solver status:
-green for optimal, orange for time limit reached, red for infeasible or no solution.
+In the sidebar, pick a **Scenario** and then a **Run**. A badge shows the solver status in
+plain words: green for *Proven best*, orange for *Stopped at time limit* (with its gap), red
+for *No valid schedule* or *Stopped, no schedule found*. The run picker shows the same after
+each run's name.
 
 | Page | What it shows |
 |---|---|
@@ -106,6 +108,8 @@ green for optimal, orange for time limit reached, red for infeasible or no solut
 | **Schedule** | Gantt chart of workloads per server for both schedules. You can filter by type or server, or show only reassigned workloads. The list of moved workloads can be downloaded as CSV |
 | **Compliance** | every limit per server, zone, cold plate and workload, plus the reassignment table (original and final zone, cross-zone moves, reason). Red cells break a limit |
 | **Compare runs** | every run of one scenario side by side: carbon saved, settings, release and scenario build. A warning shows if the runs were solved on more than one scenario build, since only runs of the same build are comparable. The table can be downloaded as CSV |
+| **Chapter 6 results** | every Chapter 6 run of the thesis in one table, in section order, with the solver status, gap and solve time. The table can be downloaded as CSV |
+| **Validation** | small, controlled checks of the model (server power, run length and speed, server A vs B, moves, the CRAC supply temperature, slowdown, cold plates, solver completeness) and the scenario's workload table, each downloadable as CSV. It reads `results/validation/<scenario>/` |
 
 Most charts are interactive. Hover for values, drag to zoom, and double-click to reset.
 The browser URL includes the selected run (`?run=<scenario>/<run-name>`), so you can

@@ -23,6 +23,7 @@ from dashboard import data, state  # noqa: E402
 from scheduler.version import VERSION  # noqa: E402
 from dashboard.views import (  # noqa: E402
     chapter6, compare, compliance, cooling, energy, new_run, overview, schedule, thermal, upload,
+    validation,
 )
 
 st.set_page_config(page_title="ThermaSched results", page_icon="🌡️", layout="wide")
@@ -39,6 +40,7 @@ def _sidebar(runs: list[data.RunRef]) -> None:
         by_scenario.setdefault(r.scenario, []).append(r.key)
     uploaded = {r.key for r in runs if state.is_uploaded(r)}
     labels = state.thesis_labels()
+    statuses = state.run_statuses()
 
     # A run just uploaded (or solved) asks to be selected before the widgets draw.
     pending = st.session_state.pop(state.PENDING_RUN, None)
@@ -62,7 +64,8 @@ def _sidebar(runs: list[data.RunRef]) -> None:
     # A Chapter 6 run shows its thesis label first, then its own name.
     st.sidebar.selectbox("Run", options, key=state.RUN_KEY,
                          format_func=lambda k: ("📤 " if k in uploaded else "")
-                         + (f"{labels[k]} · " if k in labels else "") + k.split("/", 1)[1])
+                         + (f"{labels[k]} · " if k in labels else "") + k.split("/", 1)[1]
+                         + (f" · {statuses[k]}" if k in statuses else ""))
     st.query_params["run"] = st.session_state[state.RUN_KEY]
 
     ref = state.selected_ref()
@@ -72,7 +75,8 @@ def _sidebar(runs: list[data.RunRef]) -> None:
             status = (summary.get("solver") or {}).get("status", "unknown")
             color = {"optimal": "green", "time_limit": "orange", "infeasible": "red",
                      "no_solution": "red"}.get(status, "gray")
-            st.sidebar.badge(f"solver: {status.replace('_', ' ')}", color=color)
+            st.sidebar.badge(data.solver_short(summary.get("solver") or {})
+                             if status != "unknown" else "solver: unknown", color=color)
         except (OSError, ValueError):
             st.sidebar.badge("summary.json unreadable", color="red")
         if ref.key in uploaded:
@@ -130,6 +134,8 @@ def main() -> None:
                     url_path="compare"),
             st.Page(chapter6.render, title="Chapter 6 results", icon=":material/table_view:",
                     url_path="chapter6"),
+            st.Page(validation.render, title="Validation", icon=":material/fact_check:",
+                    url_path="validation"),
         ]
     else:
         state.OVERVIEW_PAGE = None

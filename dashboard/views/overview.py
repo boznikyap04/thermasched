@@ -73,9 +73,10 @@ def _solver_card(run: data.Run) -> None:
     with st.container(border=True):
         st.markdown("**Solver (HiGHS MIP)**")
         status = sol.get("status", "unknown")
-        st.badge(f"{status.replace('_', ' ')}"
+        st.badge(data.status_text(status)
                  + (f" · {sol['solver_status_text']}" if sol.get("solver_status_text") else ""),
                  color=STATUS_COLOR.get(status, "gray"))
+        st.caption(data.solver_sentence(sol))
         c1, c2 = st.columns(2)
         c1.metric("Solve time", state.fmt_num(sol.get("solve_time_s"), 1, "s"))
         gap = sol.get("mip_gap")

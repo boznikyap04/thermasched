@@ -184,20 +184,37 @@ while read -r args; do uv run python -m scheduler.run $args < /dev/null; done < 
 
 Keep the printed output of a long run with `... | tee logs/runs/<name>.log`.
 
+## 7b. Validation checks
+
+```sh
+uv run python -m scheduler.validate --scenario thesis10
+```
+
+runs the checks of `scheduler/validate.py` and writes their tables to
+`results/validation/<scenario>/` (CSV, plus `validation.json`). The site's Validation page
+shows them, and section 8 of the solver notebook makes the same tables. The checks that solve
+build small scenarios from the scenario's own servers and constants. The checks that read runs
+(cold plates, the warm-scenario slowdown, solver completeness) are skipped if their run folders
+are missing. Run it again after adding runs to `results/<scenario>/`, so the solver table lists
+them. It exits with 1 if a check fails.
+
 ## 8. Current caveats
 
 **Solving**
 
 - **Most full-model runs stop at the time limit, not at the optimum.** On `consolidated6`
   and `thesis10` with `--reassignment free` or `same_zone`, the solver stops at 600 s with a
-  gap of about 1-4%. The worst case so far is 26% on `thesis10 free`. Treat these results
-  as good valid schedules with a proven bound, not as optima. Report the gap from
-  `summary.json`.
+  gap of about 1-4%. The worst case so far is 26% on `thesis10 free` at 600 s (1.6% at
+  1800 s). Treat these results as good valid schedules with a proven bound, not as optima.
+  Report the gap from `summary.json`; the Validation page lists every run's status, gap and
+  the most a better schedule could still save.
 - **On the large scenarios the solver often doesn't improve on its starting schedule.**
   With `free` or `same_zone`, the model is first solved with workloads fixed to their
   servers, and that schedule is used as the start. On `consolidated6` and `thesis10` with
   `--supply-temp-mode optimize`, several runs stop at the time limit still on that start:
-  the carbon is the same as `--reassignment none`, and no workload moves. When the solver
+  the carbon is the same as `--reassignment none`, and no workload moves. On `thesis10` this
+  holds at 1800 s too, also with the supply fixed at 27 °C (`free` 1.57%, `same_zone` 1.41%):
+  moves could save at most about 0.49 kg there. When the solver
   does get further, moving workloads helps: `small` moves 67 workloads, and `consolidated6` with
   `--h-min 15` moves 197 and solves to optimality.
 - **Results that stop at the time limit can be non-monotone.** For example, `consolidated6` with
@@ -234,8 +251,9 @@ Keep the printed output of a long run with `... | tee logs/runs/<name>.log`.
   unlisted server-periods are available. An unavailable server takes no work but stays on
   at idle power. Running workloads (B_i = 1) keep their server, Eq. (29), but may still
   be shifted in time.
-- **Not modelled:** fan power and airflow (`--fan-power` exits with "not defined yet") and
-  turning servers on and off (every server stays on and draws idle power).
+- **Not modelled:** fan power and airflow (`--fan-power` exits with "not defined yet"; decided
+  with the thesis group on 2026-10-22) and turning servers on and off (every server stays on
+  and draws idle power, so a move changes only the power a workload adds above idle).
 - **Cold-plate settings carry almost no cost.** Pump power is under about 1 mW per plate,
   and no equation charges energy for chilling the water. The optimizer therefore uses
   whichever flow and coolant settings remove the most heat. Where the 0.3 kW plate limit

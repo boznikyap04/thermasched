@@ -40,6 +40,7 @@ def render() -> None:
     st.subheader("Runs")
     shown = df.drop(columns="scenario").copy()
     shown["H_min_C"] = shown["H_min_C"].map(lambda h: "default" if pd.isna(h) else f"{h:g}")
+    shown["status"] = shown["status"].map(data.status_text)
     st.dataframe(shown, hide_index=True, column_config={
         "run": st.column_config.TextColumn("Run", pinned=True),
         "thesis_label": st.column_config.TextColumn(
@@ -76,7 +77,8 @@ def render() -> None:
         "optimized_n_noncompliant": st.column_config.NumberColumn("Non-compliant (opt)",
                                                                   format="%d"),
     })
-    st.download_button("Download table (CSV)", df.to_csv(index=False).encode(),
+    st.download_button("Download table (CSV)",
+                       df.assign(status=df["status"].map(data.status_text)).to_csv(index=False).encode(),
                        file_name=f"{scenario}_runs.csv", mime="text/csv",
                        icon=":material/download:")
     st.download_button("Download all these runs (.zip)", data=lambda: state.run_zip(refs),

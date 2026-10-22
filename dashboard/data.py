@@ -20,11 +20,14 @@ import numpy as np
 import pandas as pd
 
 from scheduler.build import scenario_fingerprint
+from scheduler.types import STATUS_OPTIMAL, STATUS_TIME_LIMIT, status_text
 from scheduler.version import SCHEMA_VERSION, VERSION
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 RESULTS_DIR = Path(os.environ.get("THERMASCHED_RESULTS_DIR", REPO_ROOT / "results"))
 SCENARIOS_DIR = Path(os.environ.get("THERMASCHED_SCENARIOS_DIR", REPO_ROOT / "scenarios"))
+# Validation tables, results/validation/<scenario>/ (written by the validation checks).
+VALIDATION_DIR = RESULTS_DIR / "validation"
 
 VARIANTS = ("baseline", "optimized")
 VARIANT_LABELS = {"baseline": "Baseline", "optimized": "Optimized"}
@@ -611,6 +614,42 @@ def provenance_warnings(summary: dict, scenarios_dir: str | Path = SCENARIOS_DIR
     return out
 
 
+def solver_short(solver: dict) -> str:
+    """The solver's outcome in a few words: 'Proven best', or 'Stopped at time limit, gap
+    1.60 %' (the gap tells how far from the best possible the schedule may be)."""
+    status, gap = solver.get("status"), solver.get("mip_gap")
+    text = status_text(status)
+    if status == STATUS_TIME_LIMIT and gap is not None:
+        text += f", gap {gap * 100:.2f} %"
+    return text
+
+
+def solver_sentence(solver: dict) -> str:
+    """How complete the result is, in one sentence for the thesis."""
+    status, gap, t = solver.get("status"), solver.get("mip_gap"), solver.get("solve_time_s")
+    took = f" in {t:,.0f} s" if t is not None else ""
+    if status == STATUS_OPTIMAL:
+        return f"Proven best{took}: no valid schedule emits less carbon (within the requested gap)."
+    if status == STATUS_TIME_LIMIT and gap is not None:
+        return (f"Stopped at the time limit{took}. This is the best schedule found, within "
+                f"{gap * 100:.2f} % of the best possible (the solver's lower bound); it is not "
+                "proven best.")
+    return f"{status_text(status)}{took}."
+
+
+def run_status_texts(runs: list[RunRef]) -> dict[str, str]:
+    """Run key -> solver_short, for the run picker."""
+    out = {}
+    for ref in runs:
+        try:
+            sol = load_summary(ref.path).get("solver") or {}
+        except (OSError, json.JSONDecodeError):
+            continue
+        if sol.get("status"):
+            out[ref.key] = solver_short(sol)
+    return out
+
+
 def compare_runs(runs: list[RunRef]) -> pd.DataFrame:
     """One row per run (summary.json only): settings, solver and key metrics."""
     rows = []
@@ -785,6 +824,7 @@ CHAPTER6_COLUMNS = {
     "n_unplaced": "Unplaced workloads",
     "status": "Solver status",
     "mip_gap": "MIP gap",
+    "solve_time_s": "Solve time (s)",
     "time_limit_s": "Time limit (s)",
 }
 # Columns that hold results, for the change against each section's reference.
@@ -814,7 +854,7 @@ def chapter6_row(ref: RunRef, summary: dict) -> dict:
     pv, sol, st = provenance(summary), summary.get("solver") or {}, summary.get("settings") or {}
     row = dict(run=ref.name, release=pv.get("thermasched_version") or UNVERSIONED,
                status=sol.get("status"), mip_gap=sol.get("mip_gap"),
-               time_limit_s=st.get("time_limit_s"))
+               solve_time_s=sol.get("solve_time_s"), time_limit_s=st.get("time_limit_s"))
     if not summary.get("has_optimized_schedule"):
         return row
     opt = summary.get("optimized") or {}
@@ -934,3 +974,30 @@ def settings_badges(summary: dict) -> list[tuple[str, str]]:
         ("Time limit", f"{st.get('time_limit_s', 0):g} s"),
         ("MIP gap", f"{st.get('mip_rel_gap', 0):g}"),
     ]
+
+
+# ---------------------------------------------------------------------------
+# Validation tables
+# ---------------------------------------------------------------------------
+
+def validation_scenarios(root: str | Path = VALIDATION_DIR) -> list[str]:
+    """Scenarios with validation tables, ``<root>/<scenario>/validation.json``."""
+    root = Path(root)
+    return sorted(p.parent.name for p in root.glob("*/validation.json")) if root.is_dir() else []
+
+
+def load_validation(scenario: str, root: str | Path = VALIDATION_DIR
+                    ) -> tuple[dict, dict[str, pd.DataFrame]] | None:
+    """validation.json and every table of one scenario's validation, or None if there is none."""
+    folder = Path(root) / scenario
+    meta_path = folder / "validation.json"
+    if not meta_path.is_file():
+        return None
+    meta = json.loads(meta_path.read_text())
+    tables = {}
+    for p in sorted(folder.glob("*.csv")):
+        try:
+            tables[p.stem] = pd.read_csv(p)
+        except pd.errors.EmptyDataError:
+            tables[p.stem] = pd.DataFrame()
+    return meta, tables

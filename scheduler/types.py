@@ -45,6 +45,19 @@ STATUS_TIME_LIMIT = "time_limit"      # stopped on the time limit with a valid s
 STATUS_INFEASIBLE = "infeasible"      # proven: no valid schedule exists
 STATUS_NO_SOLUTION = "no_solution"    # stopped on the time limit with no schedule found
 
+# The solver outcomes in plain words, wherever a run's status is shown.
+STATUS_TEXT = {
+    STATUS_OPTIMAL: "Proven best",
+    STATUS_TIME_LIMIT: "Stopped at time limit",
+    STATUS_INFEASIBLE: "No valid schedule (proven)",
+    STATUS_NO_SOLUTION: "Stopped, no schedule found",
+}
+
+
+def status_text(status: str | None) -> str:
+    """'time_limit' -> 'Stopped at time limit'; an unknown status is returned as it is."""
+    return STATUS_TEXT.get(status or "", status or "unknown")
+
 
 class NotDefinedYet(NotImplementedError):
     """Raised when a switch asks for a term the thesis does not define yet."""

@@ -210,6 +210,10 @@ see [above](#where-the-notebooks-code-comes-from)), so it gives the same numbers
   [Adding a run the group sent](../README.md#releasing-an-update)).
 - **Checks:** the last cell fails if any check failed, as the command line exits with an
   error.
+- **Validation checks:** section 8 runs the checks of the site's Validation page on
+  `VALIDATION_SCENARIO` (`thesis10`) when `RUN_VALIDATION = True`, the default. They take about a
+  minute, write `results/validation/<scenario>/`, and fail the cell if a check fails. The same
+  tables come from `uv run python -m scheduler.validate --scenario thesis10`.
 - **Command line, no editor:** `uv run jupyter-execute --inplace notebooks/solver.ipynb`.
 - **Release:** the first lines printed name the release. The run records it, with a
   fingerprint of its scenario, in `summary.json` (`provenance`), and the site shows both.
@@ -224,8 +228,10 @@ unattended, on Colab or a laptop.
   differ from their defaults (the fields of `RunSettings`, as in `solver.ipynb`). It comes set
   to the thesis set: the 11 Chapter 6 runs on `thesis10`, labelled as on the site, each with a
   1800 s time limit (the switches of
-  [section 5 of the solver guide](../scheduler/README.md#5-thesis-scenarios-ch-6)), then each
-  experiment with and without reassignment at the default 600 s: 19 runs and about six hours.
+  [section 5 of the solver guide](../scheduler/README.md#5-thesis-scenarios-ch-6)), then five
+  validation runs of `thesis10` (moves with the CRAC fixed at 27 °C, and no moves at H_min
+  18 °C and 19 °C; the site's Validation page reads them), then each experiment with and
+  without reassignment at the default 600 s: 24 runs and about seven hours.
   `DEFAULTS` applies switches to every run, for example a longer time limit.
 - **Plan first:** section 1 validates every entry, checks that its scenario exists and that no
   two entries are the same run, and prints the plan with an upper bound on the time, before

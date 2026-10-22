@@ -171,11 +171,13 @@ Run every command from the repository root.
 │   ├── optimize.py            MILP model (HiGHS) and infeasibility diagnosis
 │   ├── evaluate.py            scores any schedule against every limit
 │   ├── report.py              writes the result files, with the run's provenance
+│   ├── validate.py            validation checks → results/validation/<scenario>/ (python -m scheduler.validate)
 │   ├── types.py               shared data types and constants
 │   └── version.py             the release version and the summary.json layout version
 │
 ├── results/                   SOLVER OUTPUTS: results/<scenario>/<run-name>/ (the deployed dashboard shows these)
-│   └── <scenario>/<run>/      summary.json, comparison_period.csv, baseline/, optimized/
+│   ├── <scenario>/<run>/      summary.json, comparison_period.csv, baseline/, optimized/
+│   └── validation/<scenario>/ validation tables (CSV) and validation.json, for the Validation page
 ├── exports/                   zips of notebook runs, for the dashboard (not in git)
 │
 ├── logs/runs/                 console output of the runs in results/, and the list of their switches

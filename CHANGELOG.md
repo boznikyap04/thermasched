@@ -14,6 +14,39 @@ run.
   section 4 shows which scenarios differ from before), then solve again. The site warns when
   a run was solved on a different scenario build than the one it holds.
 
+## 1.2.0 (2026-10-22)
+
+**Re-run:** nothing. The model is unchanged, so runs made with 1.0.0 to 1.1.0 stay valid. The
+five new validation runs of `thesis10` are on the site, and the batch notebook lists them if
+you want to make them yourself.
+
+- New site page, **Validation**: small, controlled checks of the model, each answering a
+  question of the thesis group, with tables you can download. It covers server power at 0, 50
+  and 100 % CPU use, server speed and run length (with the examples qh2-rcc165 and qh2-rcc183),
+  the same workload on server A or B with idle electricity, moves where a move is needed or
+  helps, the CRAC supply temperature at several safety margins, slowdown from heat, the cold
+  plates, and how complete each solver result is. It also has the `thesis10` workload table
+  for Section 5.2.2: requested CPU cores (vCPU), RAM (GB), arrival, deadline, runtime and
+  allowed delay.
+- Solver notebook, new section 8: the same checks, made from your own folder
+  (`RUN_VALIDATION`). Their tables go to `results/validation/<scenario>/`.
+- The solver status is in plain words everywhere: *Proven best*, *Stopped at time limit*
+  (with its gap), *No valid schedule (proven)*. The run picker shows it after each run's name.
+  The Chapter 6 table gained a *Solve time (s)* column.
+- Why no run moves a workload: each run that allows moves starts from the no-move schedule,
+  which is proven best, and finds no better one in 30 minutes. It is not proven that none
+  exists. With the CRAC fixed at 27 °C (the value every optimized run picks), it is the same:
+  stopped at the time limit with no move, gap 1.57 % (moves anywhere) and 1.41 % (same-zone
+  moves, down from 26 %). The solver's bound limits what moves could save to about 0.49 kg
+  CO2. In the controlled cases, the model moves workloads when a move is needed or helps.
+- The CRAC supply temperature is chosen by the solver. It stays at 27 °C, the top of its range
+  and the setting with the highest COP, until a server would pass its cap. With H_min = 19 °C
+  the solver lowers zone 2 to 18 °C, then 23 °C, at the start of the day. With 20 °C, no
+  valid schedule exists.
+- Airflow is not modelled, as decided with the thesis group. Fan power stays at zero.
+- Batch notebook: five validation runs of `thesis10`: moves (free, same zone, none) with the
+  CRAC fixed at 27 °C, and no moves at H_min 18 °C and 19 °C.
+
 ## 1.1.0 (2026-10-21)
 
 **Re-run:** solver, but only for the two new runs (6.2 Base and 6.4 Temperature ignored when
