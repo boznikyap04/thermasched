@@ -224,7 +224,24 @@ def _add_fan_terms(lp: _LP, scenario: Scenario, ci_kw_to_g: np.ndarray):
 # Model construction
 # ---------------------------------------------------------------------------
 
+@dataclasses.dataclass(frozen=True)
+class WindowExtras:
+    """What a per-tick window (scheduler/pertick.py) adds to the model of its scenario.
+
+    ``priority_pairs``: the pairs O_ij = 1 to enforce, in the window's workload numbers,
+    replacing priority_pairs(scenario) (the window's arrivals are shifted, so the pairs come
+    from the whole day). ``forbidden``: per workload, servers it may not use. ``supply_history``:
+    shape (Z, h), the supply temperatures of the h periods just before the window (the last
+    column is the period right before it), so that the ramp limits (35)-(36) hold across the
+    window's start."""
+    priority_pairs: tuple[tuple[int, int], ...] | None = None
+    forbidden: dict[int, frozenset[int]] | None = None
+    supply_history: np.ndarray | None = None
+
+
 class _Window:
+    """Start and occupancy window of one (workload, server) pair: starts a..b, occupied
+    periods ya..yb, run length n_min..n_max periods."""
     __slots__ = ("a", "b", "ya", "yb", "n_min", "n_max")
 
     def __init__(self, a, b, ya, yb, n_min, n_max):
@@ -247,7 +264,8 @@ def _levels(scenario: Scenario) -> list[int]:
 
 
 def _allowed_servers(scenario: Scenario, original_server: dict[int, int],
-                     settings: RunSettings) -> dict[int, list[int]]:
+                     settings: RunSettings,
+                     forbidden: dict[int, frozenset[int]] | None = None) -> dict[int, list[int]]:
     zone_of = {sv.s: sv.zone for sv in scenario.servers}
     out: dict[int, list[int]] = {}
     for w in scenario.workloads:
@@ -262,13 +280,18 @@ def _allowed_servers(scenario: Scenario, original_server: dict[int, int],
             out[w.i] = [sv.s for sv in scenario.servers if sv.zone == zone_of[o]]
         else:
             out[w.i] = [sv.s for sv in scenario.servers]
+        if forbidden and w.i in forbidden:
+            out[w.i] = [s for s in out[w.i] if s not in forbidden[w.i]]
     return out
 
 
 def _build(scenario: Scenario, original_server: dict[int, int], settings: RunSettings,
-           relax: tuple[str, ...], feasibility_only: bool, ignore_temperature: bool = False):
+           relax: tuple[str, ...], feasibility_only: bool, ignore_temperature: bool = False,
+           extras: WindowExtras | None = None):
     """``ignore_temperature`` leaves server temperature out: no temperature recursion, no
-    thermal cap, DPF = 1. Pass 1 of the thermal-blind placement uses it to choose servers."""
+    thermal cap, DPF = 1. Pass 1 of the thermal-blind placement uses it to choose servers.
+    ``extras``: see WindowExtras."""
+    extras = extras or WindowExtras()
     settings.validate()
     for fam in relax:
         if fam not in RELAX_FAMILIES:
@@ -320,7 +343,7 @@ def _build(scenario: Scenario, original_server: dict[int, int], settings: RunSet
 
     servers = scenario.servers
     zone_of = np.array([sv.zone for sv in servers], dtype=int)
-    allowed = _allowed_servers(scenario, original_server, settings)
+    allowed = _allowed_servers(scenario, original_server, settings, extras.forbidden)
     CI = np.asarray(scenario.CI_g_per_kWh, dtype=float)
     if CI.shape != (T,):
         raise ValueError("CI_g_per_kWh must have shape (T,)")
@@ -565,7 +588,8 @@ def _build(scenario: Scenario, original_server: dict[int, int], settings: RunSet
 
     n_priority_rows = 0
     if settings.priority and RELAX_PRIORITY not in relax:
-        for i, j in priority_pairs(scenario):
+        pairs = priority_pairs(scenario) if extras.priority_pairs is None else extras.priority_pairs
+        for i, j in pairs:
             A_i = scenario.workloads[i - 1].A
             shared = [s for s in allowed[i] if (i, s) in win and (j, s) in win]
             if not shared:
@@ -651,6 +675,14 @@ def _build(scenario: Scenario, original_server: dict[int, int], settings: RunSet
             for lag, lim in ((c.ramp_short_lag, c.ramp_short_C), (c.ramp_long_lag, c.ramp_long_C)):
                 for t in range(lag + 1, T + 1):                                         # (35), (36)
                     lp.row([(Tsup[z - 1][t - 1], 1.0), (Tsup[z - 1][t - 1 - lag], -1.0)], -lim, lim)
+                # across the window's start: period t against period t - lag before it
+                hist = extras.supply_history
+                h = 0 if hist is None else hist.shape[1]
+                for t in range(1, min(lag, T) + 1):
+                    back = lag - t + 1               # periods before the window's start
+                    if back <= h:
+                        v = float(hist[z - 1, h - back])
+                        lp.row([(Tsup[z - 1][t - 1], 1.0)], v - lim, v + lim)
 
     # ---- objective: P_IT, P_cp, P_fan and CRAC columns already carry CI * energy factors
     built.lp = lp
@@ -658,6 +690,9 @@ def _build(scenario: Scenario, original_server: dict[int, int], settings: RunSet
     built.Tcol, built.Qcrac, built.Tsup = Tcol, Qcrac, Tsup
     built.slope = slope
     built.choice = choice
+    built.qcols = qcols
+    built.cop_levels = cop_levels
+    built.fixed_cop = None if fixed_value is None else float(cop(c, fixed_value))
     built.dpf_cap = dpf_cap
     built.plates, built.cp_cols = plates, cp_cols
     built.n_priority_rows = n_priority_rows
@@ -811,11 +846,12 @@ def _solve_impl(scenario: Scenario, original_server: dict[int, int], settings: R
                 relax: tuple[str, ...], warm_start: Schedule | None,
                 warm_start_supply_temp_C: np.ndarray | None, time_limit_s: float | None,
                 log: bool, feasibility_only: bool,
-                ignore_temperature: bool = False) -> SolveResult:
+                ignore_temperature: bool = False,
+                extras: WindowExtras | None = None) -> SolveResult:
     relax = tuple(relax)
     t_build0 = time.perf_counter()
     built = _build(scenario, original_server, settings, relax, feasibility_only,
-                   ignore_temperature)
+                   ignore_temperature, extras)
     notes = _model_notes(scenario, settings, built)
     built.notes[:] = notes
     if built.empty_workloads:
@@ -905,6 +941,15 @@ def _solve_impl(scenario: Scenario, original_server: dict[int, int], settings: R
         out.model_values["Q_crac_kW"] = np.array([[x[c_] for c_ in row] for row in built.Qcrac])
         out.model_values["P_IT_W"] = np.array([[x[c_] for c_ in row] for row in built.P_IT])
         out.model_values["Q_cp_W"] = np.array([[x[c_] for c_ in row] for row in built.Q_cp])
+        out.model_values["P_cp_W"] = np.array([[x[c_] for c_ in row] for row in built.P_cp])
+        out.model_values["P_fan_kW"] = np.array([[x[c_] for c_ in row] for row in built.P_fan])
+        if built.fixed_cop is not None:
+            out.model_values["P_crac_kW"] = out.model_values["Q_crac_kW"] / built.fixed_cop
+        else:
+            pc = np.zeros((Z, T))
+            for (z, t), qs in built.qcols.items():
+                pc[z - 1, t] = sum(x[q] / cp_ for q, cp_ in zip(qs, built.cop_levels))
+            out.model_values["P_crac_kW"] = pc
         out.cold_plate_ops = _extract_cold_plate_ops(scenario, built, x)
     elif status == STATUS_INFEASIBLE:
         pass
@@ -962,20 +1007,22 @@ def solve(scenario: Scenario, original_server: dict[int, int], settings: RunSett
           relax: tuple[str, ...] = (), warm_start: Schedule | None = None,
           warm_start_supply_temp_C: np.ndarray | None = None,
           time_limit_s: float | None = None, log: bool = False,
-          ignore_temperature: bool = False) -> SolveResult:
+          ignore_temperature: bool = False, extras: WindowExtras | None = None) -> SolveResult:
     """Build and solve the MILP. See the module docstring for the model.
 
     ``ignore_temperature`` solves it without server temperature (no recursion, no thermal
-    cap, DPF = 1); its schedule is not checked against the thermal limits."""
+    cap, DPF = 1); its schedule is not checked against the thermal limits. ``extras``: what a
+    per-tick window adds, see WindowExtras."""
     return _solve_impl(scenario, original_server, settings, relax=relax, warm_start=warm_start,
                        warm_start_supply_temp_C=warm_start_supply_temp_C,
                        time_limit_s=time_limit_s, log=log, feasibility_only=False,
-                       ignore_temperature=ignore_temperature)
+                       ignore_temperature=ignore_temperature, extras=extras)
 
 
 def diagnose_infeasibility(scenario: Scenario, original_server: dict[int, int],
                            settings: RunSettings, *,
-                           time_limit_s: float = 120.0) -> dict[str, str]:
+                           time_limit_s: float = 120.0,
+                           extras: WindowExtras | None = None) -> dict[str, str]:
     """Re-solve with one constraint family relaxed at a time (first feasible point is enough).
 
     Returns {family: "feasible" | "infeasible" | "unknown (time limit)"} for all families.
@@ -988,7 +1035,7 @@ def diagnose_infeasibility(scenario: Scenario, original_server: dict[int, int],
             continue
         res = _solve_impl(scenario, original_server, settings, relax=(fam,), warm_start=None,
                           warm_start_supply_temp_C=None, time_limit_s=time_limit_s, log=False,
-                          feasibility_only=True)
+                          feasibility_only=True, extras=extras)
         if res.status in (STATUS_OPTIMAL, STATUS_TIME_LIMIT):
             out[fam] = "feasible"
         elif res.status == STATUS_INFEASIBLE:

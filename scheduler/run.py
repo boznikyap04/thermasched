@@ -8,14 +8,24 @@
     uv run python -m scheduler.run --scenario consolidated6 --cold-plates --cp-mode fixed
     uv run python -m scheduler.run --scenario consolidated6 --ci-flat
     uv run python -m scheduler.run --scenario small --thermal-blind
+    uv run python -m scheduler.run --scenario small --per-tick --tick-time-limit 30
 
 Both schedules are scored by the shared evaluator; only its numbers are compared.
+
+--per-tick re-plans at every period with only the workloads that have arrived and keeps that
+period's decisions (scheduler/pertick.py). It saves its state after every tick in
+results/<scenario>/<run-name>/checkpoint/; running the same command again resumes from it.
+
+Exit codes: 0 done and every check passed; 1 done but a check failed; 2 a switch that is not
+defined yet; 3 stopped by --wall-time-limit (run the same command again to resume); 4 a tick
+had no valid schedule (the tick and the limit are in summary.json and ticks.csv).
 """
 
 from __future__ import annotations
 
 import argparse
 import sys
+import time
 from dataclasses import replace
 from pathlib import Path
 
@@ -23,6 +33,9 @@ from scheduler.baseline import build_baseline
 from scheduler.evaluate import evaluate
 from scheduler.io import apply_overrides, load_reference_baseline, load_scenario
 from scheduler.optimize import diagnose_infeasibility, solve
+from scheduler.pertick import (
+    OUTCOME_DONE, OUTCOME_STOPPED, OUTCOME_STUCK, per_tick_block, run_per_tick, stuck_result,
+)
 from scheduler.report import format_summary, write_results
 from scheduler.types import (
     BASELINE_RULES, COLD_PLATE_MODES, REASSIGNMENT_MODES, STATUS_INFEASIBLE, SUPPLY_TEMP_MODES,
@@ -33,6 +46,10 @@ OBJECTIVE_REL_TOL = 1e-6    # optimizer objective against the evaluator's carbon
 NO_WORSE_REL_TOL = 1e-9     # optimized carbon against the baseline's
 STAGE_SHARE = 0.2           # share of the time limit for the fixed-server first stage
 BLIND_SHARE = 0.7           # thermal-blind placement: share of the time limit for pass 1
+EXIT_CHECK_FAILED = 1
+EXIT_NOT_DEFINED = 2
+EXIT_WALL_TIME = 3          # per-tick run stopped by --wall-time-limit; run again to resume
+EXIT_STUCK = 4              # per-tick run: a tick has no valid schedule
 
 
 def parse_args(argv=None) -> tuple[RunSettings, argparse.Namespace]:
@@ -85,6 +102,14 @@ def parse_args(argv=None) -> tuple[RunSettings, argparse.Namespace]:
     ci.add_argument("--ci-flat", action="store_true",
                     help="hold carbon intensity at the scenario's mean in every period")
     p.add_argument("--fan-power", action="store_true", help="not defined yet")
+    p.add_argument("--per-tick", action="store_true",
+                   help="re-plan at every period with only the workloads that have arrived and "
+                        "keep that period's decisions (instead of one plan for the whole day)")
+    p.add_argument("--tick-time-limit", type=float, default=d.tick_time_limit_s,
+                   help="per-tick: HiGHS time limit of each tick's solve, seconds")
+    p.add_argument("--wall-time-limit", type=float, default=None,
+                   help="per-tick: after a tick, if this many seconds have passed, save the "
+                        "checkpoint and exit with code 3; the same command resumes the run")
     p.add_argument("--baseline-only", action="store_true", help="skip the optimized run")
     p.add_argument("--no-warm-start", action="store_true",
                    help="do not offer the solver a starting schedule")
@@ -112,7 +137,8 @@ def parse_args(argv=None) -> tuple[RunSettings, argparse.Namespace]:
         baseline_cp_flow_Lmin=a.baseline_cp_flow, baseline_cp_coolant_C=a.baseline_cp_coolant,
         cp_mode=a.cp_mode, fixed_cp_flow_Lmin=a.fixed_cp_flow, fixed_cp_coolant_C=a.fixed_cp_coolant,
         priority=not a.no_priority, zone_map=zone_map, carbon_file=a.carbon_file,
-        ci_flat=a.ci_flat, fan_power=a.fan_power,
+        ci_flat=a.ci_flat, fan_power=a.fan_power, per_tick=a.per_tick,
+        tick_time_limit_s=a.tick_time_limit,
     )
     settings.run_name = a.run_name or default_run_name(settings)
     return settings, a
@@ -122,7 +148,9 @@ def default_run_name(settings: RunSettings) -> str:
     """Run folder name built from the switches, e.g. ``least_loaded_base18_free_optimize``.
 
     Every switch that can change the result and differs from its default is in the name,
-    so two runs with different switches never share a folder."""
+    so two runs with different switches never share a folder. A per-tick run ends in
+    ``_pertick`` (and ``_ttl<s>`` for a tick time limit other than the default); the whole-day
+    time limit does not apply to it and is left out."""
     st, d = settings, RunSettings()
     fixed_temp = st.optimized_fixed_supply_temp_C()
     cp_fixed = st.cold_plates and st.cp_mode == "fixed"
@@ -145,8 +173,12 @@ def default_run_name(settings: RunSettings) -> str:
       + ([f"ci-{Path(st.carbon_file).stem}"] if st.carbon_file else [])
       + ([f"hmin{st.H_min_C:g}"] if st.H_min_C is not None else [])
       + ([f"seed{st.seed}"] if st.baseline_rule == "random" else [])
-      + ([f"tl{st.time_limit_s:g}"] if st.time_limit_s != d.time_limit_s else [])
-      + ([f"gap{st.mip_rel_gap:g}"] if st.mip_rel_gap != d.mip_rel_gap else []))
+      + ([f"tl{st.time_limit_s:g}"] if st.time_limit_s != d.time_limit_s and not st.per_tick
+         else [])
+      + ([f"gap{st.mip_rel_gap:g}"] if st.mip_rel_gap != d.mip_rel_gap else [])
+      + (["pertick"] if st.per_tick else [])
+      + ([f"ttl{st.tick_time_limit_s:g}"]
+         if st.per_tick and st.tick_time_limit_s != d.tick_time_limit_s else []))
 
 
 def solve_staged(scenario, original, settings, base_sched, base_supply, warm_start, log,
@@ -254,7 +286,12 @@ def optimized_checks(scenario, settings, original, base_eval, result, opt_eval) 
                  settings.optimized_fixed_supply_temp_C() == settings.baseline_supply_temp_C)
     if settings.reassignment == "none" and same_temp:
         name = "optimized_no_worse_than_valid_baseline"
-        if base_eval.valid:
+        if settings.per_tick:
+            out[name] = {"passed": None, "not_applicable":
+                         "per tick, the optimizer does not know later arrivals, so it can do "
+                         "worse than the baseline", "baseline_carbon_g": base_eval.total_carbon_g,
+                         "optimized_carbon_g": opt_eval.total_carbon_g}
+        elif base_eval.valid:
             out[name] = {
                 "passed": opt_eval.total_carbon_g <=
                 base_eval.total_carbon_g * (1 + NO_WORSE_REL_TOL),
@@ -277,8 +314,13 @@ def format_checks(checks: dict) -> str:
 
 def run(settings: RunSettings, *, scenarios_dir="scenarios", results_dir="results",
         baseline_only=False, warm_start=True, diagnosis_time_limit_s=120.0,
-        solver_log=False, quiet=False, made_with="command line") -> dict:
-    """Run one comparison and write its results. Returns the summary dict."""
+        solver_log=False, quiet=False, made_with="command line",
+        wall_time_limit_s: float | None = None) -> dict:
+    """Run one comparison and write its results. Returns the summary dict.
+
+    Per tick (``settings.per_tick``), a run stopped by ``wall_time_limit_s`` writes no summary
+    and returns ``{"per_tick": {"outcome": "stopped", ...}}``; the same call resumes it."""
+    started_at = time.monotonic()
     settings.validate()
     scenario = apply_overrides(load_scenario(settings.scenario, scenarios_dir), settings)
     checks: dict = {}
@@ -294,7 +336,9 @@ def run(settings: RunSettings, *, scenarios_dir="scenarios", results_dir="result
     original = base_sched.server_of()
 
     # optimized
+    out_dir = Path(results_dir) / settings.scenario / settings.run_name
     result = opt_eval = infeasibility = None
+    per_tick = None
     if baseline_only:
         pass
     elif any(sv is None for sv in original.values()):
@@ -302,6 +346,27 @@ def run(settings: RunSettings, *, scenarios_dir="scenarios", results_dir="result
         checks["optimized_run_skipped"] = {
             "reason": f"the baseline could not place workloads {unplaced}, so they have no "
                       "original server"}
+    elif settings.per_tick:
+        outcome = run_per_tick(scenario, original, settings, out_dir, warm_start=warm_start,
+                               log=solver_log, wall_time_limit_s=wall_time_limit_s,
+                               started_at=started_at, diagnosis_time_limit_s=diagnosis_time_limit_s,
+                               quiet=quiet)
+        per_tick = per_tick_block(outcome, settings)
+        if outcome.status == OUTCOME_STOPPED:
+            if not quiet:
+                print(f"\nStopped by the wall-time limit before tick {outcome.next_tick} of "
+                      f"{scenario.T}; checkpoint saved in {out_dir}/checkpoint/. Run the same "
+                      "command again to resume.")
+            return {"per_tick": {**per_tick, "next_tick": outcome.next_tick}}
+        if outcome.status == OUTCOME_DONE:
+            result = outcome.result
+            opt_eval = evaluate(scenario, result.schedule, result.supply_temp_C, settings,
+                                result.cold_plate_ops)
+            checks.update(optimized_checks(scenario, settings, original, base_eval,
+                                           result, opt_eval))
+        else:
+            result = stuck_result(outcome, scenario)
+            infeasibility = outcome.stuck.get("relaxed_one_at_a_time")
     else:
         if settings.placement == "thermal_blind":
             result, (diag_servers, diag_settings) = solve_thermal_blind(
@@ -319,11 +384,10 @@ def run(settings: RunSettings, *, scenarios_dir="scenarios", results_dir="result
             checks.update(optimized_checks(scenario, settings, original, base_eval,
                                            result, opt_eval))
 
-    out_dir = Path(results_dir) / settings.scenario / settings.run_name
     summary = write_results(
         out_dir, scenario, settings, original, base_sched, base_eval,
         result.schedule if result else None, opt_eval, result, infeasibility, checks,
-        made_with=made_with)
+        made_with=made_with, per_tick=per_tick)
     if not quiet:
         print(format_summary(summary))
         print("\n" + format_checks(checks))
@@ -336,14 +400,22 @@ def main(argv=None) -> int:
     try:
         summary = run(settings, scenarios_dir=a.scenarios_dir, results_dir=a.results_dir,
                       baseline_only=a.baseline_only, warm_start=not a.no_warm_start,
-                      diagnosis_time_limit_s=a.diagnosis_time_limit, solver_log=a.solver_log)
+                      diagnosis_time_limit_s=a.diagnosis_time_limit, solver_log=a.solver_log,
+                      wall_time_limit_s=a.wall_time_limit)
     except NotDefinedYet as e:
         print(f"Not defined yet: {e}", file=sys.stderr)
-        return 2
+        return EXIT_NOT_DEFINED
+    outcome = (summary.get("per_tick") or {}).get("outcome")
+    if outcome == OUTCOME_STOPPED:
+        return EXIT_WALL_TIME
+    if outcome == OUTCOME_STUCK:
+        st = summary["per_tick"]["stuck"]
+        print(f"\nSTUCK at tick {st['tick']}: {st['limit_text']}", file=sys.stderr)
+        return EXIT_STUCK
     failed = [n for n, c in summary.get("checks", {}).items() if c.get("passed") is False]
     if failed:
         print(f"\nFAILED checks: {failed}", file=sys.stderr)
-        return 1
+        return EXIT_CHECK_FAILED
     return 0
 
 

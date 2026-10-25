@@ -405,7 +405,9 @@ def write_results(out_dir, scenario: Scenario, settings: RunSettings,
                   original_server: dict, baseline_schedule: Schedule, baseline_eval: EvalResult,
                   optimized_schedule: Schedule | None, optimized_eval: EvalResult | None,
                   solve_result: SolveResult | None, infeasibility: dict | None,
-                  checks: dict, made_with: str = "command line") -> dict:
+                  checks: dict, made_with: str = "command line",
+                  per_tick: dict | None = None) -> dict:
+    """``per_tick``: the per-tick block (scheduler/pertick.py) of a per-tick run."""
     out = Path(out_dir)
     out.mkdir(parents=True, exist_ok=True)
 
@@ -438,6 +440,8 @@ def write_results(out_dir, scenario: Scenario, settings: RunSettings,
                      "CI_mean_g_per_kWh": float(np.mean(scenario.CI_g_per_kWh))},
         "provenance": provenance(scenario, made_with),
         "settings": settings.as_dict(),
+        "mode": "per_tick" if settings.per_tick else "whole_day",
+        "per_tick": per_tick,
         "model_note": model_note(settings),
         "cold_plates": _cold_plate_block(scenario, settings, baseline_eval),
         "airflow_modelled": bool(baseline_eval.airflow_modelled),
@@ -570,6 +574,16 @@ def format_summary(summary: dict) -> str:
                      f"{sv['n_constraints']} constraints")
         for note in sv.get("notes") or []:
             lines.append(f"        note: {note}")
+    pt = summary.get("per_tick")
+    if pt:
+        slow = pt.get("slowest_tick_solve_s")
+        lines.append(f"Per-tick re-planning: {pt['n_ticks']} ticks, {pt['n_ticks_optimal']} "
+                     f"optimal, {pt['n_ticks_time_limit']} at the {pt['tick_time_limit_s']:g} s "
+                     f"tick limit, slowest {'-' if slow is None else f'{slow:.1f}'} s "
+                     f"(tick {pt.get('slowest_tick')}); log in {pt['ticks_file']}")
+        if pt.get("stuck"):
+            st = pt["stuck"]
+            lines.append(f"STUCK at tick {st['tick']}: {st['limit_text']}. {st['detail']}.")
     if not have_opt:
         lines.append("")
         lines.append("NO VALID SCHEDULE WAS FOUND by the optimizer; only the baseline is shown.")
