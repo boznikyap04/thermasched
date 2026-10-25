@@ -1,14 +1,18 @@
 """The per-tick batch runs, from the experiment list in scheduler/experiments.py.
 
-    uv run python tools/runlist.py                    # the 18 runs of the first batch, one per line
+    uv run python tools/runlist.py                    # the 39 runs, one per line
+    uv run python tools/runlist.py --sections 6.1,6.2 # the 18 runs of the first batch
     uv run python tools/runlist.py --format json      # the same, with every field
     uv run python tools/runlist.py --format matrix    # {"include": [...]} for the Actions matrix
     uv run python tools/runlist.py --only servers6_heavy__base --format matrix
     uv run python tools/runlist.py --timing --format matrix   # the same: the timing run only
 
-The first batch (docs/PLAN.md §3): fleet servers6 on the light, normal and heavy day, every
-test of sections 6.1 and 6.2 that applies to the fleet, each as one per-tick run in
-``<results-dir>/<scenario>/<test id>/``. A run's switches are the test's (``switches_for``),
+The runs (docs/PLAN.md §3): fleet servers6 on the light, normal and heavy day, every test of
+sections 6.1 to 6.4 that applies to the fleet (the first batch was 6.1 and 6.2), each as one
+per-tick run in ``<results-dir>/<scenario>/<test id>/``. 6.4 Test 3a (flat carbon) runs with
+``--ci-flat``; 6.4 Test 3b (deeper carbon swing) runs on the configuration's ``_swing``
+scenario, so its folder is ``<scenario>_swing/s4_t3b_ci_swing/`` and is filed under the
+configuration's folder when the results are installed. A run's switches are the test's (``switches_for``),
 the same the batch notebook sets for that test, so the site recognizes the run as that test.
 
 Each run's command is ``python -m scheduler.run <args> <per_tick_args>``: ``args`` are the
@@ -26,12 +30,12 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from scheduler.experiments import (  # noqa: E402
-    LEVELS, SECTION_BY_KEY, TEST_BY_ID, applicable, configuration, switches_for,
+    LEVELS, SECTION_BY_KEY, SWING, TEST_BY_ID, applicable, configuration, switches_for,
 )
 
 FLEET = "servers6"
 LEVEL_KEYS = tuple(lv.key for lv in LEVELS)            # light, normal, heavy
-SECTIONS = ("6.1", "6.2")
+SECTIONS = ("6.1", "6.2", "6.3", "6.4")
 # The run of the timing confirmation (docs/PLAN.md §5 item 3): heavy day, 6.1 Base.
 TIMING_RUN = "servers6_heavy__base"
 
@@ -52,14 +56,29 @@ _FLAGS = {
     "supply_temp_mode": lambda v: ["--supply-temp-mode", v],
     "H_min_C": lambda v: ["--h-min", f"{v:g}"],
     "placement": lambda v: ["--thermal-blind"] if v == "thermal_blind" else [],
+    # Only the flat profile is a flag; the swing is a scenario (see _scenario_for).
+    "ci_amplitude": lambda v: ["--ci-flat"] if v == 0 else _no_flag("ci_amplitude", v),
 }
+
+
+def _no_flag(key, value):
+    raise ValueError(f"no run.py flag for switch {key}={value!r}")
+
+
+def _scenario_for(config, switches: dict) -> tuple[str, dict]:
+    """The scenario a test runs on, and the switches left for flags: the deeper carbon swing
+    is the configuration's ``_swing`` twin, whose name implies it (experiments.SWING)."""
+    implied = dict(SWING)
+    if all(switches.get(k) == v for k, v in implied.items()):
+        return f"{config.key}_swing", {k: v for k, v in switches.items() if k not in implied}
+    return config.key, switches
 
 
 def switch_args(switches: dict) -> list[str]:
     out = []
     for key, value in switches.items():
         if key not in _FLAGS:
-            raise ValueError(f"no run.py flag for switch {key}={value!r}")
+            _no_flag(key, value)
         out += _FLAGS[key](value)
     return out
 
@@ -95,11 +114,13 @@ def runs(fleet: str = FLEET, levels=LEVEL_KEYS, sections=SECTIONS, *,
                 if not applicable(test, config) or (config.key, test.id) in seen:
                     continue
                 seen.add((config.key, test.id))
-                args = (["--scenario", config.key, "--run-name", test.id]
-                        + switch_args(switches_for(test, config))
+                scenario, switches = _scenario_for(config, switches_for(test, config))
+                args = (["--scenario", scenario, "--run-name", test.id]
+                        + switch_args(switches)
                         + ["--results-dir", results_dir])
                 out.append({
-                    "id": run_id(config.key, test.id), "scenario": config.key,
+                    "id": run_id(scenario, test.id), "scenario": scenario,
+                    "configuration": config.key,
                     "run_name": test.id, "level": level, "section": key, "tag": tag,
                     "test": test.name, "args": args, "per_tick_args": tail,
                 })

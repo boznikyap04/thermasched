@@ -70,7 +70,7 @@ evaluator scores exactly as it scores any schedule today.
 - Per-tick is slower than one solve: 288 solves in sequence per run.
 - The comparison with the baseline is like for like: neither knows future workloads.
 
-## 3. First batch: 18 runs
+## 3. The runs: 18 + 21
 
 Six servers (2 slow, 2 mid, 2 fast) with 64 GB per server, on the light, normal and heavy day
 (peak demand 30 / 60 / 85 % of the fleet's cores or memory, whichever fills first), sections
@@ -85,8 +85,26 @@ Six servers (2 slow, 2 mid, 2 fast) with 64 GB per server, on the light, normal 
 | 13–15 | 6.2 | T1: CRAC changed, cold plates fixed | ✓ | ✓ | ✓ |
 | 16–18 | 6.2 | T2: cold plates changed, CRAC fixed | ✓ | ✓ | ✓ |
 
-**Not in this batch:** the 10- and 2-server fleets, sections 6.3 and 6.4, and the validation
-runs. They follow once the first batch works.
+### Second batch: 21 runs (added 2026-10-26)
+
+Sections 6.3 and 6.4 on the same fleet and days. Their base is the 6.1 Base of the first batch.
+
+| # | Section | Test | Light | Normal | Heavy |
+|---|---|---|---|---|---|
+| 19–21 | 6.3 | T1: high safety margin, H_min 19 °C | ✓ | ✓ | ✓ |
+| 22–24 | 6.3 | T2: medium safety margin, H_min 15 °C | ✓ | ✓ | ✓ |
+| 25–27 | 6.3 | T3: low safety margin, H_min 5 °C | ✓ | ✓ | ✓ |
+| 28–30 | 6.4 | T1: no reassignment | ✓ | ✓ | ✓ |
+| 31–33 | 6.4 | T2: moves chosen without temperature | ✓ | ✓ | ✓ |
+| 34–36 | 6.4 | T3a: flat carbon intensity (`--ci-flat`) | ✓ | ✓ | ✓ |
+| 37–39 | 6.4 | T3b: deeper daily carbon swing (±50 %) | ✓ | ✓ | ✓ |
+
+T3b runs on each day's `_swing` twin (`servers6_light_swing`, `servers6_swing`,
+`servers6_heavy_swing`): the same workloads, carbon amplitude 0.50 instead of 0.25. Its run
+folder is `<day>_swing/s4_t3b_ci_swing/`, filed under the day's folder when installed.
+`tools/runlist.py` now lists all 39 runs; `--sections 6.1,6.2` gives the first batch.
+
+**Not in either batch:** the 10- and 2-server fleets and the validation runs.
 
 ## 4. Where it runs: GitHub Actions
 

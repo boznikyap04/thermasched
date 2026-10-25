@@ -10,7 +10,8 @@ FILES = ("servers.csv", "workloads.csv", "carbon.csv", "baseline_schedule.csv", 
 
 
 # The scenarios data_prep.ipynb builds from data/clean/ (small_running is made from small).
-BUILT = ("servers6_light", "servers6", "servers6_heavy", "small")
+BUILT = ("servers6_light", "servers6", "servers6_heavy", "servers6_light_swing", "servers6_swing",
+         "servers6_heavy_swing", "small")
 
 
 @pytest.mark.parametrize("name", BUILT)

@@ -376,7 +376,8 @@ def scenario_fingerprint(folder):
 
 # Written by data_prep.ipynb from its Settings cell.
 # derive_scenario never overwrites them.
-SHIPPED_SCENARIOS = ("servers6_light", "servers6", "servers6_heavy", "small", "small_running")
+SHIPPED_SCENARIOS = ("servers6_light", "servers6", "servers6_heavy", "servers6_light_swing",
+                     "servers6_swing", "servers6_heavy_swing", "small", "small_running")
 
 
 def _changed(base: dict, changes: dict | None, what: str) -> dict:
