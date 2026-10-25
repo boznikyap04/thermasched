@@ -4,7 +4,7 @@ Each check answers one question of the thesis group and returns a table: a list 
 (dicts) whose keys are the column headers, with units. Where a check has an expected
 answer, the row says whether it passed.
 
-    uv run python -m scheduler.validate --scenario thesis10
+    uv run python -m scheduler.validate --scenario servers6
 
 writes every table to ``results/validation/<scenario>/`` as CSV, with ``validation.json``
 (release, date, scenario build, and the result of every check).
@@ -42,7 +42,9 @@ from .version import VERSION
 POWER_TOL_W = 0.01
 TOY_TIME_LIMIT_S = 60.0
 
-# Examples of the thesis group (validation questions of 2026-10-21).
+# Examples of the thesis group (validation questions of 2026-10-21), posed on thesis10, the
+# earlier 10-server scenario. On another scenario the checks use the workloads of these
+# numbers it has, and its first and last server.
 EXAMPLE_WORKLOADS = (211, 232, 9, 5)
 EXAMPLE_SERVERS = ("qh2-rcc165", "qh2-rcc183")
 
@@ -662,7 +664,7 @@ def _passed(rows, key="Pass"):
     return None if not vals else all(vals)
 
 
-def write_all(scenario_name: str = "thesis10", scenarios_dir="scenarios", results_dir="results",
+def write_all(scenario_name: str = "servers6", scenarios_dir="scenarios", results_dir="results",
               out_dir=None, log=print) -> dict:
     """Run every check on the scenario and write the tables to
     ``<results_dir>/validation/<scenario>/``. Returns what validation.json holds."""
@@ -717,7 +719,7 @@ def write_all(scenario_name: str = "thesis10", scenarios_dir="scenarios", result
 
 def main(argv=None) -> int:
     p = argparse.ArgumentParser(prog="scheduler.validate", description=__doc__.split("\n\n")[0])
-    p.add_argument("--scenario", default="thesis10")
+    p.add_argument("--scenario", default="servers6")
     p.add_argument("--scenarios-dir", default="scenarios")
     p.add_argument("--results-dir", default="results")
     a = p.parse_args(argv)

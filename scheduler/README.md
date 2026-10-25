@@ -38,16 +38,16 @@ Some common runs:
 
 ```sh
 # fast run: workloads stay on their baseline server, only timing and cooling change
-uv run python -m scheduler.run --scenario consolidated6 --reassignment none
+uv run python -m scheduler.run --scenario servers6 --reassignment none
 
-# full model on the main scenario, 10-minute time limit (the default)
-uv run python -m scheduler.run --scenario consolidated6
+# full model on the six-server normal day, 10-minute time limit (the default)
+uv run python -m scheduler.run --scenario servers6
 
 # with cold plates on every server, and a custom output folder
-uv run python -m scheduler.run --scenario consolidated6 --cold-plate-count 1 --run-name cp1
+uv run python -m scheduler.run --scenario servers6 --cold-plate-count 1 --run-name cp1
 
 # baseline only, no optimization
-uv run python -m scheduler.run --scenario consolidated6 --baseline-only
+uv run python -m scheduler.run --scenario servers6 --baseline-only
 ```
 
 To run the same steps one at a time, with tables and charts in between, open
@@ -63,22 +63,21 @@ folders, and how to start a run from the browser.
 
 | Scenario | Servers | Workloads | Horizon | Use |
 |---|---|---|---|---|
-| `thesis10` | 10 (4/3/3 by speed) | 238 | 288 periods (24 h from 06:00) | **main scenario**: the 10-server fleet from the thesis text; main results |
-| `consolidated6` | 6 (2/2/2) | same as `thesis10` | 288 periods | experiment: the same work on a consolidated fleet (peak demand 44% of the fleet, not 26%) |
-| `thesis10_tight` | 10 | same as `thesis10` | 288 periods | experiment: 50% time-sensitive, delay-tolerant slack 30 min to 2 h (not 2 to 8 h) |
-| `thesis10_swing` | 10 | same as `thesis10` | 288 periods | experiment: carbon intensity swings ±50% over the day (not ±25%) |
-| `thesis10_warm` | 10 | same as `thesis10` | 288 periods | experiment: CRAC supply air up to 32 °C (not 27 °C) |
-| `servers2` | 2 (both 2.4 GHz, no cold plate) | 123 | 288 periods | the 2-server configuration of Chapter 6: workloads drawn until peak demand is 62% of the fleet |
-| `consolidated6_swing` | 6 (2/2/2) | same as `thesis10` | 288 periods | `consolidated6` with the carbon swing of `thesis10_swing` (6.4 Test 3b on 6 servers) |
-| `servers2_swing` | 2 | same as `servers2` | 288 periods | `servers2` with the carbon swing of `thesis10_swing` (6.4 Test 3b on 2 servers) |
-| `small` | 3 | 99 | 96 periods (8 h, 12:00-20:00) | quick tests, debugging |
-| `small_running` | 3 | same as `small` | 96 periods | `small` with 4 workloads already running (B_i = 1) and server 3 down 15:00-16:00 (`availability.csv`), to exercise Eq. (11) and (29) |
+| `servers6_light` | 6 (2/2/2 by speed) | 45 | 288 periods (24 h from 06:00) | light day: workloads drawn until peak demand is 30% of the fleet's cores or memory (34% of memory, 17% of cores) |
+| `servers6` | 6 (2/2/2) | 132 | 288 periods | normal day: peak demand 60% (61% of memory, 31% of cores) |
+| `servers6_heavy` | 6 (2/2/2) | 210 | 288 periods | heavy day: peak demand 85% (86% of memory, 44% of cores) |
+| `small` | 3 | 79 | 96 periods (8 h, 12:00-20:00) | quick tests, debugging |
+| `small_running` | 3 | same as `small` | 96 periods | `small` with 5 workloads already running (B_i = 1) and server 3 down 15:00-16:00 (`availability.csv`), to exercise Eq. (11) and (29) |
 
-`thesis10` is the main scenario; the others are built from it by `notebooks/data_prep.ipynb`,
-each changing one aspect, and record the change under `variant_of` in `params.json`. Read
-an experiment as the difference from thesis10 run with the same switches. The notebook makes
-`small_running` from `small` (`build.build_running_variant`) and records it under
-`derived_from`.
+Every server has 64 GB of memory (66,036 MB). Almost every workload asks for 2 GB per vCPU,
+so memory fills first and sets the load level. All scenarios are built by
+`notebooks/data_prep.ipynb` from one set of reference settings (`servers10`, the ten-server
+fleet of the thesis text), each with some values changed, recorded under `variant_of` in
+`params.json`. The notebook makes `small_running` from `small`
+(`build.build_running_variant`) and records it under `derived_from`. The 10- and 2-server
+fleets (`servers10*`, `servers2*`) are added when they are run. The earlier scenarios
+(`thesis10`, `consolidated6`, `servers2` and their variants) had 516 GB per server and are in
+`archive/scenarios_516GB/`.
 
 One period is 5 minutes. Scenarios built in `notebooks/solver.ipynb` (see
 [Changing the inputs](#6-changing-the-inputs)) are folders here too, and run the same way.
@@ -135,11 +134,12 @@ Each run folder contains:
 
 ## 5. Thesis scenarios (Ch. 6)
 
-The thesis scenarios are run switches, applied to the main scenario (`--scenario thesis10`).
+The thesis scenarios are run switches, applied to the six-server fleet on each load level
+(`--scenario servers6_light`, `servers6`, `servers6_heavy`).
 
 | Scenario | Command switches |
 |---|---|
-| S1 base / T1 / T2 | default / `--zone-map 1,1,1,1,2,2,2,2,2,2` (the 2.1 GHz tier in zone 1, the faster tiers in zone 2) / `--reassignment same_zone` |
+| S1 base / T1 / T2 | default / `--zone-map 1,1,2,2,2,2` (the 2.1 GHz tier in zone 1, the faster tiers in zone 2) / `--reassignment same_zone` |
 | S2 base / T1 / T2 | `--cold-plates` (both optimized) / `--cold-plates --cp-mode fixed` (CRAC optimized) / `--cold-plates --supply-temp-mode fixed` (cold plates optimized). Airflow is not modelled |
 | S3 | `--h-min <value>` |
 | S4 base / T1 / T2 / T3 | default / `--reassignment none` / `--thermal-blind` / `--ci-flat` or `--carbon-file <csv>` |
@@ -162,7 +162,7 @@ breaks a limit when the evaluator re-checks it.
   `baseline_schedule.csv` no longer matches. To keep it passing, copy the scenario to a new
   folder and regenerate it.
 - **A new scenario from an existing one:** in `notebooks/solver.ipynb`, set `SCENARIO` to a new
-  name and `BUILD_FROM` to the scenario to start from (normally `thesis10`), and put the values to change in
+  name and `BUILD_FROM` to the scenario to start from (normally `servers6`), and put the values to change in
   `SCENARIO_CHANGES` (fleet size, speed split, horizon, load target, deadlines, carbon
   intensity), `CONSTANT_CHANGES` (the thesis constants) or `COLD_PLATE_CHANGES`. The notebook
   writes `scenarios/<name>/` with its own `baseline_schedule.csv`, so every check passes, and
@@ -190,7 +190,7 @@ Keep the printed output of a long run with `... | tee logs/runs/v<release>/<name
 ## 7b. Validation checks
 
 ```sh
-uv run python -m scheduler.validate --scenario thesis10
+uv run python -m scheduler.validate --scenario servers6
 ```
 
 runs the checks of `scheduler/validate.py` and writes their tables to
@@ -205,6 +205,9 @@ them. It exits with 1 if a check fails.
 ## 8. Current caveats
 
 **Solving**
+
+The figures in these points come from the whole-day runs on the earlier 516 GB scenarios
+(`thesis10`, `consolidated6`; now in `archive/scenarios_516GB/`).
 
 - **Most full-model runs stop at the time limit, not at the optimum.** On `consolidated6`
   and `thesis10` with `--reassignment free` or `same_zone`, the solver stops at 600 s with a

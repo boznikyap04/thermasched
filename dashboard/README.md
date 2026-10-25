@@ -39,7 +39,8 @@ A run shows on the site when it was solved on one of the configurations' scenari
 day of 10 servers is `servers10` (earlier `thesis10`), its light and heavy days
 `servers10_light` and `servers10_heavy`, and each has a `_swing` twin for 6.4 Test 3b; the
 same for `servers6` (earlier `consolidated6`) and `servers2` (two mid servers). The list is in
-`scheduler/experiments.py`. A run
+`scheduler/experiments.py`. Only the `servers6` scenarios are in `scenarios/` for now; the
+others are added when they are run. A run
 is matched to its test by its settings, not its folder name, so a run made in the batch
 notebook shows under its test too.
 
@@ -59,7 +60,7 @@ notebooks write this structure for you.
 **Common mistakes**
 
 - **Extra folder level.** Unzipping often adds one, for example
-  `results/consolidated6/my_run/my_run/summary.json`. Move the inner folder up a level.
+  `results/servers6/my_run/my_run/summary.json`. Move the inner folder up a level.
 - **No scenario folder.** Putting the run directly in `results/my_run/` doesn't work.
   It must be inside a folder.
 - **Scenario missing from `scenarios/`.** The dashboard reads the server names and the

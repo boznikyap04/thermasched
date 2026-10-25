@@ -9,8 +9,11 @@ from scheduler.io import load_scenario
 FILES = ("servers.csv", "workloads.csv", "carbon.csv", "baseline_schedule.csv", "params.json")
 
 
-@pytest.mark.parametrize("name", ["thesis10", "consolidated6", "small", "thesis10_tight", "thesis10_swing",
-                                  "thesis10_warm"])
+# The scenarios data_prep.ipynb builds from data/clean/ (small_running is made from small).
+BUILT = ("servers6_light", "servers6", "servers6_heavy", "small")
+
+
+@pytest.mark.parametrize("name", BUILT)
 def test_build_reproduces_shipped_scenario(name, tmp_path):
     """The builder used by data_prep.ipynb writes the shipped scenarios byte for byte."""
     p = json.loads(open(f"scenarios/{name}/params.json").read())
@@ -22,28 +25,31 @@ def test_build_reproduces_shipped_scenario(name, tmp_path):
         assert (tmp_path / name / f).read_bytes() == open(f"scenarios/{name}/{f}", "rb").read(), f
 
 
-def test_experiments_record_what_they_change_from_thesis10():
-    """Every shipped experiment is thesis10 with only the values under variant_of changed."""
-    main = json.loads(open("scenarios/thesis10/params.json").read())
-    assert "variant_of" not in main
-    for name in ("consolidated6", "small", "thesis10_tight", "thesis10_swing", "thesis10_warm"):
-        p = json.loads(open(f"scenarios/{name}/params.json").read())
-        assert p["variant_of"]["scenario"] == "thesis10"
+def test_scenarios_record_what_they_change_from_the_reference_settings():
+    """Every shipped scenario is the reference settings (servers10) with only the values under
+    variant_of changed: two scenarios differ only in values one of them lists as changed."""
+    params = {name: json.loads(open(f"scenarios/{name}/params.json").read()) for name in BUILT}
+    for name, p in params.items():
+        assert p["variant_of"]["scenario"] == "servers10", name
         changed = p["variant_of"]["changed"]
-        assert changed, name
-        assert p["settings"] == main["settings"] | changed.get("settings", {}), name
-        assert p["constants_as_printed"] == main["constants_as_printed"] | changed.get("constants", {}), name
-        assert p["cold_plate"] == main["cold_plate"], name
+        assert changed["settings"], name
+        assert all(p["settings"][k] == v for k, v in changed["settings"].items()), name
+        for other, q in params.items():
+            listed = set(changed["settings"]) | set(q["variant_of"]["changed"]["settings"])
+            assert {k: v for k, v in p["settings"].items() if k not in listed} == \
+                {k: v for k, v in q["settings"].items() if k not in listed}, (name, other)
+            assert p["constants_as_printed"] == q["constants_as_printed"], (name, other)
+            assert p["cold_plate"] == q["cold_plate"], (name, other)
 
 
-def test_derive_from_an_experiment(tmp_path):
-    """An experiment written by data_prep.ipynb is a valid starting point in solver.ipynb."""
-    for name in ("thesis10_warm",):
-        shutil.copytree(f"scenarios/{name}", tmp_path / name)
-    out = derive_scenario("nb_warm_six", "thesis10_warm", {"n_servers": 6, "freq_split": [2, 2, 2]},
-                          scenarios_dir=tmp_path, clean_dir="data/clean")
+def test_derive_from_a_shipped_scenario(tmp_path):
+    """A scenario written by data_prep.ipynb is a valid starting point in solver.ipynb."""
+    shutil.copytree("scenarios/servers6", tmp_path / "servers6")
+    out = derive_scenario("nb_warm_three", "servers6", {"n_servers": 3, "freq_split": [1, 1, 1]},
+                          {"T_crac_max_C": 32.0}, scenarios_dir=tmp_path, clean_dir="data/clean")
     assert out["params"]["constants_as_printed"]["T_crac_max_C"] == 32.0
-    assert load_scenario("nb_warm_six", tmp_path).S == 6
+    assert out["params"]["built_from"]["scenario"] == "servers6"
+    assert load_scenario("nb_warm_three", tmp_path).S == 3
 
 
 @pytest.fixture

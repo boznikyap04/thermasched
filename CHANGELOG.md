@@ -16,8 +16,23 @@ run.
 
 ## Unreleased
 
-**Re-run:** nothing yet. The model is unchanged; only the site and the run folders changed.
+**Re-run:** cleaning, then solver. The model is unchanged, but the cleaned data and the
+scenarios are rebuilt with 64 GB per server.
 
+- **64 GB per server.** Each UniMelb host has 64 GB of memory, not 516 GB: `data/clean/` and
+  the scenarios are rebuilt with 66,036 MB per server. Workloads on hosts that never report
+  usage are kept, with borrowed usage (`usage_imputed`), so the catalogue has 741 workloads;
+  the draw stops at the target share of the fleet's cores or memory, whichever fills first,
+  and both baseline rules check memory as well as cores.
+- **Scenarios.** `scenarios/` holds the six-server fleet on a light, normal and heavy day,
+  `servers6_light`, `servers6` and `servers6_heavy` (45, 132 and 210 workloads; peak memory
+  34, 60 and 86 % of the fleet), and `small` and `small_running`, rebuilt. The baseline has no
+  late or unplaced workload in any of them. The 10- and 2-server fleets are added when they
+  are run. The earlier 516 GB scenarios (`thesis10`, `thesis10_tight`, `_swing`, `_warm`,
+  `consolidated6`, `consolidated6_swing`, `servers2`, `servers2_swing`) moved to
+  `archive/scenarios_516GB/`.
+- The solver notebook starts on `servers6`, and the batch notebook's list is the first set of
+  thesis runs: 6.1 and 6.2 on the three load levels, 18 runs.
 - The plan going forward is [`docs/PLAN.md`](docs/PLAN.md): per-tick re-planning replaces the
   whole-day solve. Until its runs are in, `results/` is empty: the whole-day runs moved to
   `archive/results_2026-10-25_whole_day/`, the staged 1.2.1 runs (solved on 516 GB servers,

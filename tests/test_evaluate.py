@@ -438,7 +438,8 @@ def test_cold_plate_settings_checked():
 # ---------------------------------------------------------------------------
 
 @pytest.mark.parametrize("name,e_it,carbon_kg", [
-    ("small", 4.45, 2.82), ("consolidated6", 26.27, 16.33), ("thesis10", 42.27, 26.29)])
+    ("small", 4.45, 2.82), ("servers6_light", 22.73, 14.14), ("servers6", 24.59, 15.31),
+    ("servers6_heavy", 25.82, 16.05)])
 def test_reference_baseline_it_energy_and_carbon(name, e_it, carbon_kg):
     sc = load_scenario(name)
     ev = evaluate(sc, load_reference_baseline(name), constant_supply_temp(sc, 18.0),
@@ -450,18 +451,18 @@ def test_reference_baseline_it_energy_and_carbon(name, e_it, carbon_kg):
     assert ev.totals["n_noncompliant"] == 0 and ev.totals["n_unplaced"] == 0
 
 
-def test_consolidated6_thermal_and_cooling_numbers():
-    sc = load_scenario("consolidated6")
-    ref = load_reference_baseline("consolidated6")
-    st = RunSettings(scenario="consolidated6")
+def test_servers6_thermal_and_cooling_numbers():
+    sc = load_scenario("servers6")
+    ref = load_reference_baseline("servers6")
+    st = RunSettings(scenario="servers6")
     ev18 = evaluate(sc, ref, constant_supply_temp(sc, 18.0), st)
     ev27 = evaluate(sc, ref, constant_supply_temp(sc, 27.0), st)
     assert ev18.totals["hottest_T_C"] == pytest.approx(68.1, abs=0.1)
-    assert ev27.totals["hottest_T_C"] == pytest.approx(73.4, abs=0.1)
+    assert ev27.totals["hottest_T_C"] == pytest.approx(70.2, abs=0.1)
     assert ev18.T_C.max() < 80 and ev27.T_C.max() < 80
     assert ev18.totals["periods_above_cap"] == 0 and ev27.totals["periods_above_cap"] == 0
-    assert ev18.totals["E_crac_kWh"] == pytest.approx(9.8, abs=0.1)
-    assert ev27.totals["E_crac_kWh"] == pytest.approx(4.8, abs=0.1)
+    assert ev18.totals["E_crac_kWh"] == pytest.approx(9.2, abs=0.1)
+    assert ev27.totals["E_crac_kWh"] == pytest.approx(4.5, abs=0.1)
     # E_total is the sum of its parts
     t = ev18.totals
     assert t["E_total_kWh"] == pytest.approx(t["E_IT_kWh"] + t["E_crac_kWh"])

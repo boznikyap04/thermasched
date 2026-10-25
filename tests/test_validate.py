@@ -20,7 +20,9 @@ def small():
 
 @pytest.fixture(scope="module")
 def thesis10():
-    return load_scenario("thesis10", "scenarios")
+    # The thesis group's examples (workloads 211, 232, 5 on qh2-rcc165 and qh2-rcc183) were
+    # posed on thesis10, archived with the 516 GB scenarios; memory plays no part in them.
+    return load_scenario("thesis10", "archive/scenarios_516GB")
 
 
 def test_power_is_linear_in_cpu_use(small):
