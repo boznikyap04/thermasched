@@ -3,9 +3,10 @@
 The basis for the work from 2026-10-25 on. It records what was decided, why, and what is
 left to do. Where it differs from `PRD.md` or `PRD_CH6_RESULTS.md`, this file wins.
 
-**Status (2026-10-25):** decided; work item 1 done (the 64 GB `servers6` scenarios). Nothing is built, nothing is solved, and
-nothing is deployed until the project owner says go. The deployed site stays as it is
-(release 1.2.1) until the per-tick results replace it.
+**Status (2026-10-26):** work items 1–6 done. All 39 per-tick runs on six servers (6.1–6.4,
+light / normal / heavy) are solved on GitHub Actions and in `results/` on `refactor-10_25`,
+pushed only to the branch `per-tick-runs`. The deployed site stays at release 1.2.1 until the
+release (item 7), which needs the project owner's go.
 
 ---
 
@@ -262,7 +263,13 @@ names, is `<scenario>__<test id>`, e.g. `servers6_heavy__base`.
    with `--per-tick` skips until B lands.
 5. **Push and start it.** This is the first step that publishes anything, and it needs the
    project owner's go.
-6. **Put the results into `results/`** and check them on the local site.
+6. **Put the results into `results/`** and check them on the local site. **Done (2026-10-26).**
+   Batch 1 (Actions run 40219903101, 18 runs, 1 h 5 min) and batch 2 (run 40222465947,
+   21 runs): every run finished, 0 evaluator violations, 0 late, every check passed. Ticks
+   stopped at the 60 s cap with a gap over 1 %: 3–6 midday ticks in four heavy-day runs (6.1
+   T1, 6.2 Base, T1, T2; gaps 15–25 %), and in 6.4 T3a (flat carbon) 3 ticks on the normal
+   day and the heaviest case on the heavy day (63 ticks at the cap, gaps up to 29 %).
+   Re-running those with a 120 s cap is the open choice.
 7. **Release** with the per-tick results (version, changelog, notebooks), which replaces the
    whole-day results on the deployed site.
 
