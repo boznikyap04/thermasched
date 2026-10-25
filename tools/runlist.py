@@ -1,19 +1,21 @@
 """The per-tick batch runs, from the experiment list in scheduler/experiments.py.
 
     uv run python tools/runlist.py                    # the 39 runs, one per line
+    uv run python tools/runlist.py --fleet servers10  # the 39 runs of the 10-server fleet
     uv run python tools/runlist.py --sections 6.1,6.2 # the 18 runs of the first batch
     uv run python tools/runlist.py --format json      # the same, with every field
     uv run python tools/runlist.py --format matrix    # {"include": [...]} for the Actions matrix
     uv run python tools/runlist.py --only servers6_heavy__base --format matrix
     uv run python tools/runlist.py --timing --format matrix   # the same: the timing run only
 
-The runs (docs/PLAN.md §3): fleet servers6 on the light, normal and heavy day, every test of
-sections 6.1 to 6.4 that applies to the fleet (the first batch was 6.1 and 6.2), each as one
-per-tick run in ``<results-dir>/<scenario>/<test id>/``. 6.4 Test 3a (flat carbon) runs with
-``--ci-flat``; 6.4 Test 3b (deeper carbon swing) runs on the configuration's ``_swing``
-scenario, so its folder is ``<scenario>_swing/s4_t3b_ci_swing/`` and is filed under the
-configuration's folder when the results are installed. A run's switches are the test's (``switches_for``),
-the same the batch notebook sets for that test, so the site recognizes the run as that test.
+The runs (docs/PLAN.md §3): a fleet (servers6, or ``--fleet servers10``) on the light, normal
+and heavy day, every test of sections 6.1 to 6.4 that applies to the fleet (the first batch
+was 6.1 and 6.2 on servers6), each as one per-tick run in
+``<results-dir>/<scenario>/<test id>/``. 6.4 Test 3a (flat carbon) runs with ``--ci-flat``;
+6.4 Test 3b (deeper carbon swing) runs on the configuration's ``_swing`` scenario, so its
+folder is ``<scenario>_swing/s4_t3b_ci_swing/`` and is filed under the configuration's folder
+when the results are installed. A run's switches are the test's (``switches_for``), the same
+the batch notebook sets for that test, so the site recognizes the run as that test.
 
 Each run's command is ``python -m scheduler.run <args> <per_tick_args>``: ``args`` are the
 usual flags, ``per_tick_args`` the per-tick mode's. A resumed run re-runs the identical
@@ -38,6 +40,11 @@ LEVEL_KEYS = tuple(lv.key for lv in LEVELS)            # light, normal, heavy
 SECTIONS = ("6.1", "6.2", "6.3", "6.4")
 # The run of the timing confirmation (docs/PLAN.md §5 item 3): heavy day, 6.1 Base.
 TIMING_RUN = "servers6_heavy__base"
+
+
+def timing_run(fleet: str = FLEET) -> str:
+    """The fleet's timing run: its heavy day, 6.1 Base (TIMING_RUN for servers6)."""
+    return f"{fleet}_heavy__base"
 
 # Per-tick solve-time cap, seconds; None leaves the per-tick mode's default of 60 s, the cap
 # chosen after the timing run (docs/PLAN.md §5 item 3).
@@ -156,7 +163,8 @@ def main(argv=None) -> int:
     p.add_argument("--only", default="",
                    help="run ids to keep, comma- or space-separated (default: every run)")
     p.add_argument("--timing", action="store_true",
-                   help=f"keep only the timing run, {TIMING_RUN} (ignored with --only)")
+                   help="keep only the fleet's timing run, its heavy-day base, e.g. "
+                        f"{TIMING_RUN} (ignored with --only)")
     p.add_argument("--results-dir", default="results")
     p.add_argument("--tick-time-limit", type=float, default=TICK_TIME_LIMIT_S)
     p.add_argument("--wall-time-limit", type=float, default=WALL_TIME_LIMIT_S)
@@ -167,7 +175,7 @@ def main(argv=None) -> int:
     if a.only.strip():
         found = select(found, _ids(a.only))
     elif a.timing:
-        found = select(found, [TIMING_RUN])
+        found = select(found, [timing_run(a.fleet)])
     if a.format == "matrix":
         print(json.dumps(matrix(found)))
     elif a.format == "json":

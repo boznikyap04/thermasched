@@ -1,6 +1,6 @@
-# The first per-tick batch (docs/PLAN.md §3 and §4): 18 runs, one job each, on GitHub-hosted
-# runners. The run list comes from tools/runlist.py. How to start, resume and collect:
-# docs/PLAN.md §4.
+# The per-tick batch (docs/PLAN.md §3 and §4): the 39 runs of one fleet, one job each, on
+# GitHub-hosted runners. The run list comes from tools/runlist.py. How to start, resume and
+# collect: docs/PLAN.md §4.
 #
 # Starts on a push to the branch per-tick-runs, or by hand (workflow_dispatch). Never on main
 # or release. The repository is public, so its logs and artifacts are public: the jobs check
@@ -13,8 +13,13 @@ on:
     branches: [per-tick-runs]
   workflow_dispatch:
     inputs:
+      fleet:
+        description: "Fleet whose runs to start or resume (a push runs servers6)"
+        type: choice
+        options: [servers6, servers10]
+        default: servers6
       batch:
-        description: "all: the 18 runs; timing: only servers6_heavy__base (6.1 Base, heavy day)"
+        description: "all: the fleet's 39 runs; timing: only its heavy-day 6.1 Base, e.g. servers6_heavy__base"
         type: choice
         options: [all, timing]
         default: all
@@ -45,6 +50,7 @@ defaults:
 
 env:
   RESULTS_DIR: _ci/results          # run folders: _ci/results/<scenario>/<run-name>/
+  FLEET: ${{ inputs.fleet || 'servers6' }}
   RESUME_FROM: ${{ inputs.resume_from_run_id }}
 
 jobs:
@@ -89,7 +95,8 @@ jobs:
           RESUME_IDS: ${{ steps.resume.outputs.ids }}
           TICK_TIME_LIMIT: ${{ inputs.tick_time_limit }}
         run: |
-          opts=(--format matrix --results-dir "$RESULTS_DIR")
+          # A resume lists the earlier run's ids, so fleet must be the earlier run's fleet.
+          opts=(--format matrix --fleet "$FLEET" --results-dir "$RESULTS_DIR")
           if [ -n "$RUNS" ]; then opts+=(--only "$RUNS")
           elif [ -n "$RESUME_IDS" ]; then opts+=(--only "$RESUME_IDS")
           elif [ "$BATCH" = timing ]; then opts+=(--timing)
@@ -102,7 +109,7 @@ jobs:
           fi
           echo "matrix=$matrix" >> "$GITHUB_OUTPUT"
           {
-            echo "### Runs"
+            echo "### Runs ($FLEET)"
             [ -z "$RESUME_FROM" ] || echo "Resuming from workflow run $RESUME_FROM."
             echo
             jq -r '.include[] | "- `\(.id)`: `python -m scheduler.run \(.argv | fromjson | join(" "))`"' <<<"$matrix"
@@ -118,7 +125,7 @@ jobs:
     timeout-minutes: 355
     strategy:
       fail-fast: false
-      max-parallel: 18
+      max-parallel: 20
       matrix: ${{ fromJSON(needs.setup.outputs.matrix) }}
     env:
       RUN_ID: ${{ matrix.id }}
@@ -226,7 +233,7 @@ jobs:
         run: |
           case "$STATE" in
             finished) exit 0 ;;
-            resume) echo "::error::$RUN_ID needs a resume: start the workflow with resume_from_run_id=$GITHUB_RUN_ID"; exit 1 ;;
+            resume) echo "::error::$RUN_ID needs a resume: start the workflow with fleet=$FLEET resume_from_run_id=$GITHUB_RUN_ID"; exit 1 ;;
             *) exit 1 ;;
           esac
 
