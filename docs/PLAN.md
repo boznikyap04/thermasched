@@ -269,7 +269,7 @@ names, is `<scenario>__<test id>`, e.g. `servers6_heavy__base`.
    stopped at the 60 s cap with a gap over 1 %: 3–6 midday ticks in four heavy-day runs (6.1
    T1, 6.2 Base, T1, T2; gaps 15–25 %), and in 6.4 T3a (flat carbon) 3 ticks on the normal
    day and the heaviest case on the heavy day (63 ticks at the cap, gaps up to 29 %).
-   Re-running those with a 120 s cap is the open choice.
+   The owner kept these results as they are (2026-10-26); no re-run at a higher cap.
 7. **Release** with the per-tick results (version, changelog, notebooks), which replaces the
    whole-day results on the deployed site.
 
@@ -321,6 +321,7 @@ All on 2026-10-25.
 | Validation runs | left out for now |
 | Where to run | GitHub Actions |
 | Per-tick cap | 60 s, after the heavy timing run (2026-10-26) |
+| Ticks stopped at the cap | results kept as solved; no re-run at 120 s (2026-10-26) |
 | Deployed site | unchanged until the per-tick release |
 | Whole-day results and staged 516 GB runs | moved to `archive/` |
 | Scenarios to rebuild now | the three 6-server ones only |
