@@ -88,7 +88,8 @@ baseline is the same as in a whole-day run. The code is in `pertick.py`.
   which the checks compare with the evaluator's.
 
 Exit codes of `scheduler.run`: 0 done, every check passed; 1 done, a check failed; 2 a switch
-that is not defined yet; 3 stopped by `--wall-time-limit`; 4 stuck at a tick.
+that is not defined yet; 3 stopped by `--wall-time-limit`; 4 stuck at a tick; 5 the run
+crashed (for example, a checkpoint made by a different command).
 
 To run the same steps one at a time, with tables and charts in between, open
 [`notebooks/solver.ipynb`](../notebooks/solver.ipynb) (see the

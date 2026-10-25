@@ -176,13 +176,20 @@ jobs:
         run: |
           state=error
           case "$CODE" in
-            0) state=finished; echo "::notice::$RUN_ID: done" ;;
-            1) state=finished; echo "::warning::$RUN_ID: done, with failed checks (see summary.json)" ;;
+            0|1)
+              if [ -f "$RUN_DIR/summary.json" ] && [ ! -d "$RUN_DIR/checkpoint" ]; then
+                state=finished
+                if [ "$CODE" = 0 ]; then echo "::notice::$RUN_ID: done"
+                else echo "::warning::$RUN_ID: done, with failed checks (see summary.json)"; fi
+              else
+                echo "::error::$RUN_ID: exit $CODE but no finished run folder (summary.json missing or checkpoint left)"
+              fi ;;
             2) echo "::error::$RUN_ID: exit 2, a switch not defined yet or the arguments did not parse" ;;
             3) state=resume
                echo "::warning::$RUN_ID: stopped at the wall-time limit; checkpoint saved, resume it" ;;
             4) state=stuck
                echo "::error::$RUN_ID: stuck tick, no valid schedule; summary.json names the limit" ;;
+            5) echo "::error::$RUN_ID: the run crashed (traceback in the log), e.g. a checkpoint made by another command" ;;
             "")
               if [ "$SOLVE" != skipped ] && [ -d "$RUN_DIR/checkpoint" ]; then
                 state=resume

@@ -22,7 +22,7 @@ from scheduler.pertick import (
     CHECKPOINT_DIR, OUTCOME_DONE, OUTCOME_STOPPED, OUTCOME_STUCK, TICK_COLUMNS, TICKS_FILE,
     run_per_tick,
 )
-from scheduler.run import main, parse_args
+from scheduler.run import EXIT_ERROR, main, parse_args
 from scheduler.types import (
     RELAX_DEADLINES, RELAX_THERMAL, Constants, RunSettings, Scenario, Server,
 )
@@ -162,11 +162,12 @@ def test_stopped_and_resumed_run_matches_the_unbroken_run(unbroken, tmp_path):
                    for z in range(sc.Z) for t in range(sc.T)}
 
 
-def test_checkpoint_of_other_settings_is_refused(tmp_path):
+def test_checkpoint_of_other_settings_is_refused(tmp_path, capsys):
+    # exit 5, not Python's 1, which the workflow would read as a finished run
     argv = ARGS + ["--results-dir", str(tmp_path), "--run-name", "x"]
     assert main(argv + ["--wall-time-limit", "0"]) == 3
-    with pytest.raises(ValueError, match="other settings"):
-        main(argv + ["--no-priority"])
+    assert main(argv + ["--no-priority"]) == EXIT_ERROR == 5
+    assert "other settings" in capsys.readouterr().err
 
 
 def test_impossible_tick_exits_4_and_names_the_limit(tmp_path):
@@ -211,3 +212,4 @@ def test_per_tick_run_names_and_test_matching():
     # per-tick runs match the same tests as whole-day ones
     st = RunSettings(per_tick=True, tick_time_limit_s=20.0).as_dict()
     assert [t.id for t in ex.identify(st, "servers6")[1]] == ["base"]
+

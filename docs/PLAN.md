@@ -121,7 +121,8 @@ names, is `<scenario>__<test id>`, e.g. `servers6_heavy__base`.
   workflow with `batch` = `all`. `runs` takes a list of run ids to run only those.
 - **Each job** solves for up to 5 h 30 min (`--wall-time-limit`), then uploads its run folder,
   checkpoint included, as artifact `run-<id>`. Exit 0 passes, 1 passes with a warning (failed
-  checks), 3 (wall-time stop) or a job stopped by its step limit fails with "needs a resume"
+  checks); either only if `summary.json` is there and no checkpoint is left. 5 (a crash, e.g. a
+  checkpoint made by another command) fails with an error. 3 (wall-time stop) or a job stopped by its step limit fails with "needs a resume"
   and leaves a marker artifact `resume-<id>`, 4 (stuck tick) fails with an error; summary.json
   names the limit.
 - **Resume:** Run workflow with `resume_from_run_id` = the earlier run's id (the number in its
@@ -166,7 +167,8 @@ names, is `<scenario>__<test id>`, e.g. `servers6_heavy__base`.
      every tick in `<run folder>/checkpoint/`; the same command resumes;
    - the run switch `--per-tick` (`RunSettings.per_tick`, run names end in `_pertick`), the
      per-tick log `ticks.csv`, `--wall-time-limit` (exit 3), a stuck tick exits 4 and names
-     its limit in `summary.json` (`per_tick.stuck`); `summary.json` has `"mode": "per_tick"`;
+     its limit in `summary.json` (`per_tick.stuck`); a crash exits 5 (added at the merge, so
+     it can't pass for exit 1); `summary.json` has `"mode": "per_tick"`;
    - the solver and batch notebooks have the switch (`per_tick`, `PER_TICK`), **on by
      default** there (owner's choice, 2026-10-25); the command line defaults to whole-day;
    - tests on `small` (`tests/test_pertick.py`): the evaluator accepts every per-tick

@@ -26,6 +26,7 @@ from __future__ import annotations
 import argparse
 import sys
 import time
+import traceback
 from dataclasses import replace
 from pathlib import Path
 
@@ -50,6 +51,7 @@ EXIT_CHECK_FAILED = 1
 EXIT_NOT_DEFINED = 2
 EXIT_WALL_TIME = 3          # per-tick run stopped by --wall-time-limit; run again to resume
 EXIT_STUCK = 4              # per-tick run: a tick has no valid schedule
+EXIT_ERROR = 5              # the run crashed, e.g. a checkpoint made by another command
 
 
 def parse_args(argv=None) -> tuple[RunSettings, argparse.Namespace]:
@@ -405,6 +407,10 @@ def main(argv=None) -> int:
     except NotDefinedYet as e:
         print(f"Not defined yet: {e}", file=sys.stderr)
         return EXIT_NOT_DEFINED
+    except Exception:
+        # Python's own exit code for a crash is 1, the same as "done, a check failed"
+        traceback.print_exc()
+        return EXIT_ERROR
     outcome = (summary.get("per_tick") or {}).get("outcome")
     if outcome == OUTCOME_STOPPED:
         return EXIT_WALL_TIME
