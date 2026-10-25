@@ -191,8 +191,9 @@ uv run python -m scheduler.validate --scenario thesis10
 ```
 
 runs the checks of `scheduler/validate.py` and writes their tables to
-`results/validation/<scenario>/` (CSV, plus `validation.json`). The site's Validation page
-shows them, and section 8 of the solver notebook makes the same tables. The checks that solve
+`results/validation/<scenario>/` (CSV, plus `validation.json`). Section 8 of the solver
+notebook makes the same tables. The site does not show them (its Validation page,
+`dashboard/views/validation.py`, is kept off it). The checks that solve
 build small scenarios from the scenario's own servers and constants. The checks that read runs
 (cold plates, the warm-scenario slowdown, solver completeness) are skipped if their run folders
 are missing. Run it again after adding runs to `results/<scenario>/`, so the solver table lists
@@ -206,8 +207,8 @@ them. It exits with 1 if a check fails.
   and `thesis10` with `--reassignment free` or `same_zone`, the solver stops at 600 s with a
   gap of about 1-4%. The worst case so far is 26% on `thesis10 free` at 600 s (1.6% at
   1800 s). Treat these results as good valid schedules with a proven bound, not as optima.
-  Report the gap from `summary.json`; the Validation page lists every run's status, gap and
-  the most a better schedule could still save.
+  Report the gap from `summary.json`; the validation table `solver.csv` lists every run's
+  status, gap and the most a better schedule could still save.
 - **On the large scenarios the solver often doesn't improve on its starting schedule.**
   With `free` or `same_zone`, the model is first solved with workloads fixed to their
   servers, and that schedule is used as the start. On `consolidated6` and `thesis10` with

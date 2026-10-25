@@ -60,9 +60,6 @@ def test_every_run_loads(loaded, key):
     assert set(run.period["variant"]) == set(run.variants)
     assert not run.server_period["name"].isna().any()
     assert not run.period["time"].isna().any()
-    kpis = data.kpi_frame(run.summary)
-    assert {"carbon_kg", "E_total_kWh", "hottest_T_C", "n_reassigned"} <= set(kpis["key"])
-    assert not kpis["baseline"].isna().any()
 
 
 # -- missing optimized/ ------------------------------------------------------------
@@ -80,12 +77,8 @@ def test_infeasible_run_has_baseline_only(loaded):
     assert run.comparison_period["optimized_carbon_g"].isna().all()
 
 
-def test_infeasible_run_derived_views(loaded):
+def test_infeasible_run_limits(loaded):
     run = loaded(INFEASIBLE)
-    kpis = data.kpi_frame(run.summary)
-    assert kpis["optimized"].isna().all() and kpis["diff"].isna().all()
-    diag = data.infeasibility_frame(run.summary)
-    assert dict(zip(diag["family"], diag["result"]))["thermal_cap"] == "feasible"
     assert run.thermal_cap_C == 70.0 and run.H_min_C == pytest.approx(20.0)
 
 
@@ -96,13 +89,7 @@ def test_compare_runs_handles_infeasible(loaded):
     assert df.loc["least_loaded_base18_free_optimize", "carbon_saved_pct"] > 0
 
 
-# -- all-zero columns ----------------------------------------------------------------
-
-def test_is_all_zero():
-    assert data.is_all_zero(pd.Series([0.0, 0, -0.0]))
-    assert data.is_all_zero(pd.Series(["not modelled"] * 3))
-    assert data.is_all_zero(pd.Series([0.0, np.nan]))
-    assert not data.is_all_zero(pd.Series([0.0, 1e-3]))
+# -- unmodelled columns ------------------------------------------------------------
 
 
 NO_COLD_PLATES = sorted(k for k, r in BY_KEY.items()
@@ -113,14 +100,8 @@ NO_COLD_PLATES = sorted(k for k, r in BY_KEY.items()
 def test_unmodelled_columns_are_hidden(loaded, key):
     run = loaded(key)
     assert not run.settings["cold_plates"] and not run.settings["fan_power"]
-    assert data.active_energy_components(run) == ["E_IT_kWh", "E_crac_kWh"]
-    assert data.nonzero_columns(run.zone_period, ["Q_crac_kW", "P_fan_kW", "airflow"]) == \
-        ["Q_crac_kW"]
-    assert data.nonzero_columns(run.server_period, ["P_IT_W", "Q_cp_W"]) == ["P_IT_W"]
     # "not modelled" airflow is turned into a numeric (all-NaN) column
     assert run.zone_period["airflow"].dtype.kind == "f"
-    kpis = data.kpi_frame(run.summary)
-    assert not {"E_cp_kWh", "E_fan_kWh"} & set(kpis["key"])
     assert run.summary["model_note"]
 
 
@@ -135,9 +116,6 @@ def test_consolidated6_clock_covers_24_hours_from_6am(loaded):
     step = clock["time"].diff().dropna()
     assert (step == pd.Timedelta(minutes=5)).all()        # rolls past midnight, no jump back
     assert clock["time"].iloc[-1].day == clock["time"].iloc[0].day + 1
-    bound = data.period_bounds(clock, run.dt_seconds)
-    assert bound([1])[0].strftime("%H:%M") == "06:00"
-    assert bound([289])[0] - bound([1])[0] == pd.Timedelta(hours=24)
 
 
 def test_small_clock_and_time_on_frames(loaded):
@@ -178,23 +156,6 @@ def test_server_names_and_zones_from_scenario(loaded):
     assert not sch["server_name"].isna().any()
 
 
-def test_kpis_match_summary(loaded):
-    kpis = data.kpi_frame(loaded(CONSOLIDATED6_FREE).summary).set_index("key")
-    assert kpis.loc["carbon_kg", "pct"] == pytest.approx(-14.3145, abs=1e-3)
-    assert kpis.loc["min_headroom_C", "better"] == "higher"
-    assert list(kpis.index) == ["carbon_kg", "E_total_kWh", "E_IT_kWh", "E_crac_kWh",
-                                "hottest_T_C", "min_headroom_C", "n_late", "n_reassigned"]
-
-
-def test_pump_energy_kpi_is_in_wh():
-    summary = data.load_summary(BY_KEY[COLD_PLATES].path) if COLD_PLATES in BY_KEY else None
-    if summary is None:
-        pytest.skip("the 6.2 cold-plate run is not under results/")
-    row = data.kpi_frame(summary).set_index("key").loc["E_cp_kWh"]
-    assert row["unit"] == "Wh"
-    assert row["optimized"] == pytest.approx(summary["optimized"]["metrics"]["E_cp_kWh"] * 1000)
-
-
 def test_server_stats_match_server_period(loaded):
     run = loaded(SMALL_FREE)
     stats = data.server_stats(run).set_index("s")
@@ -209,25 +170,13 @@ def test_server_stats_match_server_period(loaded):
     assert data.server_stats(loaded(INFEASIBLE)).empty
 
 
-def test_gantt_lanes_never_overlap(loaded):
-    run = loaded(SMALL_FREE)
-    sch = run.schedule.copy()
-    sch["lane"] = data.gantt_lanes(sch)
-    assert (sch["lane"] >= 0).all()
-    for _, g in sch.groupby(["variant", "server", "lane"]):
-        g = g.sort_values("start")
-        assert (g["start"].iloc[1:].to_numpy() >= g["finish"].iloc[:-1].to_numpy()).all()
-
-
-def test_throttling_and_checks(loaded):
+def test_throttling(loaded):
     run = loaded(FASTEST)
     thr = data.throttled_servers(run).set_index("variant")
     assert thr.loc["baseline", "periods_throttled"] == 60
     if run.has_optimized:
         assert thr.loc["optimized", "min_DPF"] < 1
     assert data.throttled_servers(loaded(CONSOLIDATED6_FREE)).empty
-    checks = data.checks_frame(loaded(CONSOLIDATED6_FREE).summary)
-    assert checks["passed"].tolist() == [True, True, True]
 
 
 def test_unzipped_export_carries_its_scenario(tmp_path):
@@ -262,22 +211,7 @@ def test_runs_from_before_versioning_still_load():
     for ref in archived:
         run = data.load_run(ref.path)
         assert run.provenance == {}
-        assert data.UNVERSIONED in data.provenance_caption(run.summary)
         assert data.provenance_warnings(run.summary) == []
-
-
-def test_provenance_warnings():
-    from scheduler.build import scenario_fingerprint
-    here = scenario_fingerprint(data.SCENARIOS_DIR / "small")
-    summary = {"scenario": {"name": "small"},
-               "provenance": {"schema_version": 1, "thermasched_version": "1.0.0",
-                              "made_with": "notebook", "scenario_fingerprint": here}}
-    assert data.provenance_warnings(summary) == []
-    assert "in the notebook" in data.provenance_caption(summary)
-    other = {**summary, "provenance": {**summary["provenance"], "scenario_fingerprint": "0" * 12}}
-    assert "different build of `small`" in data.provenance_warnings(other)[0]
-    newer = {**summary, "provenance": {**summary["provenance"], "schema_version": 99}}
-    assert "newer" in data.provenance_warnings(newer)[0]
 
 
 def test_archived_scenarios_come_last_and_use_the_real_scenario(tmp_path):
@@ -296,6 +230,19 @@ def test_archived_scenarios_come_last_and_use_the_real_scenario(tmp_path):
     names = zipfile.ZipFile(io.BytesIO(runs_zip([(refs[1], data.SCENARIOS_DIR)]))).namelist()
     assert "small/old_run/summary.json" in names
     assert "small/servers.csv" in names and "small/carbon.csv" in names
+
+
+def test_provenance_warnings():
+    from scheduler.build import scenario_fingerprint
+    here = scenario_fingerprint(data.SCENARIOS_DIR / "small")
+    summary = {"scenario": {"name": "small"},
+               "provenance": {"schema_version": 1, "thermasched_version": "1.0.0",
+                              "made_with": "notebook", "scenario_fingerprint": here}}
+    assert data.provenance_warnings(summary) == []
+    other = {**summary, "provenance": {**summary["provenance"], "scenario_fingerprint": "0" * 12}}
+    assert "different build of `small`" in data.provenance_warnings(other)[0]
+    newer = {**summary, "provenance": {**summary["provenance"], "schema_version": 99}}
+    assert "newer" in data.provenance_warnings(newer)[0]
 
 
 # -- Chapter 6: configurations, tests and the results table -------------------------------
@@ -375,10 +322,8 @@ def test_chapter6_table_rows_and_columns():
             assert row["status"] not in (data.NOT_RUN_YET, data.NOT_APPLICABLE)
     status = table.set_index(["configuration", "section", "tag"])["status"]
     assert status["10 servers", "6.3", "Test 1"] == data.NOT_RUN_YET
-    assert status["2 servers · slow + mid", "6.1", "Test 1"] == data.NOT_APPLICABLE
-    assert status["2 servers · slow + mid", "6.2", "Base"] == data.NOT_APPLICABLE
-    assert status["2 servers · mid + mid", "6.1", "Test 1"] == data.NOT_RUN_YET
-    assert status["2 servers · slow + fast", "6.2", "Test 2"] == data.NOT_RUN_YET
+    assert status["2 servers", "6.1", "Test 1"] == data.NOT_RUN_YET
+    assert status["2 servers", "6.2", "Base"] == data.NOT_APPLICABLE
 
 
 @needs_site_runs
@@ -482,3 +427,15 @@ def test_chapter6_row_of_a_run_without_optimized_schedule(loaded):
     row = data.chapter6_row(run.ref, run.summary)
     assert row["status"] == "infeasible"
     assert not set(data.CHAPTER6_METRICS) & set(row)
+
+
+@needs_site_runs
+def test_reassignment_table(loaded):
+    run = loaded(BASE)
+    df = data.reassignment_table(run)
+    assert len(df) == 238
+    assert set(df["Moved"]) <= {"yes", "no"}
+    assert (df["Moved"] == "yes").sum() == run.summary["optimized"]["metrics"]["n_reassigned"]
+    assert df["Original server"].notna().all() and df["Final server"].notna().all()
+    if INFEASIBLE in BY_KEY:
+        assert data.reassignment_table(loaded(INFEASIBLE)).empty

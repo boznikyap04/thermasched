@@ -7,8 +7,8 @@ answer, the row says whether it passed.
     uv run python -m scheduler.validate --scenario thesis10
 
 writes every table to ``results/validation/<scenario>/`` as CSV, with ``validation.json``
-(release, date, scenario build, and the result of every check). The site shows them on its
-Validation page; ``notebooks/solver.ipynb`` computes the same tables in its last section.
+(release, date, scenario build, and the result of every check).
+``notebooks/solver.ipynb`` computes the same tables in its last section.
 
 The checks that solve build small scenarios from the real servers and constants of the
 scenario, so every number comes from the model's own code: the optimizer (optimize.py) and

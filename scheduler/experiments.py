@@ -4,9 +4,8 @@ One list for the solver, the batch notebook and the site. A run belongs to a tes
 configuration and its switches match the test's, so a folder name never decides it: a run
 made in the batch notebook or uploaded on the site is recognized too.
 
-Configurations: 10 servers (4 slow / 3 mid / 3 fast), 6 servers (2 / 2 / 2) and 2 servers,
-one configuration per pair of server tiers. Each configuration lists the scenario names that
-hold it; ``thesis10`` and ``consolidated6`` are the names of the 10- and 6-server scenarios
+Configurations: 10 servers (4 slow / 3 mid / 3 fast), 6 servers (2 / 2 / 2) and 2 servers
+(2 mid). Each configuration lists the scenario names that hold it; ``thesis10`` and ``consolidated6`` are the names of the 10- and 6-server scenarios
 until they are rebuilt as ``servers10`` and ``servers6``, and ``thesis10_swing`` is the
 10-server scenario with a deeper daily carbon swing (6.4 Test 3b).
 """
@@ -14,7 +13,6 @@ until they are rebuilt as ``servers10`` and ``servers6``, and ``thesis10_swing``
 from __future__ import annotations
 
 from dataclasses import dataclass
-from itertools import combinations_with_replacement
 
 from scheduler.types import RunSettings
 
@@ -41,24 +39,17 @@ class Configuration:
         return f"{self.n_servers} servers"
 
     @property
-    def pair_label(self) -> str | None:
-        """'slow + fast' for a 2-server configuration, None otherwise."""
-        return " + ".join(self.tiers) if self.n_servers == 2 else None
+    def label(self) -> str:
+        return self.size_label
 
     @property
-    def label(self) -> str:
-        return self.size_label + (f" · {self.pair_label}" if self.pair_label else "")
+    def fleet(self) -> str:
+        """'4 slow · 3 mid · 3 fast'."""
+        return " · ".join(f"{self.tiers.count(t)} {t}" for t in TIERS if t in self.tiers)
 
     @property
     def has_cold_plates(self) -> bool:
         return COLD_PLATE_TIER in self.tiers
-
-
-def _pair(a: str, b: str) -> Configuration:
-    key = f"servers2_{a}_{b}"
-    # Base zones alternate (server 1 in zone 1, server 2 in zone 2). Regrouping puts servers
-    # of the same tier in one zone, which changes something only when both share a tier.
-    return Configuration(key, (a, b), ((key, ()),), (1, 1) if a == b else None)
 
 
 CONFIGURATIONS: tuple[Configuration, ...] = (
@@ -69,10 +60,11 @@ CONFIGURATIONS: tuple[Configuration, ...] = (
     Configuration("servers6", ("slow",) * 2 + ("mid",) * 2 + ("fast",) * 2,
                   (("servers6", ()), ("consolidated6", ())),
                   (1, 1, 2, 2, 2, 2)),
-    *(_pair(a, b) for a, b in combinations_with_replacement(TIERS, 2)),
+    # Base zones alternate (server 1 in zone 1, server 2 in zone 2); regrouping puts both in
+    # one zone. No fast server, so no cold plate: 6.2 does not apply.
+    Configuration("servers2", ("mid", "mid"), (("servers2", ()),), (1, 1)),
 )
 CONFIGURATION_BY_KEY = {c.key: c for c in CONFIGURATIONS}
-SIZES = sorted({c.n_servers for c in CONFIGURATIONS})        # 2, 6, 10
 
 # A switch whose value comes from the configuration (6.1 Test 1's zone map).
 REGROUP = "<regroup zone map>"

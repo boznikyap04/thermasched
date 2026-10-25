@@ -12,12 +12,9 @@ def _ids(settings: dict, scenario: str) -> list[str]:
 
 
 def test_configurations():
-    assert ex.SIZES == [2, 6, 10]
-    keys = [c.key for c in ex.CONFIGURATIONS]
-    assert keys[:2] == ["servers10", "servers6"]
-    pairs = [c for c in ex.CONFIGURATIONS if c.n_servers == 2]
-    assert [c.pair_label for c in pairs] == ["slow + slow", "slow + mid", "slow + fast",
-                                             "mid + mid", "mid + fast", "fast + fast"]
+    assert [c.key for c in ex.CONFIGURATIONS] == ["servers10", "servers6", "servers2"]
+    assert [c.label for c in ex.CONFIGURATIONS] == ["10 servers", "6 servers", "2 servers"]
+    assert ex.CONFIGURATION_BY_KEY["servers2"].fleet == "2 mid"
     ten = ex.CONFIGURATION_BY_KEY["servers10"]
     assert ten.tiers.count("slow") == 4 and ten.tiers.count("fast") == 3
     assert len(ten.regroup_zone_map) == ten.n_servers
@@ -34,13 +31,11 @@ def test_sections_list_known_tests_with_the_reference_first():
 
 
 def test_not_applicable_tests():
-    pair = ex.CONFIGURATION_BY_KEY
+    config = ex.CONFIGURATION_BY_KEY
     regroup, cold = ex.TEST_BY_ID["s1_t1_zones"], ex.TEST_BY_ID["s2_base"]
-    assert ex.applicable(regroup, pair["servers2_mid_mid"])
-    assert not ex.applicable(regroup, pair["servers2_slow_fast"])
-    assert ex.applicable(cold, pair["servers2_slow_fast"])
-    assert not ex.applicable(cold, pair["servers2_slow_mid"])
-    assert all(ex.applicable(t, pair["servers10"]) for t in ex.TESTS)
+    assert ex.applicable(regroup, config["servers2"])
+    assert not ex.applicable(cold, config["servers2"])
+    assert all(ex.applicable(t, config["servers10"]) for t in ex.TESTS)
 
 
 def test_matching_by_settings():
@@ -76,10 +71,9 @@ def test_carbon_intensity_is_one_switch():
 
 
 def test_a_not_applicable_test_never_matches():
-    # A mixed pair has nothing to regroup, so its (1, 1) zone map is no test.
-    assert _ids({"zone_map": [1, 1]}, "servers2_slow_fast") == []
-    assert _ids({"zone_map": [1, 1]}, "servers2_fast_fast") == ["s1_t1_zones"]
-    assert _ids({"cold_plates": True}, "servers2_slow_mid") == []
+    # Two mid servers have no cold plate, so 6.2's switches are no test there.
+    assert _ids({"zone_map": [1, 1]}, "servers2") == ["s1_t1_zones"]
+    assert _ids({"cold_plates": True}, "servers2") == []
 
 
 @pytest.mark.parametrize("test", ex.TESTS, ids=lambda t: t.id)

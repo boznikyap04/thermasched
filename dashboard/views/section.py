@@ -1,6 +1,6 @@
 """One page per Chapter 6 scenario (6.1-6.4): the Base next to its tests for the configuration
-picked in the sidebar, with what the scenario measures, per-server figures and moved
-workloads; and the same measures across every configuration."""
+picked at the top (10, 6 or 2 servers), with what the scenario measures, per-server figures
+and moved workloads; or the same measures across every configuration."""
 
 from __future__ import annotations
 
@@ -9,7 +9,7 @@ from typing import Callable
 import pandas as pd
 import streamlit as st
 
-from dashboard import charts, data, state, tables
+from dashboard import charts, data, state
 from dashboard.views.chapter6 import (
     FORMATS, NOTES, csv_bytes, fmt_value, gap_warning, status_cell)
 from scheduler import experiments as ex
@@ -18,7 +18,10 @@ SHORT_TITLES = {"6.1": "Cooling zones", "6.2": "Cooling systems", "6.3": "Therma
                 "6.4": "Reassignment"}
 ICONS = {"6.1": ":material/grid_on:", "6.2": ":material/ac_unit:",
          "6.3": ":material/thermostat:", "6.4": ":material/swap_horiz:"}
-VIEWS = ("This configuration", "Across configurations")
+# Why a test does not apply to a configuration, by Test.needs.
+NOT_APPLICABLE = {"regroup": "it needs two servers of the same tier to regroup",
+                  "cold_plates": "it needs a server with a cold plate (a fast, 3000 MHz "
+                                 "server)"}
 # Rows under the measures in the comparison table: key -> label.
 RUN_ROWS = {"run": "Run folder", "status": "Solver status", "time_limit_s": "Time limit (s)",
             "release": "Release"}
@@ -140,7 +143,7 @@ def _moves(loaded: list[tuple[str, data.Run]], section: str) -> None:
     st.markdown("**Workloads: original and new server and zone**")
     frames = []
     for tag, run in loaded:
-        t = tables.reassignment(run)
+        t = data.reassignment_table(run)
         if not t.empty:
             frames.append(t.assign(Test=tag))
     if not frames:
@@ -158,7 +161,7 @@ def _moves(loaded: list[tuple[str, data.Run]], section: str) -> None:
     shown = every[every["Moved"] == "yes"] if only else every
     if shown.empty:
         st.caption("No run of this section moves a workload; every workload stays on the "
-                   "server it starts on. The *Validation* page (Moves) explains why.")
+                   "server it starts on.")
     else:
         st.dataframe(shown, hide_index=True)
     st.download_button("Download the workload table (CSV)",
@@ -168,6 +171,11 @@ def _moves(loaded: list[tuple[str, data.Run]], section: str) -> None:
 
 
 def _this_configuration(table, cat, config: ex.Configuration, section: ex.Section) -> None:
+    tests = [ex.TEST_BY_ID[tid] for _, tid in section.tests]
+    if not any(ex.applicable(t, config) for t in tests):
+        st.info(f"{section.key} does not apply to {config.label}: "
+                f"{NOT_APPLICABLE[tests[0].needs]}.")
+        return
     rows = _rows(table, config, section.key)
     changes = st.toggle("Show change against the Base (%)", key=f"changes-{section.key}")
     st.dataframe(_comparison(rows, section.key, changes), hide_index=True,
@@ -190,9 +198,6 @@ def _this_configuration(table, cat, config: ex.Configuration, section: ex.Sectio
     _servers(loaded, section.key)
     if section.key in MOVES:
         _moves(loaded, section.key)
-    with st.expander("Open a run"):
-        for tag, run in loaded:
-            state.run_link(run.ref, f"{tag}: {run.ref.key}")
 
 
 def _across(table: pd.DataFrame, section: ex.Section) -> None:
@@ -233,16 +238,11 @@ def page(key: str) -> Callable[[], None]:
         st.markdown(f"*{section.question}*")
         st.caption(f"**Goal:** {section.goal} {section.note}")
         table, cat = state.chapter6()
-        view = st.segmented_control("View", VIEWS, default=VIEWS[0], key=f"view-{key}",
-                                    label_visibility="collapsed") or VIEWS[0]
-        if view == VIEWS[1]:
+        config = state.pick_config(key, across=True)
+        if config is None:
             _across(table, section)
         else:
-            config = state.selected_config()
-            if config is None:
-                st.info("Pick a configuration (2, 6 or 10 servers) in the sidebar.")
-                return
-            st.caption(f"Configuration: **{config.label}** (change it in the sidebar).")
+            st.caption(f"Servers: {config.fleet}.")
             _this_configuration(table, cat, config, section)
         st.caption(NOTES)
 

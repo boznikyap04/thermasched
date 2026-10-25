@@ -3,7 +3,8 @@ model's outputs that the thesis's literature predicts.
 
 The model-check tables are written by the validation checks of the release
 (results/validation/<scenario>/); the solver notebook's last section computes the same tables.
-The relationship plots read the run picked in the sidebar.
+The relationship plots read the run picked on the page. The page is kept off the site
+(dashboard/app.py lists the pages); add it there to bring it back.
 """
 
 from __future__ import annotations
@@ -266,22 +267,26 @@ def _model_checks() -> None:
     }[section]()
 
 
-def _section64_runs() -> tuple[data.Run | None, data.Run | None]:
-    """The Base and the 6.4 flat-carbon-intensity run of the configuration picked in the
-    sidebar (10 servers when none is), as the Chapter 6 pages use."""
+def _section64_runs(config: ex.Configuration) -> tuple[data.Run | None, data.Run | None]:
+    """The Base and the 6.4 flat-carbon-intensity run of the configuration, as the Chapter 6
+    pages use."""
     cat = state.chapter6()[1]
-    config = state.selected_config() or ex.CONFIGURATION_BY_KEY["servers10"]
     base, flat = cat[(config.key, "base")][0], cat[(config.key, "s4_t3a_ci_flat")][0]
     return (state.load_run(base) if base else None, state.load_run(flat) if flat else None)
 
 
 def _relationships() -> None:
-    run = state.current_run()
+    config = state.pick_config("validation")
+    ref = state.pick_run(config, "validation")
+    if ref is None:
+        st.info(f"No runs of {config.label} yet.")
+        return
+    run = state.load_run(ref)
     info = state.run_infos().get(run.ref.key)
     label = data.run_long_title(info, run.ref) if info and info.config else None
     st.caption(
         "Does the model behave the way the papers behind the thesis say it should? Each plot "
-        "pairs two outputs of the run picked in the sidebar ("
+        "pairs two outputs of the run picked above ("
         + (f"**{label}** · " if label else "") + f"`{run.ref.scenario}` / `{run.ref.name}`), "
         "names its source, what the source leads us to expect, and what this run shows.")
     with st.container(horizontal=True, gap="medium", vertical_alignment="bottom"):
@@ -300,11 +305,11 @@ def _relationships() -> None:
     st.caption(f"**Source:** {rel.source}  \n**Expected:** {rel.expect}")
     other = None
     if rel.cold_plates and not relations.has_cold_plates(run):
-        st.info(f"This run has cold plates off. Pick **{relations.COLD_PLATE_RUN}** in the "
-                "sidebar to see this relationship.", icon=":material/info:")
+        st.info(f"This run has cold plates off. Pick **{relations.COLD_PLATE_RUN}** above "
+                "to see this relationship.", icon=":material/info:")
         return
     if rel.two_runs:
-        run, other = _section64_runs()
+        run, other = _section64_runs(config)
         if run is None or other is None:
             missing = [n for n, r in (("Base", run),
                                       ("6.4 Test 3a Flat carbon intensity", other)) if r is None]
@@ -312,8 +317,8 @@ def _relationships() -> None:
                     icon=":material/info:")
             return
         st.caption("This plot always compares the **Base** and **6.4 Test 3a Flat carbon "
-                   "intensity** runs of the configuration in the sidebar (optimized "
-                   "schedules), whatever run the sidebar shows.")
+                   "intensity** runs of the configuration picked above (optimized "
+                   "schedules), whatever run is picked.")
         variant = relations.variant_of(run)
     state.chart(relations.figure(rel.key, run, variant, state.pal(), other),
                 key=f"relation-{rel.key}")

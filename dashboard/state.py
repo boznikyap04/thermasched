@@ -1,28 +1,20 @@
-"""Streamlit glue: cached loaders, the selected run, the active palette, small widgets."""
+"""Streamlit glue: cached loaders, the configuration and run pickers, the active palette."""
 
 from __future__ import annotations
 
-import shutil
-import tempfile
-import time
-import uuid
 from pathlib import Path
 
-import pandas as pd
 import streamlit as st
 
-from dashboard import data, uploads
+from dashboard import data
 from scheduler import experiments as ex
 from dashboard.theme import PLOTLY_CONFIG, Palette, palette
 
-RUN_KEY = "run_key"
-CONFIG_KEY = "config_key"     # the configuration picked in the sidebar
-PENDING_RUN = "pending_run"   # run to select on the next rerun (set before the sidebar draws)
-OVERVIEW_PAGE = None   # set by app.py each run, for st.switch_page
-
-# Uploaded runs live in a temporary folder per browser session, never in results/.
-UPLOAD_ROOT = Path(tempfile.gettempdir()) / "thermasched-uploads"
-UPLOAD_MAX_AGE_S = 3 * 24 * 3600
+# The configuration picked on any page. Streamlit drops a widget's state when its page is
+# left, so the choice lives here and every page's picker starts from it (and from ?config=).
+CONFIG_KEY = "config"
+ACROSS = "across"
+ACROSS_LABEL = "Across configurations"
 
 
 def _mtime(path: Path) -> float:
@@ -37,86 +29,12 @@ def _discover(results_dir: str, stamp: float) -> list[data.RunRef]:
     return data.discover_runs(results_dir)
 
 
-def _discover_in(root: Path) -> list[data.RunRef]:
+def discover_runs() -> list[data.RunRef]:
+    """Every run under results/."""
+    root = data.RESULTS_DIR
     # A new run folder changes the scenario directory's mtime, which busts the cache.
     stamp = sum(_mtime(p) for p in [root, *root.glob("*")]) if root.is_dir() else 0.0
     return _discover(str(root), stamp)
-
-
-def upload_dir(create: bool = False) -> Path | None:
-    """This session's upload folder (``results/`` and ``scenarios/`` inside), or None."""
-    path = st.session_state.get("upload_dir")
-    if path is None and create:
-        _prune_old_uploads()
-        path = UPLOAD_ROOT / uuid.uuid4().hex
-        (path / "results").mkdir(parents=True)
-        (path / "scenarios").mkdir()
-        st.session_state["upload_dir"] = path
-    return path
-
-
-def _prune_old_uploads() -> None:
-    if not UPLOAD_ROOT.is_dir():
-        return
-    for d in UPLOAD_ROOT.iterdir():
-        if d.is_dir() and time.time() - _mtime(d) > UPLOAD_MAX_AGE_S:
-            shutil.rmtree(d, ignore_errors=True)
-
-
-def disk_runs() -> list[data.RunRef]:
-    return _discover_in(data.RESULTS_DIR)
-
-
-def uploaded_runs() -> list[data.RunRef]:
-    root = upload_dir()
-    return _discover_in(root / "results") if root is not None else []
-
-
-def discover_runs() -> list[data.RunRef]:
-    """Runs under results/ plus the runs uploaded in this session."""
-    return sorted(disk_runs() + uploaded_runs(), key=data.run_order)
-
-
-def is_uploaded(ref: data.RunRef) -> bool:
-    root = upload_dir()
-    return root is not None and ref.path.is_relative_to(root)
-
-
-def scenarios_dir_for(ref: data.RunRef) -> Path:
-    """Uploaded scenario files win for an uploaded run; otherwise scenarios/."""
-    root = upload_dir()
-    if root is not None and is_uploaded(ref) and (root / "scenarios" / ref.scenario).is_dir():
-        return root / "scenarios"
-    return data.SCENARIOS_DIR
-
-
-def import_upload(file) -> uploads.ImportResult:
-    root = upload_dir(create=True)
-    return uploads.import_zip(
-        file, root / "results", root / "scenarios",
-        reserved={r.key for r in disk_runs()},
-        fallback_name=Path(getattr(file, "name", "")).stem or "uploaded_run",
-        fallback_scenarios_dir=data.SCENARIOS_DIR)
-
-
-def remove_upload(ref: data.RunRef | None = None) -> None:
-    """Delete one uploaded run, or every upload of this session."""
-    root = upload_dir()
-    if root is None:
-        return
-    if ref is None:
-        shutil.rmtree(root, ignore_errors=True)
-        del st.session_state["upload_dir"]
-        return
-    if is_uploaded(ref):
-        shutil.rmtree(ref.path, ignore_errors=True)
-        scenario_dir = ref.path.parent
-        if scenario_dir.is_dir() and not any(scenario_dir.iterdir()):
-            scenario_dir.rmdir()
-
-
-def run_zip(refs: list[data.RunRef]) -> bytes:
-    return uploads.runs_zip([(r, scenarios_dir_for(r)) for r in refs])
 
 
 @st.cache_data(show_spinner="Loading run…")
@@ -125,26 +43,14 @@ def _load_run(run_dir: str, scenarios_dir: str, stamp: float) -> data.Run:
 
 
 def load_run(ref: data.RunRef) -> data.Run:
-    return _load_run(str(ref.path), str(scenarios_dir_for(ref)),
-                     _mtime(ref.path / "summary.json"))
-
-
-@st.cache_data(show_spinner=False)
-def compare_runs(keys: tuple[str, ...], _refs: tuple[data.RunRef, ...], stamp: float):
-    return data.compare_runs(list(_refs))
+    return _load_run(str(ref.path), str(data.SCENARIOS_DIR), _mtime(ref.path / "summary.json"))
 
 
 def _summaries_stamp(refs: list[data.RunRef]) -> float:
     return sum(_mtime(r.path / "summary.json") for r in refs)
 
 
-def runs_frame(refs: list[data.RunRef]) -> pd.DataFrame:
-    # Paths, not keys: two sessions can upload different runs under the same key.
-    return compare_runs(tuple(str(r.path) for r in refs), tuple(refs), _summaries_stamp(refs))
-
-
 def _cache_args(refs: list[data.RunRef]):
-    # Paths, not keys: two sessions can upload different runs under the same key.
     return tuple(str(r.path) for r in refs), tuple(refs), _summaries_stamp(refs)
 
 
@@ -155,7 +61,7 @@ def _run_infos(keys: tuple[str, ...], _refs: tuple[data.RunRef, ...],
 
 
 def run_infos() -> dict[str, data.RunInfo]:
-    """Run key -> its configuration and tests, for every run of this session."""
+    """Run key -> its configuration and tests, for every run."""
     return _run_infos(*_cache_args(discover_runs()))
 
 
@@ -172,57 +78,56 @@ def chapter6():
     return _chapter6(*_cache_args(discover_runs()))
 
 
-@st.cache_data(show_spinner=False)
-def _run_statuses(keys: tuple[str, ...], _refs: tuple[data.RunRef, ...],
-                  stamp: float) -> dict[str, str]:
-    return data.run_status_texts(list(_refs))
-
-
-def run_statuses() -> dict[str, str]:
-    """Run key -> the solver's outcome in a few words, for every run of this session."""
-    return _run_statuses(*_cache_args(discover_runs()))
-
-
 def config_runs() -> dict[str, list[data.RunRef]]:
     """Configuration key (or data.OTHER) -> its runs, in run-picker order."""
     refs = discover_runs()
     return data.config_runs(refs, run_infos())
 
 
-def run_title(ref: data.RunRef) -> str:
+def _keep_config(widget: str) -> None:
+    st.session_state[CONFIG_KEY] = st.session_state[widget]
+
+
+def pick_config(page: str, across: bool = False) -> ex.Configuration | None:
+    """The 10 / 6 / 2 servers picker of a page; with ``across``, also *Across
+    configurations* (returned as None). Every page starts from the last choice."""
+    keys = [c.key for c in ex.CONFIGURATIONS] + ([ACROSS] if across else [])
+    current = st.session_state.get(CONFIG_KEY)
+    if current not in keys:
+        query = st.query_params.get("config")
+        current = query if query in keys else keys[0]
+        # A page without *Across configurations* leaves that choice for the next page.
+        if st.session_state.get(CONFIG_KEY) is None:
+            st.session_state[CONFIG_KEY] = current
+    widget = f"config-{page}"
+    st.session_state[widget] = current
+    st.segmented_control("Configuration", keys, key=widget, required=True,
+                         format_func=lambda k: ACROSS_LABEL if k == ACROSS
+                         else ex.CONFIGURATION_BY_KEY[k].label,
+                         on_change=_keep_config, args=(widget,))
+    st.query_params["config"] = current
+    return ex.CONFIGURATION_BY_KEY.get(current)
+
+
+def run_label(ref: data.RunRef, used: set[str]) -> str:
+    """'6.1 · Test 1 · …' for the run a test uses, else its folder name with what it is."""
     info = run_infos().get(ref.key)
-    return data.run_title(info, ref) if info else ref.name
+    if info and info.tests:
+        title = data.run_title(info, ref)
+        return title if ref.key in used else f"{title} · older solve ({ref.name})"
+    return f"{ref.name} (validation)" if ref.name.startswith("v_") else ref.name
 
 
-def selected_config() -> ex.Configuration | None:
-    return ex.CONFIGURATION_BY_KEY.get(st.session_state.get(CONFIG_KEY))
-
-
-def run_link(ref: data.RunRef | None, text: str) -> None:
-    """A button that opens a run on Run summary."""
-    if ref is None or OVERVIEW_PAGE is None:
-        return
-    if st.button(text, key=f"open-{ref.key}", type="tertiary", icon=":material/open_in_new:"):
-        st.session_state[PENDING_RUN] = ref.key
-        st.switch_page(OVERVIEW_PAGE)
-
-
-def selected_ref() -> data.RunRef | None:
-    runs = {r.key: r for r in discover_runs()}
-    return runs.get(st.session_state.get(RUN_KEY))
-
-
-def current_run() -> data.Run | None:
-    """The run picked in the sidebar, or a friendly stop when none can be loaded."""
-    ref = selected_ref()
-    if ref is None:
-        st.info("Pick a run in the sidebar.")
-        st.stop()
-    try:
-        return load_run(ref)
-    except Exception as e:  # noqa: BLE001 - shown to the user, the app keeps running
-        st.error(f"Could not load **{ref.key}**: {e}")
-        st.stop()
+def pick_run(config: ex.Configuration, page: str) -> data.RunRef | None:
+    """A run of the configuration: the run of each test in test order, then the others."""
+    refs = config_runs().get(config.key, [])
+    if not refs:
+        return None
+    used = {ref.key for ref, _ in chapter6()[1].values() if ref is not None}
+    by_key = {r.key: r for r in refs}
+    key = st.selectbox("Run", list(by_key), key=f"run-{page}-{config.key}",
+                       format_func=lambda k: run_label(by_key[k], used))
+    return by_key[key]
 
 
 def pal() -> Palette:
@@ -232,35 +137,3 @@ def pal() -> Palette:
 
 def chart(fig, key: str | None = None) -> None:
     st.plotly_chart(fig, config=PLOTLY_CONFIG, key=key, theme=None)
-
-
-def page_header(title: str, run: data.Run, caption: str | None = None) -> None:
-    st.title(title)
-    info = run_infos().get(run.ref.key)
-    label = data.run_long_title(info, run.ref) if info else None
-    original = run.settings.get("run_name")
-    st.caption((f"**{label}** · " if label else "") + f"`{run.ref.scenario}` / `{run.ref.name}`"
-               + (f" (solved as `{original}`)" if original and original != run.ref.name else "")
-               + (f" · {caption}" if caption else ""))
-
-
-def no_optimized_note(run: data.Run) -> None:
-    status = run.solver.get("status", "unknown")
-    st.warning(f"This run has no optimized schedule (solver status **{status}**), so only the "
-               "baseline is shown. See *Run summary* for the infeasibility diagnosis.", icon="⚠️")
-
-
-def model_note(run: data.Run) -> None:
-    note = run.summary.get("model_note")
-    if note:
-        st.caption(f"ℹ️ Model note: {note}")
-
-
-def fmt_num(v, digits: int = 2, unit: str = "") -> str:
-    if v is None or (isinstance(v, float) and pd.isna(v)):
-        return "–"
-    if isinstance(v, (int,)) or float(v).is_integer() and digits == 0:
-        s = f"{int(round(float(v))):,}"
-    else:
-        s = f"{float(v):,.{digits}f}"
-    return f"{s} {unit}".strip()

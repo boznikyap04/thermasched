@@ -11,4 +11,4 @@ Superseded material, kept for reference. Nothing in the current pipeline reads i
 | `results_2026-10-25/` | Every run taken off the site when the Chapter 6 runs were renamed (2026-10-25): the 600 s solves replaced by 1800 s ones, the experiment scenarios (`thesis10_tight`, `_warm`, `_swing`), and the earlier `archive-*` folders. The runs kept on the site moved to `results/servers10/` and `results/servers6/` under short names; their `summary.json` still records the original run name |
 
 To view the archived runs in the dashboard, see
-[Keep old results or view another folder](../dashboard/README.md#4-keep-old-results-or-view-another-folder).
+[View another folder](../dashboard/README.md#4-view-another-folder).

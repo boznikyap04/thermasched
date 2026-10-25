@@ -41,7 +41,7 @@ The project has three parts, each with its own guide:
 |---|---|---|
 | **Cleaning notebook** | turns the raw datasets into cleaned tables and ready-to-solve scenarios | [`notebooks/README.md`](notebooks/README.md) |
 | **Solver** | builds the baseline, solves the MILP with HiGHS, writes the comparison to `results/`; runs step by step in `notebooks/solver.ipynb`, or a list of runs in `notebooks/batch.ipynb` | [`scheduler/README.md`](scheduler/README.md) |
-| **Dashboard** | browser app to explore, compare and share the results | [`dashboard/README.md`](dashboard/README.md) |
+| **Dashboard** | browser app with the Chapter 6 results (6.1 to 6.4) and every output CSV | [`dashboard/README.md`](dashboard/README.md) |
 
 ```
 raw data ──► notebooks/data_prep.ipynb ──► scenarios/ ──► scheduler (solver) ──► results/ ──► dashboard
@@ -67,10 +67,8 @@ data_prep.ipynb ──► data/clean/, scenarios/        on their Google Drive (
 solver.ipynb (one run) or batch.ipynb (a list) ──► results/, exports/<run>.zip
    │
    ▼
-site › Upload results ── the zip opens for that browser tab only
-   │
-   └── to keep a run on the site: they send the zip to the project owner, who unzips it
-       into results/ and pushes it to the release branch
+to put a run on the site: they send the zip to the project owner, who unzips it into
+results/ and pushes it to the release branch
 ```
 
 Every scenario and run records the release that made it (`scheduler/version.py`), and every
@@ -109,7 +107,7 @@ next to the run folders), check it on the local dashboard, commit, and push `mai
 `release`. The site names a Chapter 6 run by its test whatever its folder; to match the
 others, move it to `results/<configuration>/<test id>/` (for example
 `results/servers10/s3_t1_hmin_high/`; the test ids are in `scheduler/experiments.py`). The
-Run summary page warns if it was solved on another scenario build than the one in
+*Output files* page warns if it was solved on another scenario build than the one in
 `scenarios/`.
 
 ## Setup
@@ -181,9 +179,9 @@ Run every command from the repository root.
 │
 ├── results/                   SOLVER OUTPUTS (the deployed dashboard shows these)
 │   ├── servers10/<test>/      the 10-server Chapter 6 runs by test (base, s1_t1_zones, ...), and v_* validation runs
-│   ├── servers6/<test>/       the 6-server runs; servers2_<pair>/ for the 2-server pairs
+│   ├── servers6/<test>/       the 6-server runs; servers2/ for the 2-server (mid + mid) runs
 │   │                          (each run: summary.json, comparison_period.csv, baseline/, optimized/)
-│   └── validation/<scenario>/ validation tables (CSV) and validation.json, for the Validation page
+│   └── validation/<scenario>/ validation tables (CSV) and validation.json (not shown on the site)
 ├── exports/                   zips of notebook runs, for the dashboard (not in git)
 │
 ├── logs/runs/                 console output of the runs in results/, and the list of their switches
@@ -193,9 +191,9 @@ Run every command from the repository root.
 │   ├── app.py                 entry point (streamlit run dashboard/app.py)
 │   ├── requirements.txt       what Streamlit Community Cloud installs
 │   ├── data.py, state.py      finding and loading runs
-│   ├── uploads.py             zip import and export of runs
+│   ├── uploads.py             zip export of runs (used by the notebooks)
 │   ├── charts.py, theme.py    chart helpers and colours
-│   └── views/                 one file per page (overview, energy, thermal, cooling, ...)
+│   └── views/                 one file per page (chapter6 overview, section 6.1-6.4, files)
 │
 ├── tests/                     automated tests (uv run pytest)
 ├── tools/sync_notebooks.py    copies the code, the version and the scenario fingerprints into the notebooks

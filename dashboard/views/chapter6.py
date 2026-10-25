@@ -110,8 +110,8 @@ def render() -> None:
     st.caption(
         f"Every fleet configuration goes through the tests of the four Chapter 6 scenarios. "
         f"**{done} of {total} runs are on the site.** A run is matched to its test by its "
-        "settings, not its folder name, so runs made in the batch notebook or uploaded here "
-        "are recognized too. When several runs match one test, the newest is used.")
+        "settings, not its folder name, so runs made in the batch notebook are recognized "
+        "too. When several runs match one test, the newest is used.")
 
     st.subheader("Runs by configuration")
     grid = _status_grid(table)
@@ -147,17 +147,10 @@ def render() -> None:
     st.dataframe(shown, hide_index=True, column_config=config)
     gap_warning(table[table["configuration"].isin(picked)])
 
-    with st.container(horizontal=True):
-        st.download_button("Download every result (CSV)",
-                           csv_bytes(table, data.CHAPTER6_COLUMNS),
-                           file_name="chapter6_results.csv", mime="text/csv",
-                           icon=":material/download:",
-                           help="Every configuration and test at full precision, with the "
-                                "units in the headers.")
-        used = list(dict.fromkeys(ref for ref, _ in cat.values() if ref is not None))
-        st.download_button("Download these runs (.zip)", data=lambda: state.run_zip(used),
-                           file_name="chapter6_runs.zip", mime="application/zip",
-                           on_click="ignore", icon=":material/folder_zip:", disabled=not used,
-                           help="Every run of the table in one zip, to open on the Upload "
-                                "results page.")
+    st.download_button("Download every result (CSV)",
+                       csv_bytes(table, data.CHAPTER6_COLUMNS),
+                       file_name="chapter6_results.csv", mime="text/csv",
+                       icon=":material/download:",
+                       help="Every configuration and test at full precision, with the units "
+                            "in the headers.")
     st.caption(NOTES)

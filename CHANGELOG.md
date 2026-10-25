@@ -18,16 +18,23 @@ run.
 
 **Re-run:** nothing yet. The model is unchanged; only the site and the run folders changed.
 
-- The site is organized by **configuration** (2, 6 or 10 servers; for 2 servers, a pair of
-  server tiers) and by the tests of the four Chapter 6 scenarios. The sidebar picks the
-  configuration, then a run named by its test, for example *6.1 · Test 1 · Same-type servers
-  regrouped into one zone*. A run is still matched to its test by its settings, so runs from
-  the batch notebook and uploads are named the same way.
-- New pages: the Chapter 6 *Overview* (which test has a run in each configuration, and every
-  result in one CSV) and one page per scenario, 6.1 to 6.4, with what that scenario measures:
-  the Base next to each test, a chart, per-server figures (utilization, temperature,
-  headroom, DPF) and, for 6.1 and 6.4, every workload's original and new server and zone.
-  *Across configurations* shows one measure for every configuration.
+- The site shows only the four Chapter 6 scenarios. The sidebar lists the pages: the
+  Chapter 6 *Overview* (which test has a run in each configuration, and every result in one
+  CSV), one page per scenario, 6.1 to 6.4, and *Output files*.
+- On each scenario page, pick **10 servers**, **6 servers** or **2 servers** at the top, or
+  *Across configurations*. The choice stays the same from page to page and is kept in the
+  link (`?config=servers6`). A page shows what its scenario measures: the Base next to each
+  test, a chart, per-server figures (utilization, temperature, headroom, DPF) and, for 6.1
+  and 6.4, every workload's original and new server and zone.
+- *Output files* shows every CSV a run wrote, as it is, with a download for each: pick the
+  configuration, the run (named by its test) and the file.
+- 2 servers is one configuration: two mid servers (`results/servers2/`). 6.2 does not apply
+  to it (no server with a cold plate).
+- A run is matched to its test by its settings, so runs from the batch notebook show under
+  their test whatever their folder name.
+- Removed from the site: the run picker, *Run summary*, the Chapter 5 *Charts* and *Tables*,
+  *Inputs*, *Upload results* and *New run*. The *Validation* page is kept in the code but not
+  shown. To put a run on the site, send its zip (the notebooks write one) to the project owner.
 - The runs kept on the site have short names: `results/servers10/base`, `s1_t1_zones`,
   `s2_t1_crac`, ... and `results/servers6/`. Their `summary.json` still records the name they
   were solved under. The 10-server runs are the 1800 s solves of `thesis10`; 6.4 Test 3b
@@ -36,7 +43,7 @@ run.
 - Every other run (the 600 s solves replaced at 1800 s, `thesis10_tight`, `_warm`, the other
   `_swing` run and the earlier `archive-*` folders) moved to `archive/results_2026-10-25/`.
 - Still to run: 6.3 Test 1 (H_min 19 °C) on 10 servers, most tests on 6 servers, and every
-  2-server pair.
+  2-server test.
 
 ## 1.2.1 (2026-10-22)
 

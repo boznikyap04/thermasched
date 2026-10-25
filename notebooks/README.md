@@ -204,13 +204,12 @@ see [above](#where-the-notebooks-code-comes-from)), so it gives the same numbers
   `WRITE_RESULTS = False` to write nothing.
 - **Zip for the dashboard:** the run is also zipped to `exports/<scenario>__<run name>.zip`,
   together with its scenario's `servers.csv` and `carbon.csv` (on Colab the zip is also
-  downloaded; `DOWNLOAD_ZIP = False` turns that off). Drop it on the dashboard's *Upload
-  results* page to view it for that browser session. To keep it on the deployed site, the
+  downloaded; `DOWNLOAD_ZIP = False` turns that off). To put it on the deployed site, the
   group sends the zip to the project owner, who adds it (see
   [Adding a run the group sent](../README.md#releasing-an-update)).
 - **Checks:** the last cell fails if any check failed, as the command line exits with an
   error.
-- **Validation checks:** section 8 runs the checks of the site's Validation page on
+- **Validation checks:** section 8 runs the model checks on
   `VALIDATION_SCENARIO` (`thesis10`) when `RUN_VALIDATION = True`, the default. They take about a
   minute, write `results/validation/<scenario>/`, and fail the cell if a check fails. The same
   tables come from `uv run python -m scheduler.validate --scenario thesis10`.
@@ -230,7 +229,7 @@ unattended, on Colab or a laptop.
   1800 s time limit (the switches of
   [section 5 of the solver guide](../scheduler/README.md#5-thesis-scenarios-ch-6)), then five
   validation runs of `thesis10` (moves with the CRAC fixed at 27 °C, and no moves at H_min
-  18 °C and 19 °C; the site's Validation page reads them), then each experiment with and
+  18 °C and 19 °C; the model checks read them), then each experiment with and
   without reassignment at the default 600 s: 24 runs and about seven hours.
   `DEFAULTS` applies switches to every run, for example a longer time limit.
 - **Plan first:** section 1 validates every entry, checks that its scenario exists and that no
