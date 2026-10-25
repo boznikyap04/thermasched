@@ -107,8 +107,12 @@ downloaded as a zip and unzipped into `results/`.
 1. **Rebuild the 6-server scenarios with 64 GB per server** (`servers6_light`, `servers6`,
    `servers6_heavy`): memory 66,036 MB per server, the draw stops at the target share of
    cores or memory, the baseline rules check memory. Commit them; the runners see only what
-   is in the repository. Until this is done, `tests/test_build.py::test_build_reproduces_shipped_scenario`
+   is in the repository. Only these three are rebuilt; the 10- and 2-server fleets wait until
+   they are run. Until this is done, `tests/test_build.py::test_build_reproduces_shipped_scenario`
    fails for 6 scenarios: the 64 GB build code is committed, the scenarios are not rebuilt yet.
+   The step also settles those tests: the old scenarios (`thesis10`, `consolidated6` and their
+   variants) no longer reproduce from 64 GB clean data, so they move to `archive/` or out of
+   the test list.
 2. **Build the per-tick mode** (estimate 2–4 days):
    - the loop over ticks: build the window's problem, solve, keep period *t*, advance;
    - only arrived, not-yet-started workloads are free; arrival, deadline and allowed delay are
@@ -123,13 +127,35 @@ downloaded as a zip and unzipped into `results/`.
    - a per-tick solve-time cap, and the state saved after every tick so a run can resume;
    - a run switch for the mode, its log per tick (status, solve time) in the run folder, and
      the copies in the solver and batch notebooks (`tools/sync_notebooks.py`).
-3. **Time one heavy-day run** and set the per-tick cap from it.
-4. **Add the GitHub Actions workflow** for the 18 jobs.
+   - tests on `small`: the evaluator accepts every per-tick schedule; no workload starts
+     before it arrives and no started workload moves; a run resumed from its checkpoint gives
+     the same schedule as an unbroken run; a stuck tick stops and names the limit.
+3. **Time one heavy-day run** on this machine (6.1 Base, `servers6_heavy`) and set the
+   per-tick cap from it with margin; the first Actions job confirms it on the 4-core runner.
+4. **Add the GitHub Actions workflow** for the 18 jobs: a matrix of 18, resume from the
+   checkpoint, upload each run folder. It starts on a push to a dedicated runs branch, so
+   `main` and `release` are not touched.
 5. **Push and start it.** This is the first step that publishes anything, and it needs the
    project owner's go.
 6. **Put the results into `results/`** and check them on the local site.
 7. **Release** with the per-tick results (version, changelog, notebooks), which replaces the
    whole-day results on the deployed site.
+
+### Who does what
+
+One thread per phase; this planning thread ("Plan Next Steps") coordinates and keeps this
+file current.
+
+| Thread | Work items | Starts from | Can run alongside |
+|---|---|---|---|
+| A: 64 GB servers6 scenarios | 1 | `refactor-10_25` | B, D |
+| B: per-tick mode | 2 | `refactor-10_25`, own worktree and branch | A, D |
+| D: Actions workflow | 4 | `refactor-10_25`, own worktree and branch | A, B |
+| planning thread | 3, 6, 7 and merging A, B, D back | after A and B | none |
+
+B and D both touch the run entry point (`scheduler/run.py`): D codes against the run switch
+and checkpoint layout fixed at the start of B, and is merged after B. Step 5 (push) needs a
+separate go.
 
 ## 6. Open items
 
@@ -166,3 +192,7 @@ All on 2026-10-25.
 | Per-tick cap | set after timing one heavy run |
 | Deployed site | unchanged until the per-tick release |
 | Whole-day results and staged 516 GB runs | moved to `archive/` |
+| Scenarios to rebuild now | the three 6-server ones only |
+| How the work is split | one thread per phase (A, B, D); this planning thread coordinates |
+| Where to time the cap | this machine first, confirmed by the first Actions job |
+| Start | not yet: nothing starts until the owner says go |
