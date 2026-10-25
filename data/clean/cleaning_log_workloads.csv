@@ -9,6 +9,7 @@ UFCG,drop migrated VMs,VMs,1172,1166,6,host is NA for some VMs; that is not a mi
 UFCG,drop VMs alive at trace start,VMs,1166,1054,112,arrival unknown
 UFCG,drop VMs alive at trace end,VMs,1054,944,110,total work unknown
 UFCG,at least 3 snapshots,VMs,944,785,159,
-UFCG,drop VMs on unmonitored hosts,VMs,785,545,240,26 of 102 hosts never report usage
-UFCG,has any usage reading,VMs,545,527,18,
-UFCG,usage coverage >= 90%,VMs,527,502,25,
+UFCG,drop VMs on unmonitored hosts,VMs,785,785,0,26 of 102 hosts never report usage; kept for imputation
+UFCG,has any usage reading,VMs,785,767,18,
+UFCG,usage coverage >= 90%,VMs,767,742,25,
+UFCG,unmonitored VMs given a donor's usage,VMs,742,741,1,239 imputed; dropped if no same-flavor donor

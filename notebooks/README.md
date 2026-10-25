@@ -126,8 +126,8 @@ and run all cells again. The main groups:
 | `cfg["paths"]` | where the raw files are, where outputs go | file locations only |
 | `cfg["servers"]` | core-count regime, failed-sensor values, eligibility gates | `data/clean/servers.csv` |
 | `cfg["workloads"]` | slot length, dropped flavors, coverage and gap-filling limits, `impute_unmonitored` | `data/clean/workloads.csv`, `workload_usage.parquet` |
-| `thesis10` and `cfg["scenario"]` | the main scenario's fleet, horizon, load target, deadline slack and carbon intensity, then each experiment's changes to them | `scenarios/thesis10` and the experiments (`consolidated6`, `small`, `thesis10_tight`, `thesis10_swing`, `thesis10_warm`) |
-| `cfg["scenario_constants"]` | constants changed for one experiment only (`thesis10_warm`: CRAC supply up to 32 °C) | that experiment's `params.json` |
+| `servers10`, `fleets`, `levels` and `cfg["scenario"]` | the reference settings (fleet, horizon, load target, deadline slack, carbon intensity), then each scenario's changes to them | `scenarios/servers6_light`, `servers6`, `servers6_heavy` and `small` |
+| `cfg["scenario_constants"]` | constants changed for one scenario only (none as shipped) | that scenario's `params.json` |
 | `cfg["constants"]`, `cfg["cold_plate"]` | thesis constants, cold-plate resistance table | each scenario's `params.json` |
 
 ## 4. What it writes
@@ -136,15 +136,17 @@ and run all cells again. The main groups:
 |---|---|---|
 | 1. Servers | `data/raw/UniMelb.csv` | `data/clean/servers.csv`, `cleaning_log_servers.csv` |
 | 2. Workloads | `data/raw/UFCG/servers_usage.csv`, `servers_specs.csv`, `flavors.csv` | `data/clean/workloads.csv`, `workload_usage.parquet`, `cleaning_log_workloads.csv` |
-| 3. Model inputs | the two cleaned tables | `scenarios/thesis10/` (the main scenario), then the experiments built from it: `scenarios/consolidated6/`, `small/`, `thesis10_tight/`, `thesis10_swing/`, `thesis10_warm/`, by the rules in `scheduler/build.py` |
+| 3. Model inputs | the two cleaned tables | `scenarios/servers6_light/`, `servers6/`, `servers6_heavy/` and `small/`, by the rules in `scheduler/build.py` |
 | 4. Checks | all outputs | nothing; every assertion must pass |
 
-`thesis10` is the main scenario, the ten-server data center the thesis describes. Each
-other scenario is an experiment: thesis10 with one aspect changed, recorded under
-`variant_of` in its `params.json`. Section 3 of the notebook has a table of what each one
+Every scenario is the reference settings (`servers10`, the ten-server data center the
+thesis describes) with some values changed, recorded under `variant_of` in its
+`params.json`: `servers6` has six servers, and its light and heavy days a lower or higher
+load target. The 10- and 2-server fleets are one line each in `fleets`, added when they are
+run. Section 3 of the notebook has a table of what each one
 changes and which question it answers. Section 5 describes every output column. Each scenario folder gets
 `servers.csv`, `workloads.csv`, `carbon.csv`, `baseline_schedule.csv` and `params.json`.
-`scenarios/small_running/` is made from `small` rather than from the cleaned tables: four
+`scenarios/small_running/` is made from `small` rather than from the cleaned tables: five
 workloads already running at the start and server 3 down for an hour, written to an extra
 `availability.csv` (`cfg["running_variants"]`; see the
 [solver guide](../scheduler/README.md#2-scenarios)).
@@ -184,8 +186,8 @@ see [above](#where-the-notebooks-code-comes-from)), so it gives the same numbers
 [Google Colab](#google-colab).
 
 - **Scenario:** the first code cell starts with `SCENARIO`, the folder to solve; it is
-  `thesis10`, the main scenario, by default. To build a new experiment first, set `SCENARIO`
-  to a new name and `BUILD_FROM` to an existing scenario (normally `"thesis10"`), then uncomment and edit values in `SCENARIO_CHANGES`, `CONSTANT_CHANGES` and
+  `servers6`, the six-server fleet on a normal day, by default. To build a new experiment first, set `SCENARIO`
+  to a new name and `BUILD_FROM` to an existing scenario (normally `"servers6"`), then uncomment and edit values in `SCENARIO_CHANGES`, `CONSTANT_CHANGES` and
   `COLD_PLATE_CHANGES`. Every key is listed there with what it does. Section 1 writes
   `scenarios/<SCENARIO>/` and shows what changed and the new scenario's figures beside the
   starting one's (size, load, thermal caps, baseline carbon). Running again rebuilds it. The
@@ -196,7 +198,7 @@ see [above](#where-the-notebooks-code-comes-from)), so it gives the same numbers
   [command-line options](../scheduler/README.md#3-run-options)), plus a few notebook options.
   Change them and run all cells again.
 - **Run time:** the settings are the command-line defaults, so the solve runs for the full
-  10-minute time limit (on `thesis10` as on `small`). With `reassignment="none"`, a run takes a few seconds.
+  10-minute time limit (on `servers6` as on `small`). With `reassignment="none"`, a run takes a few seconds.
 - **Output:** the run is written to `results/<scenario>/nb_<run name>/`, in the same layout as
   a command-line run, and the local dashboard shows it. The name holds every switch that
   differs from its default, so a sweep over one switch (for example `H_min_C`) gives one
@@ -210,9 +212,9 @@ see [above](#where-the-notebooks-code-comes-from)), so it gives the same numbers
 - **Checks:** the last cell fails if any check failed, as the command line exits with an
   error.
 - **Validation checks:** section 8 runs the model checks on
-  `VALIDATION_SCENARIO` (`thesis10`) when `RUN_VALIDATION = True`, the default. They take about a
+  `VALIDATION_SCENARIO` (`servers6`) when `RUN_VALIDATION = True`, the default. They take about a
   minute, write `results/validation/<scenario>/`, and fail the cell if a check fails. The same
-  tables come from `uv run python -m scheduler.validate --scenario thesis10`.
+  tables come from `uv run python -m scheduler.validate --scenario servers6`.
 - **Command line, no editor:** `uv run jupyter-execute --inplace notebooks/solver.ipynb`.
 - **Release:** the first lines printed name the release. The run records it, with a
   fingerprint of its scenario, in `summary.json` (`provenance`), and the site shows both.
@@ -225,12 +227,10 @@ unattended, on Colab or a laptop.
 
 - **The list:** `RUNS` in the first code cell, one entry per run: a label and the switches that
   differ from their defaults (the fields of `RunSettings`, as in `solver.ipynb`). It comes set
-  to the thesis set: the 11 Chapter 6 runs on `thesis10`, labelled as on the site, each with a
-  1800 s time limit (the switches of
-  [section 5 of the solver guide](../scheduler/README.md#5-thesis-scenarios-ch-6)), then five
-  validation runs of `thesis10` (moves with the CRAC fixed at 27 °C, and no moves at H_min
-  18 °C and 19 °C; the model checks read them), then each experiment with and
-  without reassignment at the default 600 s: 24 runs and about seven hours.
+  to the first set of thesis runs: the six tests of 6.1 and 6.2 (the switches of
+  [section 5 of the solver guide](../scheduler/README.md#5-thesis-scenarios-ch-6)) on
+  `servers6_light`, `servers6` and `servers6_heavy`, labelled as on the site, each with a
+  1800 s time limit: 18 runs and up to nine hours.
   `DEFAULTS` applies switches to every run, for example a longer time limit.
 - **Plan first:** section 1 validates every entry, checks that its scenario exists and that no
   two entries are the same run, and prints the plan with an upper bound on the time, before

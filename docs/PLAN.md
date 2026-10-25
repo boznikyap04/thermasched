@@ -3,7 +3,7 @@
 The basis for the work from 2026-10-25 on. It records what was decided, why, and what is
 left to do. Where it differs from `PRD.md` or `PRD_CH6_RESULTS.md`, this file wins.
 
-**Status (2026-10-25):** decided, not started. Nothing is built, nothing is solved, and
+**Status (2026-10-25):** decided; work item 1 done (the 64 GB `servers6` scenarios). Nothing is built, nothing is solved, and
 nothing is deployed until the project owner says go. The deployed site stays as it is
 (release 1.2.1) until the per-tick results replace it.
 
@@ -108,11 +108,15 @@ downloaded as a zip and unzipped into `results/`.
    `servers6_heavy`): memory 66,036 MB per server, the draw stops at the target share of
    cores or memory, the baseline rules check memory. Commit them; the runners see only what
    is in the repository. Only these three are rebuilt; the 10- and 2-server fleets wait until
-   they are run. Until this is done, `tests/test_build.py::test_build_reproduces_shipped_scenario`
-   fails for 6 scenarios: the 64 GB build code is committed, the scenarios are not rebuilt yet.
-   The step also settles those tests: the old scenarios (`thesis10`, `consolidated6` and their
-   variants) no longer reproduce from 64 GB clean data, so they move to `archive/` or out of
-   the test list.
+   they are run.
+   **Done (2026-10-25).** `data/clean/` rebuilt at 64 GB; `servers6_light`, `servers6`,
+   `servers6_heavy` have 45 / 132 / 210 workloads, peak memory 33.6 / 60.5 / 86.3 % and peak
+   cores 16.9 / 30.5 / 43.5 % of the fleet, and a baseline with 0 late and 0 unplaced, within
+   every server's cores and 66,036 MB. `small` and `small_running` are rebuilt the same way
+   (79 workloads; 5 running at the start). The old 516 GB scenarios moved to
+   `archive/scenarios_516GB/`; the build test covers the new ones. The data-prep notebook
+   builds only these scenarios; the solver notebook starts on `servers6`, and the batch
+   notebook's list is the 18 runs of §3 (whole-day until the per-tick switch exists).
 2. **Build the per-tick mode** (estimate 2–4 days):
    - the loop over ticks: build the window's problem, solve, keep period *t*, advance;
    - only arrived, not-yet-started workloads are free; arrival, deadline and allowed delay are

@@ -169,7 +169,7 @@ def test_clock_without_carbon_csv(tmp_path):
 
 def test_server_names_and_zones_from_scenario(loaded):
     run = loaded(CONSOLIDATED6_FREE)
-    servers = pd.read_csv(data.SCENARIOS_DIR / "consolidated6" / "servers.csv")
+    servers = pd.read_csv(data.REPO_ROOT / "archive" / "scenarios_516GB" / "consolidated6" / "servers.csv")
     assert dict(zip(run.servers["s"], run.servers["name"])) == \
         dict(zip(servers["s"], servers["server"]))
     assert run.server_name(1) == "qh2-rcc188"
