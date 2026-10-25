@@ -1,7 +1,9 @@
-"""Validation: small, controlled checks of the model, and the workload inputs of the thesis.
+"""Validation: small, controlled checks of the model, and the relationships between the
+model's outputs that the thesis's literature predicts.
 
-The tables are written by the validation checks of the release (results/validation/<scenario>/);
-the solver notebook's last section computes the same tables.
+The model-check tables are written by the validation checks of the release
+(results/validation/<scenario>/); the solver notebook's last section computes the same tables.
+The relationship plots read the run picked in the sidebar.
 """
 
 from __future__ import annotations
@@ -9,10 +11,12 @@ from __future__ import annotations
 import pandas as pd
 import streamlit as st
 
-from dashboard import charts, data, state
+from scheduler import experiments as ex
+from dashboard import charts, data, relations, state
 
+GROUPS = ("Model checks", "Relationships")
 TABS = ("Moves", "Reassignment test", "CRAC", "Speed", "Server A vs B", "Slowdown",
-        "Cold plates", "Power", "Airflow", "Workload inputs")
+        "Cold plates", "Power")
 
 
 def _csv(df: pd.DataFrame) -> bytes:
@@ -221,24 +225,14 @@ def _power(meta: dict, tables: dict, scenario: str) -> None:
     _table(tables, "power", scenario)
 
 
-def _airflow() -> None:
-    st.markdown(
-        "**Airflow is not modelled** (decided with the thesis group on 2026-10-22). The CRAC's "
-        "electricity is the heat it removes divided by its COP at the chosen supply "
-        "temperature; fan power is a model term fixed at zero, so every run reports 0 kWh for "
-        "fans. In 6.2, *CRAC changed* means the supply air temperature only.")
+AIRFLOW_NOTE = (
+    "**Airflow is not modelled** (decided with the thesis group on 2026-10-22): the CRAC's "
+    "electricity is the heat it removes divided by its COP at the chosen supply temperature, and "
+    "fan power is fixed at 0, so every run reports 0 kWh for fans. In 6.2, *CRAC changed* means "
+    "the supply air temperature only.")
 
 
-def _inputs(tables: dict, scenario: str) -> None:
-    st.markdown(
-        f"Every workload of `{scenario}`: what it asks for (CPU cores and RAM) and when "
-        "(arrival, deadline, allowed delay), with units in the headers. Times are local; "
-        "period 1 starts at the scenario's start hour.")
-    _table(tables, "workload_inputs", scenario, height=420)
-
-
-def render() -> None:
-    st.title("Validation")
+def _model_checks() -> None:
     scenarios = data.validation_scenarios()
     if not scenarios:
         st.info("No validation tables yet. They are written to results/validation/<scenario>/ "
@@ -252,6 +246,7 @@ def render() -> None:
         f"`{meta.get('scenario_fingerprint')}`). Each section answers one question with a table you "
         "can download. The checks that solve use small scenarios built from this scenario's own "
         "servers and constants, solved by the model and scored by the independent evaluator.")
+    st.caption(AIRFLOW_NOTE)
     checks = meta.get("checks") or {}
     failed = [k for k, v in checks.items() if v.get("passed") is False]
     if failed:
@@ -268,6 +263,68 @@ def render() -> None:
         "Slowdown": lambda: _slowdown(meta, tables, scenario),
         "Cold plates": lambda: _cold_plates(meta, tables, scenario),
         "Power": lambda: _power(meta, tables, scenario),
-        "Airflow": _airflow,
-        "Workload inputs": lambda: _inputs(tables, scenario),
     }[section]()
+
+
+def _section64_runs() -> tuple[data.Run | None, data.Run | None]:
+    """The Base and the 6.4 flat-carbon-intensity run of the configuration picked in the
+    sidebar (10 servers when none is), as the Chapter 6 pages use."""
+    cat = state.chapter6()[1]
+    config = state.selected_config() or ex.CONFIGURATION_BY_KEY["servers10"]
+    base, flat = cat[(config.key, "base")][0], cat[(config.key, "s4_t3a_ci_flat")][0]
+    return (state.load_run(base) if base else None, state.load_run(flat) if flat else None)
+
+
+def _relationships() -> None:
+    run = state.current_run()
+    info = state.run_infos().get(run.ref.key)
+    label = data.run_long_title(info, run.ref) if info and info.config else None
+    st.caption(
+        "Does the model behave the way the papers behind the thesis say it should? Each plot "
+        "pairs two outputs of the run picked in the sidebar ("
+        + (f"**{label}** · " if label else "") + f"`{run.ref.scenario}` / `{run.ref.name}`), "
+        "names its source, what the source leads us to expect, and what this run shows.")
+    with st.container(horizontal=True, gap="medium", vertical_alignment="bottom"):
+        rel = st.selectbox("Relationship", relations.RELATIONS, key="relation",
+                           format_func=lambda r: f"{relations.RELATIONS.index(r) + 1}. {r.title}",
+                           width=480)
+        variants = list(run.variants)
+        default = relations.variant_of(run)
+        variant = st.segmented_control(
+            "Schedule", variants, default=default, key="relation_variant",
+            format_func=data.VARIANT_LABELS.get, disabled=rel.two_runs or len(variants) < 2,
+            help="The optimized schedule unless you pick the baseline (least-loaded, CRAC "
+                 "fixed), which can show behaviour the optimizer never chooses.") or default
+
+    st.subheader(rel.title)
+    st.caption(f"**Source:** {rel.source}  \n**Expected:** {rel.expect}")
+    other = None
+    if rel.cold_plates and not relations.has_cold_plates(run):
+        st.info(f"This run has cold plates off. Pick **{relations.COLD_PLATE_RUN}** in the "
+                "sidebar to see this relationship.", icon=":material/info:")
+        return
+    if rel.two_runs:
+        run, other = _section64_runs()
+        if run is None or other is None:
+            missing = [n for n, r in (("Base", run),
+                                      ("6.4 Test 3a Flat carbon intensity", other)) if r is None]
+            st.info(f"Needs both 6.4 runs; not found: {', '.join(missing)}.",
+                    icon=":material/info:")
+            return
+        st.caption("This plot always compares the **Base** and **6.4 Test 3a Flat carbon "
+                   "intensity** runs of the configuration in the sidebar (optimized "
+                   "schedules), whatever run the sidebar shows.")
+        variant = relations.variant_of(run)
+    state.chart(relations.figure(rel.key, run, variant, state.pal(), other),
+                key=f"relation-{rel.key}")
+    st.markdown(f"**This run:** {relations.reading(rel.key, run, variant, other)}")
+
+
+def render() -> None:
+    st.title("Validation")
+    group = st.segmented_control("Group", GROUPS, default=GROUPS[0], key="validation_group",
+                                 label_visibility="collapsed") or GROUPS[0]
+    if group == "Model checks":
+        _model_checks()
+    else:
+        _relationships()

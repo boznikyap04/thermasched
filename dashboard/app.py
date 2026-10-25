@@ -45,11 +45,12 @@ def _drop_stale_modules() -> None:
 _drop_stale_modules()
 
 from dashboard import data, state  # noqa: E402
+from scheduler import experiments as ex  # noqa: E402
 from scheduler.version import VERSION  # noqa: E402
 from dashboard.views import (  # noqa: E402
-    chapter6, compare, compliance, cooling, energy, new_run, overview, schedule, thermal, upload,
-    validation,
+    chapter6, graphs, inputs, new_run, overview, section, upload, validation,
 )
+from dashboard.views import tables as tables_view  # noqa: E402
 
 st.set_page_config(page_title="ThermaSched results", page_icon="🌡️", layout="wide")
 
@@ -59,39 +60,97 @@ NEW_RUN_FLAG = "enable_new_run"
 SOLVER_INSTALLED = importlib.util.find_spec("highspy") is not None
 
 
-def _sidebar(runs: list[data.RunRef]) -> None:
-    by_scenario: dict[str, list[str]] = {}
-    for r in runs:
-        by_scenario.setdefault(r.scenario, []).append(r.key)
-    uploaded = {r.key for r in runs if state.is_uploaded(r)}
-    labels = state.thesis_labels()
+SIZE_KEY = "config_size"
+PAIR_KEY = "config_pair"
+OTHER_RUNS = "Other"
+SIZE_LABELS = [f"{n} servers" for n in ex.SIZES]
+
+
+def _pick_config(config_key: str) -> None:
+    """Point the configuration widgets at one configuration (before they are drawn)."""
+    st.session_state[state.CONFIG_KEY] = config_key
+    config = ex.CONFIGURATION_BY_KEY.get(config_key)
+    if config is None:
+        st.session_state[SIZE_KEY] = OTHER_RUNS
+        return
+    st.session_state[SIZE_KEY] = config.size_label
+    if config.pair_label:
+        st.session_state[PAIR_KEY] = config.key
+
+
+def _scenario_name(ref: data.RunRef) -> str:
+    """The scenario a run was solved on (results/servers10/ holds thesis10 runs)."""
+    try:
+        return (data.load_summary(ref.path).get("scenario") or {}).get("name") or ref.scenario
+    except (OSError, ValueError):
+        return ref.scenario
+
+
+def _sidebar() -> None:
+    groups = state.config_runs()
+    infos = state.run_infos()
+    keys = {r.key for refs in groups.values() for r in refs}
+    uploaded = {r.key for r in state.discover_runs() if state.is_uploaded(r)}
     statuses = state.run_statuses()
+    used = {ref.key for ref, _ in state.chapter6()[1].values() if ref is not None}
 
-    # A run just uploaded (or solved) asks to be selected before the widgets draw.
-    pending = st.session_state.pop(state.PENDING_RUN, None)
-    if pending in {r.key for r in runs}:
-        st.session_state[state.RUN_KEY] = pending
-        st.session_state["scenario"] = pending.split("/")[0]
-
-    # First visit: honour ?run=<scenario>/<run> so a view can be linked.
-    if state.RUN_KEY not in st.session_state:
+    # A run just uploaded (or solved), or named in ?run=<folder>/<run>, picks its
+    # configuration. The first visit opens 10 servers.
+    wanted = st.session_state.pop(state.PENDING_RUN, None)
+    if wanted not in keys and st.session_state.get(state.RUN_KEY) not in keys:
         wanted = st.query_params.get("run")
-        st.session_state[state.RUN_KEY] = wanted if wanted in {r.key for r in runs} else runs[0].key
-    if "scenario" not in st.session_state or st.session_state["scenario"] not in by_scenario:
-        st.session_state["scenario"] = st.session_state[state.RUN_KEY].split("/")[0]
-        if st.session_state["scenario"] not in by_scenario:
-            st.session_state["scenario"] = runs[0].scenario
+    if wanted in keys:
+        st.session_state[state.RUN_KEY] = wanted
+        _pick_config(infos[wanted].config_key)
+    elif st.session_state.get(SIZE_KEY) is None:
+        _pick_config("servers10")
 
-    scenario = st.sidebar.selectbox("Scenario", list(by_scenario), key="scenario")
-    options = by_scenario[scenario]
+    sizes = SIZE_LABELS + ([OTHER_RUNS] if data.OTHER in groups else [])
+    if st.session_state.get(SIZE_KEY) not in sizes:
+        st.session_state[SIZE_KEY] = sizes[-1 if data.OTHER not in groups else -2]
+    size = st.sidebar.segmented_control(
+        "Configuration", sizes, key=SIZE_KEY, required=True,
+        help="Each configuration goes through every Chapter 6 test. *Other* holds runs of "
+             "another scenario.")
+    if size == OTHER_RUNS:
+        config_key = data.OTHER
+    else:
+        configs = [c for c in ex.CONFIGURATIONS if c.size_label == size]
+        if len(configs) > 1:
+            pairs = [c.key for c in configs]
+            if st.session_state.get(PAIR_KEY) not in pairs:
+                st.session_state[PAIR_KEY] = next((k for k in pairs if k in groups), pairs[0])
+            config_key = st.sidebar.selectbox(
+                "Server pair", pairs, key=PAIR_KEY,
+                format_func=lambda k: ex.CONFIGURATION_BY_KEY[k].pair_label
+                + ("" if k in groups else " · no runs yet"))
+        else:
+            config_key = configs[0].key
+    st.session_state[state.CONFIG_KEY] = config_key
+
+    options = [r.key for r in groups.get(config_key, [])]
+    if not options:
+        st.session_state[state.RUN_KEY] = None
+        st.sidebar.caption("No runs of this configuration yet. The Chapter 6 pages show which "
+                           "tests are still to run.")
+        return
     if st.session_state.get(state.RUN_KEY) not in options:
         st.session_state[state.RUN_KEY] = options[0]
-    # A Chapter 6 run shows its thesis label first, then its own name.
-    st.sidebar.selectbox("Run", options, key=state.RUN_KEY,
-                         format_func=lambda k: ("📤 " if k in uploaded else "")
-                         + (f"{labels[k]} · " if k in labels else "") + k.split("/", 1)[1]
-                         + (f" · {statuses[k]}" if k in statuses else ""))
+    refs = {r.key: r for r in groups[config_key]}
+
+    def name(k: str) -> str:
+        ref = refs[k]
+        text = k if config_key == data.OTHER else state.run_title(ref)
+        if infos[k].tests and k not in used:
+            text += f" · older solve ({ref.name})"
+        elif not infos[k].tests and config_key != data.OTHER:
+            text = f"{ref.name} (validation)" if ref.name.startswith("v_") else ref.name
+        return ("📤 " if k in uploaded else "") + text + (f" · {statuses[k]}" if k in statuses
+                                                         else "")
+    st.sidebar.selectbox("Run", options, key=state.RUN_KEY, format_func=name,
+                         help="The pages under *This run* show this run.")
     st.query_params["run"] = st.session_state[state.RUN_KEY]
+    st.session_state["scenario"] = _scenario_name(refs[st.session_state[state.RUN_KEY]])
 
     ref = state.selected_ref()
     if ref is not None:
@@ -119,10 +178,10 @@ def _sidebar(runs: list[data.RunRef]) -> None:
 def main() -> None:
     runs = state.discover_runs()
     with st.sidebar:
-        st.markdown("**ThermaSched** · pick a run")
+        st.markdown("**ThermaSched** · Chapter 6 results")
         st.caption(f"Release {VERSION}")
     if runs:
-        _sidebar(runs)
+        _sidebar()
 
     with st.sidebar:
         st.divider()
@@ -138,29 +197,26 @@ def main() -> None:
                           url_path="upload", default=not runs)
     pages = {}
     if runs:
-        state.OVERVIEW_PAGE = st.Page(overview.render, title="Overview",
-                                      icon=":material/dashboard:", url_path="overview",
-                                      default=True)
-        pages["Results"] = [
-            state.OVERVIEW_PAGE,
-            st.Page(energy.render, title="Energy & Carbon", icon=":material/bolt:",
-                    url_path="energy"),
-            st.Page(thermal.render, title="Thermal", icon=":material/device_thermostat:",
-                    url_path="thermal"),
-            st.Page(cooling.render, title="Cooling", icon=":material/ac_unit:",
-                    url_path="cooling"),
-            st.Page(schedule.render, title="Schedule", icon=":material/view_timeline:",
-                    url_path="schedule"),
-            st.Page(compliance.render, title="Compliance", icon=":material/rule:",
-                    url_path="compliance"),
+        state.OVERVIEW_PAGE = st.Page(overview.render, title="Run summary",
+                                      icon=":material/dashboard:", url_path="overview")
+        pages["Chapter 6"] = [
+            st.Page(chapter6.render, title="Overview", icon=":material/grid_view:",
+                    url_path="chapter6", default=True),
+            *(st.Page(section.page(s.key), title=f"{s.key} {section.SHORT_TITLES[s.key]}",
+                      icon=section.ICONS[s.key], url_path=f"section-{s.key.replace('.', '-')}")
+              for s in ex.SECTIONS),
         ]
-        pages["Across runs"] = [
-            st.Page(compare.render, title="Compare runs", icon=":material/compare_arrows:",
-                    url_path="compare"),
-            st.Page(chapter6.render, title="Chapter 6 results", icon=":material/table_view:",
-                    url_path="chapter6"),
+        pages["This run"] = [
+            state.OVERVIEW_PAGE,
+            st.Page(graphs.render, title="Charts", icon=":material/show_chart:",
+                    url_path="charts"),
+            st.Page(tables_view.render, title="Tables", icon=":material/table_view:",
+                    url_path="tables"),
+        ]
+        pages["More"] = [
             st.Page(validation.render, title="Validation", icon=":material/fact_check:",
                     url_path="validation"),
+            st.Page(inputs.render, title="Inputs", icon=":material/input:", url_path="inputs"),
         ]
     else:
         state.OVERVIEW_PAGE = None

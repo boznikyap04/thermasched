@@ -1,0 +1,92 @@
+"""The Chapter 6 configurations and tests (scheduler/experiments.py) and how runs match them."""
+
+from __future__ import annotations
+
+import pytest
+
+from scheduler import experiments as ex
+
+
+def _ids(settings: dict, scenario: str) -> list[str]:
+    return [t.id for t in ex.identify(settings, scenario)[1]]
+
+
+def test_configurations():
+    assert ex.SIZES == [2, 6, 10]
+    keys = [c.key for c in ex.CONFIGURATIONS]
+    assert keys[:2] == ["servers10", "servers6"]
+    pairs = [c for c in ex.CONFIGURATIONS if c.n_servers == 2]
+    assert [c.pair_label for c in pairs] == ["slow + slow", "slow + mid", "slow + fast",
+                                             "mid + mid", "mid + fast", "fast + fast"]
+    ten = ex.CONFIGURATION_BY_KEY["servers10"]
+    assert ten.tiers.count("slow") == 4 and ten.tiers.count("fast") == 3
+    assert len(ten.regroup_zone_map) == ten.n_servers
+    assert all(len(c.regroup_zone_map or c.tiers) == c.n_servers for c in ex.CONFIGURATIONS)
+
+
+def test_sections_list_known_tests_with_the_reference_first():
+    for section in ex.SECTIONS:
+        assert section.tests[0][0] == "Base"
+        assert all(tid in ex.TEST_BY_ID for _, tid in section.tests)
+    used = {tid for s in ex.SECTIONS for _, tid in s.tests}
+    assert used == set(ex.TEST_BY_ID)
+    assert [s.key for s, _ in ex.sections_of("base")] == ["6.1", "6.3", "6.4"]
+
+
+def test_not_applicable_tests():
+    pair = ex.CONFIGURATION_BY_KEY
+    regroup, cold = ex.TEST_BY_ID["s1_t1_zones"], ex.TEST_BY_ID["s2_base"]
+    assert ex.applicable(regroup, pair["servers2_mid_mid"])
+    assert not ex.applicable(regroup, pair["servers2_slow_fast"])
+    assert ex.applicable(cold, pair["servers2_slow_fast"])
+    assert not ex.applicable(cold, pair["servers2_slow_mid"])
+    assert all(ex.applicable(t, pair["servers10"]) for t in ex.TESTS)
+
+
+def test_matching_by_settings():
+    assert _ids({}, "thesis10") == ["base"]
+    assert _ids({}, "servers10") == ["base"]
+    assert _ids({}, "consolidated6") == ["base"]
+    assert _ids({"reassignment": "none"}, "thesis10") == ["s4_t1_no_moves"]
+    assert _ids({"zone_map": [1, 1, 1, 1, 2, 2, 2, 2, 2, 2]}, "thesis10") == ["s1_t1_zones"]
+    assert _ids({"zone_map": [1, 1, 2, 2, 2, 2]}, "consolidated6") == ["s1_t1_zones"]
+    assert _ids({"cold_plates": True, "cp_mode": "fixed"}, "thesis10") == ["s2_t1_crac"]
+    assert _ids({"H_min_C": 19}, "thesis10") == ["s3_t1_hmin_high"]
+    assert _ids({"placement": "thermal_blind"}, "servers6") == ["s4_t2_blind"]
+    # Names, time limits and gaps never decide a test.
+    assert _ids({"run_name": "x", "time_limit_s": 60, "mip_rel_gap": 0.1}, "thesis10") == ["base"]
+    # Two switches at once: no test.
+    assert _ids({"reassignment": "none", "H_min_C": 5}, "thesis10") == []
+    # A random baseline, another scenario, an unknown carbon file: no test.
+    assert _ids({"baseline_rule": "random"}, "thesis10") == []
+    assert ex.identify({}, "thesis10_tight") == (None, [])
+    assert _ids({"carbon_file": "x.csv"}, "thesis10") == []
+
+
+def test_carbon_intensity_is_one_switch():
+    """Flat carbon (the old ci_flat switch), the swing scenario and a future ci_amplitude
+    switch all map to ci_amplitude."""
+    assert _ids({"ci_flat": True}, "thesis10") == ["s4_t3a_ci_flat"]
+    assert _ids({"ci_amplitude": 0.0}, "servers10") == ["s4_t3a_ci_flat"]
+    assert _ids({}, "thesis10_swing") == ["s4_t3b_ci_swing"]
+    assert _ids({"ci_amplitude": 0.5}, "servers10") == ["s4_t3b_ci_swing"]
+    assert _ids({"ci_flat": True}, "thesis10_swing") == ["s4_t3a_ci_flat"]
+    config, _ = ex.identify({}, "thesis10_swing")
+    assert config.key == "servers10"
+
+
+def test_a_not_applicable_test_never_matches():
+    # A mixed pair has nothing to regroup, so its (1, 1) zone map is no test.
+    assert _ids({"zone_map": [1, 1]}, "servers2_slow_fast") == []
+    assert _ids({"zone_map": [1, 1]}, "servers2_fast_fast") == ["s1_t1_zones"]
+    assert _ids({"cold_plates": True}, "servers2_slow_mid") == []
+
+
+@pytest.mark.parametrize("test", ex.TESTS, ids=lambda t: t.id)
+def test_titles(test):
+    title = ex.title_of(test)
+    if test.id == "base":
+        assert title == "Base"
+    else:
+        section, tag = ex.sections_of(test.id)[0]
+        assert title == f"{section.key} · {tag} · {test.name}"

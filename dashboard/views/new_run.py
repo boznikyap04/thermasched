@@ -159,7 +159,7 @@ def _result(job: Job) -> None:
     status = (job.summary.get("solver") or {}).get("status", "baseline only")
     st.success(f"`{job.key}` finished in {elapsed:,.0f} s · solver status **{status}**.",
                icon="✅")
-    if st.button("Open in Overview", on_click=_open, args=(job.key,), type="primary",
+    if st.button("Open in Run summary", on_click=_open, args=(job.key,), type="primary",
                  key=f"open_{job.key}_{job.finished}") and state.OVERVIEW_PAGE is not None:
         st.switch_page(state.OVERVIEW_PAGE)
 

@@ -1,4 +1,5 @@
-"""Overview: settings, KPI tiles baseline vs optimized, solver card, self-checks."""
+"""Run summary: what was run, how complete the solver's answer is, the headline numbers
+optimized vs baseline, and whether the self-checks passed."""
 
 from __future__ import annotations
 
@@ -7,7 +8,7 @@ import streamlit as st
 
 from dashboard import data, state
 
-DIGITS = {"kg CO₂": 2, "kWh": 2, "°C": 1, "": 0}
+DIGITS = {"kg CO₂": 2, "kWh": 2, "Wh": 3, "°C": 1, "": 0}
 DELTA_COLOR = {"lower": "inverse", "higher": "normal", "neutral": "off"}
 STATUS_COLOR = {"optimal": "green", "time_limit": "orange", "infeasible": "red",
                 "no_solution": "red"}
@@ -29,8 +30,6 @@ def _tile(row: pd.Series, run: data.Run) -> None:
         m = (run.summary.get("optimized" if has_opt else "baseline") or {}).get("metrics", {})
         help_text = (f"On {run.server_name(m.get('hottest_server'))}, "
                      f"period t={m.get('hottest_period')}.")
-    elif row["key"] in ("periods_above_dvfs", "periods_above_cap"):
-        help_text = "Server-periods: one server for one period counts once."
     label = row["label"]
     if not has_opt:
         st.metric(label, state.fmt_num(value, digits, unit), border=True, help=help_text)
@@ -52,58 +51,56 @@ def _tile(row: pd.Series, run: data.Run) -> None:
 
 def _kpis(run: data.Run) -> None:
     kpis = data.kpi_frame(run.summary)
-    cols_per_row = 4
-    for start in range(0, len(kpis), cols_per_row):
-        cols = st.columns(cols_per_row)
-        for col, (_, row) in zip(cols, kpis.iloc[start:start + cols_per_row].iterrows()):
+    energy = kpis[kpis["key"].str.startswith(("carbon", "E_"))]
+    rest = kpis.drop(energy.index)
+    for group in (energy, rest):
+        cols = st.columns(5)
+        for col, (_, row) in zip(cols, group.iterrows()):
             with col:
                 _tile(row, run)
-    with st.expander("KPI table"):
-        table = kpis[["label", "unit", "baseline", "optimized", "diff", "pct"]].rename(
-            columns={"label": "Metric", "unit": "Unit", "baseline": "Baseline",
-                     "optimized": "Optimized", "diff": "Change", "pct": "Change (%)"})
-        st.dataframe(table, hide_index=True, column_config={
-            c: st.column_config.NumberColumn(format="%.4f")
-            for c in ("Baseline", "Optimized", "Change")} | {
-            "Change (%)": st.column_config.NumberColumn(format="%.2f%%")})
 
 
-def _solver_card(run: data.Run) -> None:
+def _solver(run: data.Run) -> None:
     sol = run.solver
+    status = sol.get("status", "unknown")
     with st.container(border=True):
-        st.markdown("**Solver (HiGHS MIP)**")
-        status = sol.get("status", "unknown")
-        st.badge(data.status_text(status)
-                 + (f" · {sol['solver_status_text']}" if sol.get("solver_status_text") else ""),
-                 color=STATUS_COLOR.get(status, "gray"))
+        with st.container(horizontal=True, gap="small", vertical_alignment="center"):
+            st.markdown("**Solver**")
+            st.badge(data.solver_short(sol) if status != "unknown" else "unknown",
+                     color=STATUS_COLOR.get(status, "gray"))
         st.caption(data.solver_sentence(sol))
-        c1, c2 = st.columns(2)
-        c1.metric("Solve time", state.fmt_num(sol.get("solve_time_s"), 1, "s"))
+        c1, c2, c3 = st.columns(3)
+        c1.metric("Solve time", state.fmt_num(sol.get("solve_time_s"), 0, "s"))
         gap = sol.get("mip_gap")
         c2.metric("MIP gap", "–" if gap is None else f"{gap * 100:.2f}%",
                   help=f"Requested: {run.settings.get('mip_rel_gap', 0) * 100:g}%")
-        obj, bound = sol.get("objective_g"), sol.get("best_bound_g")
-        c1.metric("Objective (carbon)", state.fmt_num(None if obj is None else obj / 1000, 3,
-                                                       "kg"))
-        c2.metric("Best bound", state.fmt_num(None if bound is None else bound / 1000, 3, "kg"),
+        bound = sol.get("best_bound_g")
+        c3.metric("Best bound", state.fmt_num(None if bound is None else bound / 1000, 3, "kg"),
                   help="Lower bound on the optimum: no schedule can emit less.")
-        st.caption(f"{state.fmt_num(sol.get('n_variables'), 0)} variables "
-                   f"({state.fmt_num(sol.get('n_binaries'), 0)} binary) · "
-                   f"{state.fmt_num(sol.get('n_constraints'), 0)} constraints")
-        if sol.get("relaxed"):
-            st.caption(f"Relaxed families: {', '.join(sol['relaxed'])}")
-        if sol.get("notes"):
-            with st.expander(f"Model notes ({len(sol['notes'])})"):
-                for n in sol["notes"]:
-                    st.markdown(f"- {n}")
+        with st.expander("Solver details"):
+            obj = sol.get("objective_g")
+            st.caption(f"Objective (carbon) {state.fmt_num(None if obj is None else obj / 1000, 3, 'kg')}"
+                       f" · {state.fmt_num(sol.get('n_variables'), 0)} variables "
+                       f"({state.fmt_num(sol.get('n_binaries'), 0)} binary) · "
+                       f"{state.fmt_num(sol.get('n_constraints'), 0)} constraints"
+                       + (f" · {sol['solver_status_text']}" if sol.get("solver_status_text")
+                          else ""))
+            if sol.get("relaxed"):
+                st.caption(f"Relaxed families: {', '.join(sol['relaxed'])}")
+            for n in sol.get("notes") or []:
+                st.markdown(f"- {n}")
 
 
 def _checks(run: data.Run) -> None:
     checks = data.checks_frame(run.summary)
-    with st.container(border=True):
-        st.markdown("**Self-checks**")
-        if checks.empty:
-            st.caption("No self-checks recorded.")
+    if checks.empty:
+        st.caption("No self-checks recorded for this run.")
+        return
+    failed = checks[checks["passed"] == False]  # noqa: E712 - None means not applicable
+    n = len(checks)
+    title = (f"✅ All {n} self-checks passed" if failed.empty
+             else f"❌ {len(failed)} of {n} self-checks failed: " + ", ".join(failed["label"]))
+    with st.expander(title, expanded=not failed.empty):
         for _, c in checks.iterrows():
             icon, word = {True: ("✅", "pass"), False: ("❌", "FAIL")}.get(c["passed"], ("➖", "n/a"))
             st.markdown(f"{icon} **{word}** · {c['label']}")
@@ -149,7 +146,7 @@ def render() -> None:
     run = state.current_run()
     sc = run.summary.get("scenario", {})
     hours = sc.get("T", 0) * run.dt_seconds / 3600
-    state.page_header("Overview", run,
+    state.page_header("Run summary", run,
                       f"{sc.get('I', '?')} workloads · {sc.get('S', '?')} servers · "
                       f"{sc.get('Z', '?')} zones · {sc.get('T', '?')} periods of "
                       f"{run.dt_seconds / 60:g} min ({hours:g} h)")
@@ -157,18 +154,13 @@ def render() -> None:
     st.caption(data.provenance_caption(run.summary))
     for warning in data.provenance_warnings(run.summary):
         st.warning(warning, icon=":material/difference:")
-    st.space("small")
     if not run.has_optimized:
         _infeasibility(run)
     _violations(run)
+    _solver(run)
 
     st.subheader("Key results: optimized vs baseline" if run.has_optimized
                  else "Key results: baseline only")
     _kpis(run)
-
-    left, right = st.columns([3, 2])
-    with left:
-        _solver_card(run)
-    with right:
-        _checks(run)
+    _checks(run)
     state.model_note(run)

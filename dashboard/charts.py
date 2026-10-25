@@ -14,7 +14,7 @@ from dashboard.data import (
     ENERGY_COMPONENTS, VARIANT_LABELS, WORKLOAD_TYPES, Run, active_energy_components,
     period_bounds,
 )
-from dashboard.theme import Palette, rgba, style
+from dashboard.theme import Palette, rgba, style, threshold
 
 TIME_TITLE = "Local time (HH:MM)"
 
@@ -64,70 +64,28 @@ def carbon_and_ci(run: Run, pal: Palette) -> go.Figure:
     return fig
 
 
-def energy_stack(run: Run, pal: Palette) -> go.Figure:
-    """Stacked energy by component, one panel per variant, shared y scale."""
+def energy_bars(run: Run, pal: Palette) -> go.Figure:
+    """Energy over the horizon by component, one stacked bar per schedule."""
     comps = active_energy_components(run)
     variants = [v for v in run.variants if (run.period["variant"] == v).any()]
-    fig = make_subplots(rows=1, cols=len(variants), shared_yaxes=True,
-                        subplot_titles=[VARIANT_LABELS[v] for v in variants],
-                        horizontal_spacing=0.03)
-    for k, v in enumerate(variants, start=1):
-        p = run.period[run.period["variant"] == v]
-        for comp in comps:
-            fig.add_scatter(
-                x=p["time"], y=p[comp], name=ENERGY_COMPONENTS[comp], mode="lines",
-                stackgroup=v, legendgroup=comp, showlegend=k == 1,
-                line=dict(color=pal.surface, width=0.75),
-                fillcolor=pal.components[comp], customdata=p["t"],
-                hovertemplate=f"%{{y:,.4f}} kWh (t=%{{customdata}})", row=1, col=k)
-    style(fig, pal, height=380, titled=True)
-    fig.update_yaxes(title_text=f"Energy per {_period_label(run)} (kWh)", row=1, col=1)
-    fig.update_xaxes(title_text=TIME_TITLE)
-    return fig
-
-
-def cumulative_savings(cum: pd.DataFrame, run: Run, pal: Palette) -> go.Figure:
-    """Running total of carbon saved (optimized vs baseline), split by component."""
+    totals = run.period.groupby("variant")[comps].sum()
     fig = go.Figure()
-    for comp in active_energy_components(run):
-        col = f"{comp}_carbon_saved_kg"
-        if col in cum:
-            fig.add_scatter(x=cum["time"], y=cum[col], name=f"{ENERGY_COMPONENTS[comp]}",
-                            mode="lines", line=dict(color=pal.components[comp], width=1.5),
-                            customdata=cum["t"],
-                            hovertemplate="%{y:,.3f} kg CO₂ (t=%{customdata})")
-    fig.add_scatter(x=cum["time"], y=cum["carbon_saved_kg"], name="Total", mode="lines",
-                    line=dict(color=pal.ink, width=2.5), customdata=cum["t"],
-                    hovertemplate="%{y:,.3f} kg CO₂ (t=%{customdata})")
-    last = cum.iloc[-1]
-    fig.add_annotation(x=last["time"], y=last["carbon_saved_kg"],
-                       text=f"{last['carbon_saved_kg']:,.2f} kg", showarrow=False,
-                       xanchor="right", yanchor="bottom", font=dict(color=pal.ink, size=12))
-    style(fig, pal, height=340)
-    fig.update_yaxes(title_text="Cumulative carbon saved (kg CO₂)", zeroline=True)
-    fig.update_xaxes(title_text=TIME_TITLE)
-    return fig
-
-
-def savings_bars(sb: pd.DataFrame, pal: Palette) -> go.Figure:
-    """Carbon saved per energy component (kg); positive = optimized emitted less."""
-    sb = sb.iloc[::-1]
-    fig = go.Figure(go.Bar(
-        x=sb["carbon_saved_kg"], y=sb["label"], orientation="h",
-        marker=dict(color=[pal.components[c] for c in sb["component"]], line_width=0,
-                    cornerradius=4),
-        text=[f"{v:,.3f} kg" for v in sb["carbon_saved_kg"]], textposition="outside",
-        textfont=dict(color=pal.ink2), cliponaxis=False,
-        customdata=np.c_[sb["energy_saved_kWh"], sb["energy_effect_kg"], sb["timing_effect_kg"]],
-        hovertemplate=("<b>%{y}</b><br>Carbon saved %{x:,.4f} kg CO₂<br>"
-                       "Energy saved %{customdata[0]:,.4f} kWh<br>"
-                       "Energy effect %{customdata[1]:,.4f} kg<br>"
-                       "Timing effect %{customdata[2]:,.4f} kg<extra></extra>")))
-    style(fig, pal, height=110 + 48 * len(sb), legend=False, time_axis=False, hovermode="closest")
-    fig.update_xaxes(title_text="Carbon saved vs baseline (kg CO₂)", zeroline=True,
-                     zerolinecolor=pal.axis)
-    fig.update_yaxes(showgrid=False)
-    fig.update_layout(bargap=0.45, margin=dict(r=60))
+    for comp in comps:
+        y = [float(totals.loc[v, comp]) for v in variants]
+        grand = [float(totals.loc[v].sum()) for v in variants]
+        fig.add_bar(
+            x=[VARIANT_LABELS[v] for v in variants], y=y, name=ENERGY_COMPONENTS[comp],
+            marker=dict(color=pal.components[comp], line_width=0),
+            customdata=np.c_[[100 * a / g if g else 0 for a, g in zip(y, grand)]],
+            hovertemplate=(f"{ENERGY_COMPONENTS[comp]}: %{{y:,.4f}} kWh "
+                           "(%{customdata[0]:.1f}% of total)<extra></extra>"))
+    for v in variants:
+        total = float(totals.loc[v].sum())
+        fig.add_annotation(x=VARIANT_LABELS[v], y=total, text=f"{total:,.2f} kWh",
+                           showarrow=False, yanchor="bottom", font=dict(color=pal.ink2))
+    style(fig, pal, height=380, time_axis=False, hovermode="closest")
+    fig.update_layout(barmode="stack", bargap=0.55)
+    fig.update_yaxes(title_text="Energy over the horizon (kWh)", rangemode="tozero")
     return fig
 
 
@@ -151,10 +109,10 @@ def temperature_colorscale(pal: Palette, zmin: float, zmax: float,
     return scale
 
 
-def temperature_heatmap(run: Run, pal: Palette) -> go.Figure:
+def temperature_heatmap(run: Run, pal: Palette, variants: list[str]) -> go.Figure:
     """Server x time temperature for each variant on one shared colour scale."""
     sp = run.server_period
-    variants = [v for v in run.variants if (sp["variant"] == v).any()]
+    variants = [v for v in variants if (sp["variant"] == v).any()]
     dvfs, cap = run.T_dvfs_C, run.thermal_cap_C
     zmin = math.floor(sp["temperature_C"].min())
     zmax = max(math.ceil(sp["temperature_C"].max()), max(dvfs, cap) + 2)
@@ -204,238 +162,117 @@ def temperature_heatmap(run: Run, pal: Palette) -> go.Figure:
     return fig
 
 
-def _threshold_traces(fig: go.Figure, pal: Palette, run: Run, rows: int, cols: int,
-                      n_panels: int) -> None:
-    dvfs, cap = run.T_dvfs_C, run.thermal_cap_C
-    for k in range(n_panels):
-        r, c = k // cols + 1, k % cols + 1
-        fig.add_hline(y=dvfs, line=dict(color=pal.ink2, width=1, dash="dash"), row=r, col=c)
-        fig.add_hline(y=cap, line=dict(color=pal.ink2, width=1, dash="dot"), row=r, col=c)
-    # Legend entries for the two limit lines.
-    for name, dash in ((f"DVFS {dvfs:g} °C", "dash"), (f"Thermal cap {cap:g} °C", "dot")):
-        fig.add_scatter(x=[None], y=[None], mode="lines", name=name, hoverinfo="skip",
-                        line=dict(color=pal.ink2, width=1, dash=dash), row=1, col=1)
+def _dash_key(fig: go.Figure, pal: Palette, variants: list[str]) -> None:
+    """Legend entries saying which schedule is solid and which dashed (two schedules only)."""
+    if len(variants) < 2:
+        return
+    for v in variants:
+        fig.add_scatter(x=[None], y=[None], mode="lines", hoverinfo="skip",
+                        name=f"{VARIANT_LABELS[v]} ({'solid' if v == 'optimized' else 'dashed'})",
+                        line=dict(color=pal.ink2, width=1.4,
+                                  dash="solid" if v == "optimized" else "dash"))
 
 
-def server_temperatures(run: Run, pal: Palette, servers: list[int], cols: int = 2) -> go.Figure:
-    """Small multiples: one panel per server, baseline vs optimized, with limit lines."""
+# server_period column -> (axis title, hover format, scale, unit); scale converts the value.
+SERVER_LINES = {
+    "utilization": ("CPU utilization (%)", ".1f", 100.0, "%"),
+    "temperature_C": ("Predicted temperature (°C)", ".2f", 1.0, "°C"),
+    "headroom_C": ("Thermal headroom (°C)", ".2f", 1.0, "°C"),
+    "PC_eff_MHz": ("Effective processing capability (GHz)", ",.2f", 1e-3, "GHz"),
+    "P_IT_W": ("IT power (W)", ",.1f", 1.0, "W"),
+    "DPF": ("DPF (1 = full speed)", ".4f", 1.0, ""),
+    "cp_coolant_C": ("Coolant inlet temperature (°C)", ".2f", 1.0, "°C"),
+    "cp_flow_Lmin": ("Coolant flow (L/min)", ".3f", 1.0, "L/min"),
+}
+
+
+def server_lines(run: Run, pal: Palette, servers: list[int], column: str,
+                 variants: list[str]) -> go.Figure:
+    """One line per server over the day; a second schedule is drawn dashed in the same
+    colour. Temperature carries the DVFS and cap lines, headroom the required H_min."""
+    title, fmt, scale, unit = SERVER_LINES[column]
     sp = run.server_period
-    info = run.servers.set_index("s").loc[servers]
-    rows = math.ceil(len(servers) / cols)
-    cols = min(cols, len(servers))
-    fig = make_subplots(rows=rows, cols=cols, shared_xaxes=True, shared_yaxes=True,
-                        subplot_titles=info["label"].tolist(),
-                        vertical_spacing=0.32 / rows if rows > 1 else 0.05,
-                        horizontal_spacing=0.04)
-    for k, s in enumerate(servers):
-        r, c = k // cols + 1, k % cols + 1
-        for v in run.variants:
-            d = sp[(sp["variant"] == v) & (sp["s"] == s)]
-            if d.empty:
-                continue
-            fig.add_scatter(
-                x=d["time"], y=d["temperature_C"], name=VARIANT_LABELS[v], mode="lines",
-                line=_variant_line(pal, v, 1.5), legendgroup=v, showlegend=k == 0,
-                customdata=np.c_[d["t"], d["headroom_C"]],
-                hovertemplate="%{y:.2f} °C, headroom %{customdata[1]:.2f} °C (t=%{customdata[0]})",
-                row=r, col=c)
-    _threshold_traces(fig, pal, run, rows, cols, len(servers))
-    style(fig, pal, height=110 + 210 * rows, titled=True)
-    lo = math.floor(sp["temperature_C"].min() / 5) * 5
-    hi = max(sp["temperature_C"].max(), run.thermal_cap_C, run.T_dvfs_C) + 3
-    fig.update_yaxes(range=[lo, hi])
-    fig.update_xaxes(showticklabels=True)
-    for r in range(1, rows + 1):
-        fig.update_yaxes(title_text="Temperature (°C)", row=r, col=1)
-    for c in range(1, cols + 1):
-        fig.update_xaxes(title_text=TIME_TITLE, row=rows, col=c)
-    return fig
-
-
-def min_headroom(run: Run, pal: Palette) -> go.Figure:
-    """Smallest headroom across servers per period, with the required H_min."""
-    sp = run.server_period
+    info = run.servers.reset_index(drop=True)
     fig = go.Figure()
-    for v in run.variants:
-        d = sp[sp["variant"] == v]
-        if d.empty:
+    for k, srv in info.iterrows():
+        if srv["s"] not in servers:
             continue
-        idx = d.groupby("t")["headroom_C"].idxmin()
-        m = d.loc[idx].sort_values("t")
-        fig.add_scatter(
-            x=m["time"], y=m["headroom_C"], name=VARIANT_LABELS[v], mode="lines",
-            line=_variant_line(pal, v), customdata=np.c_[m["t"], m["name"]],
-            hovertemplate="%{y:.2f} °C on %{customdata[1]} (t=%{customdata[0]})")
-    style(fig, pal, height=320)
-    if run.H_min_C is not None:
-        fig.add_hline(y=run.H_min_C, line=dict(color=pal.ink2, width=1, dash="dot"),
-                      annotation=dict(text=f"Required H_min {run.H_min_C:g} °C",
-                                      font=dict(color=pal.ink2, size=11)),
-                      annotation_position="bottom right")
-    lo = min(0.0, sp["headroom_C"].min() - 2) if len(sp) else 0
-    fig.update_yaxes(title_text="Min. headroom across servers (°C)",
-                     range=[lo, sp["headroom_C"].max() + 2])
+        for v in variants:
+            d = sp[(sp["variant"] == v) & (sp["s"] == srv["s"])]
+            if d.empty or d[column].isna().all():
+                continue
+            tag = "" if len(variants) == 1 else f" ({VARIANT_LABELS[v].lower()})"
+            fig.add_scatter(
+                x=d["time"], y=d[column] * scale, name=srv["label"], mode="lines",
+                legendgroup=str(srv["s"]), showlegend=v == variants[0],
+                line=dict(color=pal.nth(k), width=1.6 if v == "optimized" else 1.2,
+                          dash="solid" if v == "optimized" else "dash",
+                          shape="hv" if column in ("utilization", "cp_flow_Lmin",
+                                                   "cp_coolant_C") else "linear"),
+                customdata=d["t"],
+                hovertemplate=f"{srv['name']}{tag}: %{{y:{fmt}}} {unit}<extra></extra>")
+    _dash_key(fig, pal, variants)
+    style(fig, pal, height=440)
+    if column == "temperature_C":
+        threshold(fig, pal, run.T_dvfs_C, f"DVFS {run.T_dvfs_C:g} °C", dash="dash")
+        threshold(fig, pal, run.thermal_cap_C, f"Thermal cap {run.thermal_cap_C:g} °C",
+                  dash="dot")
+        fig.update_yaxes(range=[None, max(run.thermal_cap_C, run.T_dvfs_C) + 3])
+    elif column == "headroom_C" and run.H_min_C is not None:
+        threshold(fig, pal, run.H_min_C, f"Required H_min {run.H_min_C:g} °C", dash="dot")
+        fig.update_yaxes(rangemode="tozero")
+    elif column == "utilization":
+        fig.update_yaxes(range=[0, 103])
+    elif column == "DPF":
+        fig.update_yaxes(range=[min(0.9, float(sp["DPF"].min()) - 0.02), 1.02])
+    fig.update_yaxes(title_text=title)
     fig.update_xaxes(title_text=TIME_TITLE)
     return fig
 
 
-# column -> (axis title, hover format, scale, unit); scale converts the stored value.
-SERVER_METRICS = {
-    "headroom_C": ("Headroom (°C)", ".2f", 1.0, "°C"),
-    "utilization": ("CPU utilization (%)", ".1f", 100.0, "%"),
-    "P_IT_W": ("IT power (W)", ",.1f", 1.0, "W"),
-    "PC_eff_MHz": ("Effective capability (GHz)", ",.2f", 1e-3, "GHz"),
+# zone_period column -> (axis title, hover format, scale, unit).
+ZONE_LINES = {
+    "supply_temp_C": ("CRAC supply-air temperature (°C)", ".1f", 1.0, "°C"),
+    "E_crac_kWh": ("CRAC energy per period (kWh)", ",.4f", 1.0, "kWh"),
 }
 
 
-def server_metric(run: Run, pal: Palette, servers: list[int], column: str,
-                  cols: int = 2) -> go.Figure:
-    """Small multiples of one server_period column: one panel per server, baseline vs
-    optimized. Headroom carries the H_min line; PC_eff the full-speed N_cores * f_s line."""
-    title, fmt, scale, unit = SERVER_METRICS[column]
-    sp = run.server_period
-    info = run.servers.set_index("s").loc[servers]
-    rows = math.ceil(len(servers) / cols)
-    cols = min(cols, len(servers))
-    fig = make_subplots(rows=rows, cols=cols, shared_xaxes=True, shared_yaxes=True,
-                        subplot_titles=info["label"].tolist(),
-                        vertical_spacing=0.32 / rows if rows > 1 else 0.05,
-                        horizontal_spacing=0.04)
-    for k, s in enumerate(servers):
-        r, c = k // cols + 1, k % cols + 1
-        for v in run.variants:
-            d = sp[(sp["variant"] == v) & (sp["s"] == s)]
+def zone_lines(run: Run, pal: Palette, column: str, variants: list[str]) -> go.Figure:
+    """One line per cooling zone over the day; the supply chart shades the allowed range.
+    ``E_crac_kWh`` is the CRAC power times the period length."""
+    title, fmt, scale, unit = ZONE_LINES[column]
+    zp = run.zone_period.copy()
+    zp["E_crac_kWh"] = zp["P_crac_kW"] * run.dt_seconds / 3600
+    fig = go.Figure()
+    for k, z in enumerate(sorted(zp["z"].unique())):
+        for v in variants:
+            d = zp[(zp["variant"] == v) & (zp["z"] == z)]
             if d.empty:
                 continue
+            tag = "" if len(variants) == 1 else f" ({VARIANT_LABELS[v].lower()})"
             fig.add_scatter(
-                x=d["time"], y=d[column] * scale, name=VARIANT_LABELS[v], mode="lines",
-                line=dict(color=pal.variant(v), width=1.5,
-                          shape="hv" if column == "utilization" else "linear"),
-                legendgroup=v, showlegend=k == 0, customdata=d["t"],
-                hovertemplate=f"%{{y:{fmt}}} {unit} (t=%{{customdata}})", row=r, col=c)
-        if column == "PC_eff_MHz":
-            full = sp.loc[sp["s"] == s, column].max() * scale
-            fig.add_hline(y=full, line=dict(color=pal.ink2, width=1, dash="dot"), row=r, col=c)
-    if column == "headroom_C" and run.H_min_C is not None:
-        for k in range(len(servers)):
-            fig.add_hline(y=run.H_min_C, line=dict(color=pal.ink2, width=1, dash="dot"),
-                          row=k // cols + 1, col=k % cols + 1)
-        fig.add_scatter(x=[None], y=[None], mode="lines", name=f"Required H_min {run.H_min_C:g} °C",
-                        hoverinfo="skip", line=dict(color=pal.ink2, width=1, dash="dot"),
-                        row=1, col=1)
-    if column == "PC_eff_MHz":
-        fig.add_scatter(x=[None], y=[None], mode="lines", name="Full speed (DPF = 1)",
-                        hoverinfo="skip", line=dict(color=pal.ink2, width=1, dash="dot"),
-                        row=1, col=1)
-    style(fig, pal, height=110 + 210 * rows, titled=True)
-    vals = sp.loc[sp["s"].isin(servers), column] * scale
-    if column == "utilization":
-        fig.update_yaxes(range=[0, max(100.0, float(vals.max())) + 3])
-    elif column == "headroom_C":
-        lo = min(0.0 if run.H_min_C is None else run.H_min_C, float(vals.min()))
-        fig.update_yaxes(range=[lo - 2, float(vals.max()) + 2])
-    elif column == "PC_eff_MHz":
-        fig.update_yaxes(range=[float(vals.min()) * 0.95, float(vals.max()) * 1.03])
-    fig.update_xaxes(showticklabels=True)
-    for r in range(1, rows + 1):
-        fig.update_yaxes(title_text=title, row=r, col=1)
-    for c in range(1, cols + 1):
-        fig.update_xaxes(title_text=TIME_TITLE, row=rows, col=c)
-    return fig
-
-
-def dpf_lines(run: Run, pal: Palette, servers: list[int], cols: int = 2) -> go.Figure:
-    """DPF (1 = full clock speed) per throttled server, baseline vs optimized."""
-    sp = run.server_period
-    info = run.servers.set_index("s").loc[servers]
-    rows = math.ceil(len(servers) / cols)
-    cols = min(cols, len(servers))
-    fig = make_subplots(rows=rows, cols=cols, shared_xaxes=True, shared_yaxes=True,
-                        subplot_titles=info["label"].tolist(),
-                        vertical_spacing=0.3 / rows if rows > 1 else 0.05,
-                        horizontal_spacing=0.04)
-    for k, s in enumerate(servers):
-        r, c = k // cols + 1, k % cols + 1
-        for v in run.variants:
-            d = sp[(sp["variant"] == v) & (sp["s"] == s)]
-            if d.empty:
-                continue
-            fig.add_scatter(
-                x=d["time"], y=d["DPF"], name=VARIANT_LABELS[v], mode="lines",
-                line=_variant_line(pal, v, 1.5), legendgroup=v, showlegend=k == 0,
-                customdata=np.c_[d["t"], d["PC_eff_MHz"], d["temperature_C"]],
-                hovertemplate=("DPF %{y:.4f}, %{customdata[1]:,.0f} MHz effective, "
-                               "%{customdata[2]:.2f} °C (t=%{customdata[0]})"),
-                row=r, col=c)
-    style(fig, pal, height=110 + 200 * rows, titled=True)
-    lo = sp.loc[sp["s"].isin(servers), "DPF"].min()
-    fig.update_yaxes(range=[max(0.0, lo - 0.03), 1.02])
-    fig.update_xaxes(showticklabels=True)
-    for r in range(1, rows + 1):
-        fig.update_yaxes(title_text="DPF (1 = full speed, –)", row=r, col=1)
-    for c in range(1, cols + 1):
-        fig.update_xaxes(title_text=TIME_TITLE, row=rows, col=c)
-    return fig
-
-
-# ---------------------------------------------------------------------------
-# Cooling
-# ---------------------------------------------------------------------------
-
-ZONE_METRICS = {
-    "supply_temp_C": "Supply air (°C)",
-    "Q_crac_kW": "Q_crac (kW)",
-    "P_crac_kW": "P_crac (kW)",
-    "COP": "COP (–)",
-    "P_fan_kW": "Fan power (kW)",
-    "airflow": "Airflow (m³/s)",
-}
-ZONE_FORMATS = {"supply_temp_C": ".2f", "Q_crac_kW": ",.4f", "P_crac_kW": ",.4f",
-                "COP": ".4f", "P_fan_kW": ",.4f", "airflow": ",.4f"}
-
-
-def zone_grid(run: Run, pal: Palette, metrics: list[str]) -> go.Figure:
-    """Rows = metrics, columns = zones; baseline vs optimized lines.
-    The supply panel shades the allowed supply band from compliance_zones.csv."""
-    zp = run.zone_period
-    zones = sorted(zp["z"].unique())
-    fig = make_subplots(rows=len(metrics), cols=len(zones), shared_xaxes=True,
-                        subplot_titles=[f"Zone {z}" for z in zones],
-                        vertical_spacing=0.05, horizontal_spacing=0.06)
+                x=d["time"], y=d[column] * scale, mode="lines", name=f"Zone {z}",
+                legendgroup=str(z), showlegend=v == variants[0],
+                line=dict(color=pal.nth(k), width=1.8 if v == "optimized" else 1.3,
+                          dash="solid" if v == "optimized" else "dash", shape="hv"),
+                customdata=d["t"],
+                hovertemplate=f"Zone {z}{tag}: %{{y:{fmt}}} {unit}<extra></extra>")
+    _dash_key(fig, pal, variants)
+    style(fig, pal, height=360)
     cz = run.compliance_zones
-    for c, z in enumerate(zones, start=1):
-        for r, m in enumerate(metrics, start=1):
-            for v in run.variants:
-                d = zp[(zp["variant"] == v) & (zp["z"] == z)]
-                if d.empty:
-                    continue
-                fig.add_scatter(
-                    x=d["time"], y=d[m], name=VARIANT_LABELS[v], mode="lines",
-                    line=dict(color=pal.variant(v), width=1.75, shape="hv"),
-                    legendgroup=v, showlegend=(r == 1 and c == 1), customdata=d["t"],
-                    hovertemplate=f"%{{y:{ZONE_FORMATS[m]}}} (t=%{{customdata}})",
-                    row=r, col=c)
-            if m == "supply_temp_C" and not cz.empty:
-                lim = cz[(cz["z"] == z)].iloc[0]
-                fig.add_hrect(y0=lim["supply_allowed_min_C"], y1=lim["supply_allowed_max_C"],
-                              fillcolor=rgba(pal.muted, 0.12), line_width=0, layer="below",
-                              row=r, col=c)
-                fig.add_annotation(
-                    text=f"allowed {lim['supply_allowed_min_C']:g}–"
-                         f"{lim['supply_allowed_max_C']:g} °C",
-                    xref="x domain", x=0.01, y=lim["supply_allowed_max_C"], xanchor="left",
-                    yanchor="top", showarrow=False, font=dict(color=pal.ink2, size=11),
-                    row=r, col=c)
-    style(fig, pal, height=100 + 190 * len(metrics), titled=True)
-    for r, m in enumerate(metrics, start=1):
-        fig.update_yaxes(title_text=ZONE_METRICS[m], row=r, col=1)
-    if "supply_temp_C" in metrics and not cz.empty:
-        r = metrics.index("supply_temp_C") + 1
-        lo = min(cz["supply_allowed_min_C"].min(), zp["supply_temp_C"].min()) - 1
-        hi = max(cz["supply_allowed_max_C"].max(), zp["supply_temp_C"].max()) + 1
-        fig.update_yaxes(range=[lo, hi], row=r)
-    for c in range(1, len(zones) + 1):
-        fig.update_xaxes(title_text=TIME_TITLE, row=len(metrics), col=c)
+    if column == "supply_temp_C" and not cz.empty:
+        lo, hi = cz["supply_allowed_min_C"].min(), cz["supply_allowed_max_C"].max()
+        fig.add_hrect(y0=lo, y1=hi, fillcolor=rgba(pal.muted, 0.12), line_width=0,
+                      layer="below")
+        fig.add_annotation(text=f"allowed {lo:g}–{hi:g} °C", xref="x domain", x=0.01, y=hi,
+                           xanchor="left", yanchor="top", showarrow=False,
+                           font=dict(color=pal.ink2, size=11))
+        fig.update_yaxes(range=[min(lo, zp["supply_temp_C"].min()) - 1,
+                                max(hi, zp["supply_temp_C"].max()) + 1])
+    else:
+        fig.update_yaxes(rangemode="tozero")
+    fig.update_yaxes(title_text=title)
+    fig.update_xaxes(title_text=TIME_TITLE)
     return fig
 
 
@@ -446,49 +283,6 @@ def cold_plate_servers(run: Run) -> list[int]:
         return []
     has = set(sp.loc[pd.to_numeric(sp["cp_flow_Lmin"], errors="coerce").notna(), "s"])
     return [s for s in run.servers["s"] if s in has]
-
-
-def cooling_decisions(run: Run, pal: Palette, servers: list[int]) -> go.Figure:
-    """Per cold-plate server: CRAC supply air of its zone and coolant temperature in one
-    panel (both °C), coolant flow in the panel below (L/min; CRAC airflow is not modelled)."""
-    sp, zp = run.server_period, run.zone_period
-    info = run.servers.set_index("s").loc[servers]
-    n = len(servers)
-    fig = make_subplots(rows=2, cols=n, shared_xaxes=True, shared_yaxes="rows",
-                        subplot_titles=info["label"].tolist(), vertical_spacing=0.1,
-                        horizontal_spacing=0.04, row_heights=[0.6, 0.4])
-    for c, s in enumerate(servers, start=1):
-        zone = int(info.loc[s, "zone"])
-        for v in run.variants:
-            d = sp[(sp["variant"] == v) & (sp["s"] == s)]
-            z = zp[(zp["variant"] == v) & (zp["z"] == zone)] if not zp.empty else zp
-            if d.empty:
-                continue
-            first = c == 1
-            fig.add_scatter(
-                x=d["time"], y=d["cp_coolant_C"], name=f"{VARIANT_LABELS[v]} · coolant",
-                mode="lines", line=dict(color=pal.variant(v), width=1.75, shape="hv"),
-                legendgroup=f"{v}cool", showlegend=first, customdata=d["t"],
-                hovertemplate="coolant %{y:.2f} °C (t=%{customdata})", row=1, col=c)
-            if not z.empty:
-                fig.add_scatter(
-                    x=z["time"], y=z["supply_temp_C"], name=f"{VARIANT_LABELS[v]} · CRAC supply air",
-                    mode="lines", line=dict(color=pal.variant(v), width=1.25, dash="dot",
-                                            shape="hv"),
-                    legendgroup=f"{v}air", showlegend=first, customdata=z["t"],
-                    hovertemplate=f"zone {zone} supply %{{y:.0f}} °C (t=%{{customdata}})",
-                    row=1, col=c)
-            fig.add_scatter(
-                x=d["time"], y=d["cp_flow_Lmin"], name=f"{VARIANT_LABELS[v]} · coolant flow",
-                mode="lines", line=dict(color=pal.variant(v), width=1.75, shape="hv"),
-                legendgroup=f"{v}cool", showlegend=False, customdata=d["t"],
-                hovertemplate="flow %{y:.3f} L/min (t=%{customdata})", row=2, col=c)
-    style(fig, pal, height=520, titled=True)
-    fig.update_yaxes(title_text="Temperature (°C)", row=1, col=1)
-    fig.update_yaxes(title_text="Coolant flow (L/min)", row=2, col=1, rangemode="tozero")
-    for c in range(1, n + 1):
-        fig.update_xaxes(title_text=TIME_TITLE, row=2, col=c)
-    return fig
 
 
 # ---------------------------------------------------------------------------
@@ -601,6 +395,24 @@ def gantt(run: Run, sched: pd.DataFrame, blocks: pd.DataFrame, pal: Palette, tit
 # Compare runs
 # ---------------------------------------------------------------------------
 
+def grouped_bars(categories: list[str], series: dict[str, list], pal: Palette, *,
+                 y_title: str, stacked: bool = False, colors: dict[str, str] | None = None,
+                 fmt: str = ",.3f", height: int = 340) -> go.Figure:
+    """One bar per category and series, grouped (or stacked). Chapter 6 uses it with the
+    tests of a section (Base, Test 1, ...) or the configurations as categories."""
+    fig = go.Figure()
+    for k, (name, values) in enumerate(series.items()):
+        color = (colors or {}).get(name, pal.nth(k))
+        fig.add_bar(x=categories, y=values, name=name,
+                    marker=dict(color=color, cornerradius=4, line_width=0),
+                    hovertemplate=f"%{{x}} · {name}: %{{y:{fmt}}}<extra></extra>")
+    style(fig, pal, height=height, time_axis=False, hovermode="closest",
+          legend=len(series) > 1)
+    fig.update_layout(barmode="stack" if stacked else "group", bargap=0.3, bargroupgap=0.08)
+    fig.update_yaxes(title_text=y_title, rangemode="tozero")
+    return fig
+
+
 def compare_carbon(df: pd.DataFrame, pal: Palette) -> go.Figure:
     """Total carbon per run, baseline vs optimized, with % saved at the bar end."""
     df = df.iloc[::-1]
@@ -621,29 +433,6 @@ def compare_carbon(df: pd.DataFrame, pal: Palette) -> go.Figure:
     fig.update_layout(barmode="group", bargap=0.3, bargroupgap=0.08, margin=dict(r=150),
                       legend_traceorder="reversed")
     fig.update_xaxes(title_text="Total carbon over the horizon (kg CO₂)", rangemode="tozero")
-    fig.update_yaxes(showgrid=False)
-    return fig
-
-
-def compare_saved(df: pd.DataFrame, pal: Palette) -> go.Figure:
-    """% carbon saved per run (single series); labels sit right of the bar or of zero."""
-    df = df.iloc[::-1]
-    pct = df["carbon_saved_pct"]
-    fig = go.Figure(go.Bar(
-        y=df["run"], x=pct.fillna(0), orientation="h",
-        marker=dict(color=pal.optimized, cornerradius=4, line_width=0),
-        customdata=np.c_[df["carbon_saved_kg"].fillna(np.nan)],
-        hovertemplate="%{x:.3f}% (%{customdata[0]:,.3f} kg CO₂)<extra></extra>"))
-    for run, p in zip(df["run"], pct):
-        text = ("no optimized schedule" if pd.isna(p) else
-                f"{p:.2f}% saved" if p >= 0 else f"{-p:.2f}% more carbon")
-        fig.add_annotation(x=0 if pd.isna(p) else max(p, 0), y=run, text=text, xanchor="left",
-                           xshift=6, showarrow=False, font=dict(color=pal.ink2, size=12))
-    style(fig, pal, height=120 + 44 * len(df), time_axis=False, legend=False,
-          hovermode="closest")
-    fig.update_layout(bargap=0.4, margin=dict(r=160))
-    fig.update_xaxes(title_text="Carbon saved vs baseline (%)", zeroline=True,
-                     zerolinecolor=pal.axis, zerolinewidth=1)
     fig.update_yaxes(showgrid=False)
     return fig
 

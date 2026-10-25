@@ -104,11 +104,12 @@ def test_run_based_tables_and_write_all(tmp_path, small):
 
 def test_solver_rows_say_how_complete_each_run_is():
     rows = {r["Run"]: r for r in validate.solver_rows("results", "thesis10")}
-    base = rows["least_loaded_base18_free_optimize_tl1800"]
+    base = rows["base"]                         # results/servers10/base, a thesis10 run
     assert base["Solver status"] == "Stopped at time limit"
     assert base["Most a better schedule could save (kg CO2)"] == pytest.approx(
         base["Carbon (kg CO2)"] - base["Lower bound (kg CO2)"], abs=1e-3)
-    assert rows["least_loaded_base18_none_optimize_tl1800"]["Solver status"] == "Proven best"
+    assert rows["s4_t1_no_moves"]["Solver status"] == "Proven best"
+    assert "s4_t3b_ci_swing" not in rows        # solved on thesis10_swing
 
 
 def test_status_words():

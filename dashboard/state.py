@@ -12,9 +12,11 @@ import pandas as pd
 import streamlit as st
 
 from dashboard import data, uploads
+from scheduler import experiments as ex
 from dashboard.theme import PLOTLY_CONFIG, Palette, palette
 
 RUN_KEY = "run_key"
+CONFIG_KEY = "config_key"     # the configuration picked in the sidebar
 PENDING_RUN = "pending_run"   # run to select on the next rerun (set before the sidebar draws)
 OVERVIEW_PAGE = None   # set by app.py each run, for st.switch_page
 
@@ -141,26 +143,33 @@ def runs_frame(refs: list[data.RunRef]) -> pd.DataFrame:
     return compare_runs(tuple(str(r.path) for r in refs), tuple(refs), _summaries_stamp(refs))
 
 
-@st.cache_data(show_spinner="Reading the Chapter 6 runs…")
-def _chapter6(keys: tuple[str, ...], _refs: tuple[data.RunRef, ...], stamp: float):
-    return data.chapter6_table(list(_refs)), data.chapter6_runs(list(_refs))
-
-
-def chapter6(refs: list[data.RunRef]):
-    """The Chapter 6 table and, per entry, the run used and every matching run."""
-    return _chapter6(tuple(str(r.path) for r in refs), tuple(refs), _summaries_stamp(refs))
+def _cache_args(refs: list[data.RunRef]):
+    # Paths, not keys: two sessions can upload different runs under the same key.
+    return tuple(str(r.path) for r in refs), tuple(refs), _summaries_stamp(refs)
 
 
 @st.cache_data(show_spinner=False)
-def _thesis_labels(keys: tuple[str, ...], _refs: tuple[data.RunRef, ...],
-                   stamp: float) -> dict[str, str]:
-    return data.thesis_label_texts(list(_refs))
+def _run_infos(keys: tuple[str, ...], _refs: tuple[data.RunRef, ...],
+               stamp: float) -> dict[str, data.RunInfo]:
+    return data.run_infos(list(_refs))
 
 
-def thesis_labels() -> dict[str, str]:
-    """Run key -> thesis label text, for every run of this session that has one."""
-    refs = discover_runs()
-    return _thesis_labels(tuple(str(r.path) for r in refs), tuple(refs), _summaries_stamp(refs))
+def run_infos() -> dict[str, data.RunInfo]:
+    """Run key -> its configuration and tests, for every run of this session."""
+    return _run_infos(*_cache_args(discover_runs()))
+
+
+@st.cache_data(show_spinner="Reading the Chapter 6 runs…")
+def _chapter6(keys: tuple[str, ...], _refs: tuple[data.RunRef, ...], stamp: float):
+    refs = list(_refs)
+    infos = data.run_infos(refs)
+    return data.chapter6_table(refs, infos), data.catalogue(refs, infos)
+
+
+def chapter6():
+    """The Chapter 6 table (every configuration) and the catalogue: (configuration, test)
+    -> (run used, every matching run)."""
+    return _chapter6(*_cache_args(discover_runs()))
 
 
 @st.cache_data(show_spinner=False)
@@ -171,8 +180,31 @@ def _run_statuses(keys: tuple[str, ...], _refs: tuple[data.RunRef, ...],
 
 def run_statuses() -> dict[str, str]:
     """Run key -> the solver's outcome in a few words, for every run of this session."""
+    return _run_statuses(*_cache_args(discover_runs()))
+
+
+def config_runs() -> dict[str, list[data.RunRef]]:
+    """Configuration key (or data.OTHER) -> its runs, in run-picker order."""
     refs = discover_runs()
-    return _run_statuses(tuple(str(r.path) for r in refs), tuple(refs), _summaries_stamp(refs))
+    return data.config_runs(refs, run_infos())
+
+
+def run_title(ref: data.RunRef) -> str:
+    info = run_infos().get(ref.key)
+    return data.run_title(info, ref) if info else ref.name
+
+
+def selected_config() -> ex.Configuration | None:
+    return ex.CONFIGURATION_BY_KEY.get(st.session_state.get(CONFIG_KEY))
+
+
+def run_link(ref: data.RunRef | None, text: str) -> None:
+    """A button that opens a run on Run summary."""
+    if ref is None or OVERVIEW_PAGE is None:
+        return
+    if st.button(text, key=f"open-{ref.key}", type="tertiary", icon=":material/open_in_new:"):
+        st.session_state[PENDING_RUN] = ref.key
+        st.switch_page(OVERVIEW_PAGE)
 
 
 def selected_ref() -> data.RunRef | None:
@@ -204,15 +236,18 @@ def chart(fig, key: str | None = None) -> None:
 
 def page_header(title: str, run: data.Run, caption: str | None = None) -> None:
     st.title(title)
-    label = thesis_labels().get(run.ref.key)
+    info = run_infos().get(run.ref.key)
+    label = data.run_long_title(info, run.ref) if info else None
+    original = run.settings.get("run_name")
     st.caption((f"**{label}** · " if label else "") + f"`{run.ref.scenario}` / `{run.ref.name}`"
+               + (f" (solved as `{original}`)" if original and original != run.ref.name else "")
                + (f" · {caption}" if caption else ""))
 
 
 def no_optimized_note(run: data.Run) -> None:
     status = run.solver.get("status", "unknown")
     st.warning(f"This run has no optimized schedule (solver status **{status}**), so only the "
-               "baseline is shown. See *Overview* for the infeasibility diagnosis.", icon="⚠️")
+               "baseline is shown. See *Run summary* for the infeasibility diagnosis.", icon="⚠️")
 
 
 def model_note(run: data.Run) -> None:

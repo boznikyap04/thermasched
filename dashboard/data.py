@@ -19,6 +19,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
+from scheduler import experiments as ex
 from scheduler.build import scenario_fingerprint
 from scheduler.types import STATUS_OPTIMAL, STATUS_TIME_LIMIT, status_text
 from scheduler.version import SCHEMA_VERSION, VERSION
@@ -381,33 +382,28 @@ def active_energy_components(run: Run) -> list[str]:
     return always + extra
 
 
-# (key, label, unit, better) for the KPI tiles; better is "lower", "higher" or "neutral".
+# (key, label, unit, better) for the Summary tiles; better is "lower", "higher" or "neutral".
+# The headline numbers of a run; the full limit checks are on the Chapter 5 tables page.
 KPIS = [
     ("carbon_kg", "Total carbon", "kg CO₂", "lower"),
     ("E_total_kWh", "Total energy", "kWh", "lower"),
     ("E_IT_kWh", "IT energy", "kWh", "lower"),
     ("E_crac_kWh", "CRAC energy", "kWh", "lower"),
-    ("E_cp_kWh", "Cold-plate pump energy", "kWh", "lower"),
-    ("E_fan_kWh", "Fan energy", "kWh", "lower"),
-    ("hottest_T_C", "Hottest server temperature", "°C", "lower"),
-    ("min_headroom_C", "Minimum thermal headroom", "°C", "higher"),
-    ("periods_above_dvfs", "Server-periods above DVFS", "", "lower"),
-    ("periods_above_cap", "Server-periods above cap", "", "lower"),
-    ("n_late", "Late workloads", "", "lower"),
-    ("n_noncompliant", "Non-compliant workloads", "", "lower"),
-    ("n_priority_violations", "Priority inversions", "", "lower"),
-    ("n_reassigned", "Reassigned workloads", "", "neutral"),
-    ("n_cross_zone", "Moved to another zone", "", "neutral"),
+    ("E_cp_kWh", "Cold-plate pump energy", "Wh", "lower"),
+    ("hottest_T_C", "Hottest server", "°C", "lower"),
+    ("min_headroom_C", "Lowest thermal headroom", "°C", "higher"),
+    ("n_late", "Missed deadlines", "", "lower"),
+    ("n_reassigned", "Workloads moved", "", "neutral"),
 ]
-# KPIs older runs do not have; dropped from the tiles when missing on both sides.
-OPTIONAL_KPIS = ("n_priority_violations", "n_cross_zone")
+# Stored in kWh but shown in Wh: the pumps use a fraction of a watt-hour a day.
+KPI_SCALE = {"E_cp_kWh": 1000.0}
 
 
 def kpi_frame(summary: dict) -> pd.DataFrame:
     """One row per KPI: key, label, unit, better, baseline, optimized, diff, pct.
 
     ``optimized``/``diff``/``pct`` are NaN without an optimized schedule; ``pct`` is NaN
-    when the baseline is 0. All-zero energy components (not modelled) are dropped.
+    when the baseline is 0. Cold-plate pump energy is dropped when it is zero (plates off).
     """
     base = (summary.get("baseline") or {}).get("metrics", {})
     opt = (summary.get("optimized") or {}).get("metrics", {}) \
@@ -415,12 +411,11 @@ def kpi_frame(summary: dict) -> pd.DataFrame:
     rows = []
     for key, label, unit, better in KPIS:
         b, o = base.get(key), opt.get(key)
-        if key in ("E_cp_kWh", "E_fan_kWh") and not b and not o:
+        if key == "E_cp_kWh" and not b and not o:
             continue
-        if key in OPTIONAL_KPIS and b is None and o is None:
-            continue
-        b = np.nan if b is None else float(b)
-        o = np.nan if o is None else float(o)
+        scale = KPI_SCALE.get(key, 1.0)
+        b = np.nan if b is None else float(b) * scale
+        o = np.nan if o is None else float(o) * scale
         diff = o - b
         pct = diff / b * 100 if b and not np.isnan(diff) else np.nan
         rows.append(dict(key=key, label=label, unit=unit, better=better,
@@ -455,86 +450,6 @@ def infeasibility_frame(summary: dict) -> pd.DataFrame:
     return pd.DataFrame(
         [dict(family=k, label=RELAX_FAMILY_LABELS.get(k, k.replace("_", " ")), result=v)
          for k, v in diag.items()], columns=["family", "label", "result"])
-
-
-SAVINGS_COLUMNS = ["component", "label", "energy_saved_kWh", "carbon_saved_kg",
-                   "energy_effect_kg", "timing_effect_kg"]
-
-
-def savings_breakdown(run: Run) -> pd.DataFrame:
-    """Where the savings came from, one row per energy component.
-
-    Carbon per period is CI * E_total, so carbon saved splits exactly by component:
-    ``carbon_saved_kg = sum_t CI_t * (E_base - E_opt)``. Positive means the optimized run
-    emitted less. It is split further into an energy effect (the kWh saved at the mean
-    carbon intensity) and a timing effect (the rest: energy moved to cleaner or dirtier
-    periods), which explains carbon saved on IT even when IT kWh do not change.
-    """
-    cp = run.comparison_period
-    if cp.empty or not run.has_optimized:
-        return pd.DataFrame(columns=SAVINGS_COLUMNS)
-    ci = cp["CI_g_per_kWh"]
-    rows = []
-    for col in active_energy_components(run):
-        saved = -cp[f"diff_{col}"].fillna(0.0)
-        saved = saved.where(saved.abs() > ZERO_TOL, 0.0)
-        carbon = _clean(float((saved * ci).sum() / 1000))
-        energy_effect = _clean(float(saved.sum() * ci.mean() / 1000))
-        rows.append(dict(component=col, label=ENERGY_COMPONENTS[col],
-                         energy_saved_kWh=_clean(float(saved.sum())), carbon_saved_kg=carbon,
-                         energy_effect_kg=energy_effect,
-                         timing_effect_kg=carbon - energy_effect))
-    return pd.DataFrame(rows, columns=SAVINGS_COLUMNS)
-
-
-def _clean(x: float, tol: float = 1e-9) -> float:
-    """Round float noise (e.g. -7e-16 kWh) to an exact 0 so it does not print as -0.0000."""
-    return 0.0 if abs(x) < tol else x
-
-
-def cumulative_savings(run: Run) -> pd.DataFrame:
-    """t, time, clock, carbon_saved_kg (running total) and per-component running totals."""
-    cp = run.comparison_period
-    if cp.empty or not run.has_optimized:
-        return pd.DataFrame(columns=["t", "time", "clock", "carbon_saved_kg"])
-    out = cp[["t", "time", "clock"]].copy()
-    out["carbon_saved_kg"] = (-cp["diff_carbon_g"].fillna(0.0)).cumsum() / 1000
-    for col in active_energy_components(run):
-        out[f"{col}_carbon_saved_kg"] = \
-            (-(cp[f"diff_{col}"].fillna(0.0) * cp["CI_g_per_kWh"])).cumsum() / 1000
-    return out
-
-
-def workload_moves(run: Run) -> pd.DataFrame:
-    """One row per workload, baseline next to optimized (server, start, finish, wait).
-
-    Without an optimized schedule the optimized columns are NaN.
-    """
-    sch = run.schedule
-    if sch.empty:
-        return pd.DataFrame()
-    keep = ["i", "workload_id", "type", "type_label", "arrival", "allowed_delay", "deadline"]
-    per = ["server_name", "start", "finish", "wait", "compliant"]
-    b = sch[sch["variant"] == "baseline"]
-    out = b[keep + per].rename(columns={c: f"{c}_baseline" for c in per})
-    if run.has_optimized:
-        o = sch[sch["variant"] == "optimized"]
-        o = o[["i", "original_server_name", "reassigned"] + per].rename(
-            columns={c: f"{c}_optimized" for c in per})
-        out = out.merge(o, on="i", how="left")
-    else:
-        out["original_server_name"] = out["server_name_baseline"]
-        out["reassigned"] = 0
-        for c in per:
-            out[f"{c}_optimized"] = np.nan
-    ra = run.reassignment
-    if not ra.empty:
-        out = out.merge(ra[["i", "original_zone", "final_zone", "cross_zone", "reason"]],
-                        on="i", how="left")
-    out["wait_change"] = out["wait_optimized"] - out["wait_baseline"]
-    out["start_shift"] = out["start_optimized"] - out["start_baseline"]
-    out["reassigned"] = out["reassigned"].fillna(0).astype(bool)
-    return out.reset_index(drop=True)
 
 
 def gantt_lanes(schedule: pd.DataFrame) -> pd.Series:
@@ -668,9 +583,11 @@ def compare_runs(runs: list[RunRef]) -> pd.DataFrame:
         b_c, o_c = base.get("carbon_kg"), opt.get("carbon_kg")
         b_e, o_e = base.get("E_total_kWh"), opt.get("E_total_kWh")
         pv = provenance(s)
+        info = run_info(ref, s)
         rows.append(dict(
             scenario=ref.scenario, run=ref.name,
-            thesis_label=thesis_label_text(thesis_labels(s, ref.scenario)) or None,
+            configuration=info.config.label if info.config else None,
+            test=run_title(info, ref) if info.tests else None,
             scenario_build=pv.get("scenario_fingerprint") or UNKNOWN_BUILD,
             version=pv.get("thermasched_version") or UNVERSIONED,
             made_with=pv.get("made_with"),
@@ -699,128 +616,139 @@ def compare_runs(runs: list[RunRef]) -> pd.DataFrame:
 
 
 # ---------------------------------------------------------------------------
-# Chapter 6 of the thesis: labels and the results table
+# Chapter 6 of the thesis: configurations, tests and the results tables
 # ---------------------------------------------------------------------------
 
+# The configurations, tests and sections live in scheduler/experiments.py, shared with the
+# solver and the batch notebook. A run is matched to a test by its settings.
+CONFIGURATIONS = ex.CONFIGURATIONS
+SECTIONS = ex.SECTIONS
+OTHER = "other"                 # runs of no configuration (another scenario, an archive)
+NOT_RUN_YET = "not run yet"
+NOT_APPLICABLE = "not applicable"
+
+
 @dataclass(frozen=True)
-class ThesisRun:
-    """One Chapter 6 run: its section, its label, and the switches that differ from the
-    defaults. A run matches by its settings, not its folder name, so a run made in the batch
-    notebook or uploaded on the site gets its label too."""
-    section: str
-    label: str
-    scenario: str
-    switches: tuple[tuple[str, object], ...] = ()
+class RunInfo:
+    """What a run is: its configuration (None for another scenario), the tests it matches
+    and when it was made (for picking the newest of several matches)."""
+    config: ex.Configuration | None
+    tests: tuple[ex.Test, ...]
+    created: str
 
     @property
-    def title(self) -> str:
-        return f"{self.section} {self.label}"
+    def config_key(self) -> str:
+        return self.config.key if self.config else OTHER
 
 
-THESIS_SCENARIO = "thesis10"
-THESIS_RUNS = (
-    ThesisRun("6.1", "Base", THESIS_SCENARIO),
-    ThesisRun("6.1", "Regrouped zones", THESIS_SCENARIO,
-              (("zone_map", (1, 1, 1, 1, 2, 2, 2, 2, 2, 2)),)),
-    ThesisRun("6.1", "Same-zone moves only", THESIS_SCENARIO, (("reassignment", "same_zone"),)),
-    ThesisRun("6.2", "Base, both cooling systems optimized", THESIS_SCENARIO,
-              (("cold_plates", True),)),
-    ThesisRun("6.2", "CRAC changed, cold plates fixed", THESIS_SCENARIO,
-              (("cold_plates", True), ("cp_mode", "fixed"))),
-    ThesisRun("6.2", "Cold plates changed, CRAC fixed", THESIS_SCENARIO,
-              (("cold_plates", True), ("supply_temp_mode", "fixed"))),
-    ThesisRun("6.3", "Base 10 °C safety margin", THESIS_SCENARIO),
-    ThesisRun("6.3", "Low 5 °C safety margin", THESIS_SCENARIO, (("H_min_C", 5.0),)),
-    ThesisRun("6.3", "High 15 °C safety margin", THESIS_SCENARIO, (("H_min_C", 15.0),)),
-    ThesisRun("6.4", "Reassignment allowed", THESIS_SCENARIO),
-    ThesisRun("6.4", "No reassignment", THESIS_SCENARIO, (("reassignment", "none"),)),
-    ThesisRun("6.4", "Temperature ignored when choosing servers", THESIS_SCENARIO,
-              (("placement", "thermal_blind"),)),
-    ThesisRun("6.4", "Flat carbon intensity", THESIS_SCENARIO, (("ci_flat", True),)),
-)
-
-# Switches that never decide a label: names, solver limits, and the seed of a rule not used.
-_LABEL_IGNORED = {"scenario", "run_name", "time_limit_s", "mip_rel_gap", "seed"}
+def run_info(ref: RunRef, summary: dict | None = None) -> RunInfo:
+    try:
+        summary = summary if summary is not None else load_summary(ref.path)
+    except (OSError, json.JSONDecodeError):
+        return RunInfo(None, (), "")
+    created = str(provenance(summary).get("created_utc") or "")
+    if is_archive(ref.scenario):
+        return RunInfo(None, (), created)
+    scenario = (summary.get("scenario") or {}).get("name") or ref.scenario
+    config, tests = ex.identify(summary.get("settings") or {}, scenario)
+    return RunInfo(config, tuple(tests), created)
 
 
-def _setting_value(key: str, value):
-    if key == "zone_map" and value is not None:
-        return tuple(int(z) for z in value)
-    if isinstance(value, bool) or value is None or isinstance(value, str):
-        return value
-    if isinstance(value, (int, float)):
-        return float(value)
-    return value
+def run_infos(runs: list[RunRef]) -> dict[str, RunInfo]:
+    return {ref.key: run_info(ref) for ref in runs}
 
 
-def _switch_defaults() -> dict:
-    from scheduler.types import RunSettings
-    return {k: _setting_value(k, v) for k, v in RunSettings().as_dict().items()
-            if k not in _LABEL_IGNORED}
+def run_title(info: RunInfo, ref: RunRef) -> str:
+    """'6.1 · Test 1 · …' for a test run, else its folder name."""
+    return " / ".join(ex.title_of(t) for t in info.tests) or ref.name
 
 
-def thesis_labels(summary: dict, scenario: str | None = None) -> list[ThesisRun]:
-    """The Chapter 6 runs a run matches: same scenario, the entry's switches, and every
-    other switch at its default. Archived runs match none."""
-    scenario = scenario or (summary.get("scenario") or {}).get("name")
-    if not scenario or is_archive(scenario):
-        return []
-    st = summary.get("settings") or {}
-    if st.get("baseline_rule", "least_loaded") == "random":
-        return []
-    defaults = _switch_defaults()
-    have = {k: _setting_value(k, st.get(k, d)) for k, d in defaults.items()}
-    out = []
-    for tr in THESIS_RUNS:
-        if tr.scenario != scenario:
-            continue
-        want = dict(defaults)
-        want.update({k: _setting_value(k, v) for k, v in tr.switches})
-        if have == want:
-            out.append(tr)
-    return out
+def run_long_title(info: RunInfo, ref: RunRef) -> str:
+    """'10 servers · 6.1 · Test 1 · …', for page headers."""
+    title = run_title(info, ref) if info.tests else ref.name
+    return f"{info.config.label} · {title}" if info.config else title
 
 
-def thesis_label_text(labels: list[ThesisRun]) -> str:
-    return " / ".join(tr.title for tr in labels)
-
-
-def thesis_label_texts(runs: list[RunRef]) -> dict[str, str]:
-    """Run key -> its thesis labels as one text, for the runs that have any."""
-    out = {}
+def catalogue(runs: list[RunRef], infos: dict[str, RunInfo] | None = None
+              ) -> dict[tuple[str, str], tuple[RunRef | None, list[RunRef]]]:
+    """(configuration key, test id) -> (the run used: the newest match, or None; every
+    match, oldest first), for every configuration and test."""
+    infos = infos if infos is not None else run_infos(runs)
+    found: dict[tuple[str, str], list[tuple[str, RunRef]]] = {}
     for ref in runs:
-        try:
-            text = thesis_label_text(thesis_labels(load_summary(ref.path), ref.scenario))
-        except (OSError, json.JSONDecodeError):
+        info = infos.get(ref.key)
+        if info is None or info.config is None:
             continue
-        if text:
-            out[ref.key] = text
+        for test in info.tests:
+            found.setdefault((info.config.key, test.id), []).append((info.created, ref))
+    out = {}
+    for config in CONFIGURATIONS:
+        for test in ex.TESTS:
+            matches = [r for _, r in sorted(found.get((config.key, test.id), []),
+                                            key=lambda m: m[0])]
+            out[(config.key, test.id)] = (matches[-1] if matches else None, matches)
     return out
 
 
-# Columns of the Chapter 6 table: key -> header (with its unit).
+def cell_status(config: ex.Configuration, test: ex.Test, used: RunRef | None) -> str | None:
+    """None when the test has a run, else NOT_APPLICABLE or NOT_RUN_YET."""
+    if not ex.applicable(test, config):
+        return NOT_APPLICABLE
+    return None if used is not None else NOT_RUN_YET
+
+
+def config_runs(runs: list[RunRef], infos: dict[str, RunInfo] | None = None
+                ) -> dict[str, list[RunRef]]:
+    """Configuration key (or OTHER) -> its runs for the run picker: the run used for each
+    test, in test order, then the configuration's other runs (validation runs, older solves
+    of a test) by folder name. Configurations without runs are left out."""
+    infos = infos if infos is not None else run_infos(runs)
+    cat = catalogue(runs, infos)
+    out: dict[str, list[RunRef]] = {}
+    for config in CONFIGURATIONS:
+        used = [cat[(config.key, t.id)][0] for t in ex.TESTS]
+        used = list(dict.fromkeys(r for r in used if r is not None))
+        rest = sorted((r for r in runs if infos[r.key].config_key == config.key
+                       and r not in used), key=lambda r: r.name)
+        if used or rest:
+            out[config.key] = used + rest
+    other = [r for r in runs if infos[r.key].config is None]
+    if other:
+        out[OTHER] = other
+    return out
+
+
+# Columns of the Chapter 6 results table: key -> header (with its unit).
 CHAPTER6_COLUMNS = {
+    "configuration": "Configuration",
     "section": "Section",
+    "tag": "Test",
     "label": "Run",
-    "run": "Original run name",
+    "run": "Run folder",
     "release": "Release",
     "wait_mean_min": "Average waiting time (min)",
     "wait_max_min": "Longest waiting time (min)",
-    "turnaround_mean_min": "Average arrival to completion (min)",
-    "turnaround_max_min": "Longest arrival to completion (min)",
+    "exec_mean_min": "Average execution time (min)",
+    "turnaround_mean_min": "Average completion time, from arrival (min)",
+    "turnaround_max_min": "Longest completion time, from arrival (min)",
+    "util_mean_pct": "Average server utilization (%)",
     "E_crac_zone1_kWh": "CRAC electricity, Zone 1 (kWh)",
     "E_crac_zone2_kWh": "CRAC electricity, Zone 2 (kWh)",
+    "E_crac_kWh": "CRAC electricity (kWh)",
     "E_IT_kWh": "IT electricity (kWh)",
     "E_cp_Wh": "Cold-plate pump electricity (Wh)",
+    "E_cooling_kWh": "Cooling electricity, CRAC + cold plates (kWh)",
     "E_total_kWh": "Total electricity (kWh)",
     "carbon_kg": "Total carbon emissions (kg CO2)",
     "T_mean_C": "Average server temperature (°C)",
     "T_max_C": "Highest server temperature (°C)",
+    "H_mean_C": "Average thermal headroom (°C)",
     "n_moved_server": "Workloads moved to another server",
     "n_moved_zone": "Workloads moved to another zone",
     "n_late": "Missed deadlines",
     "pct_late": "Missed deadlines (%)",
     "n_throttled_servers": "Servers slowed by temperature",
+    "DPF_min": "Lowest DPF",
     "n_unplaced": "Unplaced workloads",
     "status": "Solver status",
     "mip_gap": "MIP gap",
@@ -828,22 +756,40 @@ CHAPTER6_COLUMNS = {
     "time_limit_s": "Time limit (s)",
 }
 # Columns that hold results, for the change against each section's reference.
-CHAPTER6_METRICS = tuple(list(CHAPTER6_COLUMNS)[4:21])
-NOT_RUN_YET = "not run yet"
+CHAPTER6_METRICS = tuple(k for k in CHAPTER6_COLUMNS if k not in {
+    "configuration", "section", "tag", "label", "run", "release", "n_unplaced", "status",
+    "mip_gap", "solve_time_s", "time_limit_s"})
+# What each section measures (the Chapter 6 document's "What to measure"), in its order.
+SECTION_MEASURES = {
+    "6.1": ("n_moved_server", "n_moved_zone", "util_mean_pct", "E_crac_zone1_kWh",
+            "E_crac_zone2_kWh", "E_total_kWh", "carbon_kg", "n_late", "pct_late", "T_mean_C",
+            "T_max_C"),
+    "6.2": ("T_mean_C", "T_max_C", "H_mean_C", "E_crac_kWh", "E_cp_Wh", "E_cooling_kWh",
+            "carbon_kg"),
+    "6.3": ("exec_mean_min", "wait_mean_min", "turnaround_mean_min", "n_late", "pct_late",
+            "T_mean_C", "T_max_C", "DPF_min", "n_throttled_servers", "E_total_kWh",
+            "carbon_kg"),
+    "6.4": ("n_moved_server", "E_IT_kWh", "E_crac_kWh", "E_cp_Wh", "carbon_kg",
+            "turnaround_mean_min", "wait_mean_min", "n_late", "T_mean_C", "T_max_C",
+            "DPF_min"),
+}
 
 
 def schedule_times(schedule_csv: str | Path, dt_seconds: float) -> dict:
-    """Waiting time (start - arrival) and time from arrival to completion (end - arrival, the
-    end being exclusive) in minutes, over the placed workloads of one schedule.csv."""
+    """Waiting time (start - arrival), execution time (end - start) and time from arrival to
+    completion (end - arrival), the end being exclusive, in minutes, over the placed workloads
+    of one schedule.csv."""
     df = pd.read_csv(schedule_csv)
     placed = df[df["placed"] == 1] if "placed" in df else df.dropna(subset=["start"])
     per_min = dt_seconds / 60.0
     wait = placed["wait"].astype(float) * per_min
+    run = (placed["finish"].astype(float) - placed["start"].astype(float)) * per_min
     turn = (placed["finish"].astype(float) - placed["arrival"].astype(float)) * per_min
     nan = float("nan")
     return dict(
         wait_mean_min=wait.mean() if len(placed) else nan,
         wait_max_min=wait.max() if len(placed) else nan,
+        exec_mean_min=run.mean() if len(placed) else nan,
         turnaround_mean_min=turn.mean() if len(placed) else nan,
         turnaround_max_min=turn.max() if len(placed) else nan,
         n_unplaced=int(len(df) - len(placed)))
@@ -861,12 +807,14 @@ def chapter6_row(ref: RunRef, summary: dict) -> dict:
     tot, met = opt.get("totals") or {}, opt.get("metrics") or {}
     zones = list(tot.get("E_crac_by_zone_kWh") or [])
     n = tot.get("n_workloads") or (summary.get("scenario") or {}).get("I")
-    e_cp = tot.get("E_cp_kWh")
+    e_cp, e_crac = tot.get("E_cp_kWh"), tot.get("E_crac_kWh")
     row.update(
         E_crac_zone1_kWh=zones[0] if len(zones) > 0 else None,
         E_crac_zone2_kWh=zones[1] if len(zones) > 1 else None,
+        E_crac_kWh=e_crac,
         E_IT_kWh=tot.get("E_IT_kWh"),
         E_cp_Wh=None if e_cp is None else e_cp * 1000.0,
+        E_cooling_kWh=None if e_crac is None else e_crac + (e_cp or 0.0),
         E_total_kWh=tot.get("E_total_kWh"),
         carbon_kg=tot.get("carbon_kg"),
         T_mean_C=met.get("mean_T_C"), T_max_C=met.get("hottest_T_C"),
@@ -879,45 +827,101 @@ def chapter6_row(ref: RunRef, summary: dict) -> dict:
     schedule = Path(ref.path) / "optimized" / "schedule.csv"
     if schedule.is_file():
         row.update(schedule_times(schedule, float(dt)))
+    sp_path = Path(ref.path) / "optimized" / "server_period.csv"
+    if sp_path.is_file():
+        sp = pd.read_csv(sp_path, usecols=["utilization", "headroom_C", "DPF"])
+        row.update(util_mean_pct=float(sp["utilization"].mean()) * 100.0,
+                   H_mean_C=float(sp["headroom_C"].mean()), DPF_min=float(sp["DPF"].min()))
     return row
 
 
-def chapter6_runs(runs: list[RunRef]) -> list[tuple[ThesisRun, RunRef | None, list[RunRef]]]:
-    """For each Chapter 6 entry: the run used (the newest match by creation time), or None,
-    and every run that matches it."""
-    matches: dict[ThesisRun, list[tuple[str, RunRef]]] = {tr: [] for tr in THESIS_RUNS}
-    for ref in runs:
-        try:
-            s = load_summary(ref.path)
-        except (OSError, json.JSONDecodeError):
+# Per-server figures of one schedule, for the Chapter 6 section detail: column -> header.
+SERVER_STATS = {
+    "util_mean_pct": "Average CPU utilization (%)",
+    "util_max_pct": "Peak CPU utilization (%)",
+    "T_mean_C": "Average temperature (°C)",
+    "T_max_C": "Highest temperature (°C)",
+    "H_mean_C": "Average thermal headroom (°C)",
+    "H_min_C": "Lowest thermal headroom (°C)",
+    "DPF_mean": "Average DPF",
+    "DPF_min": "Lowest DPF",
+    "periods_throttled": "Periods slowed (DPF < 1)",
+    "E_IT_kWh": "IT electricity (kWh)",
+}
+# The per-server figures each section shows first.
+SECTION_SERVER_STATS = {
+    "6.1": "util_mean_pct",
+    "6.2": "T_max_C",
+    "6.3": "DPF_min",
+    "6.4": "DPF_min",
+}
+
+
+def server_stats(run: Run, variant: str = "optimized") -> pd.DataFrame:
+    """One row per server (display order): s, name, zone and the SERVER_STATS columns."""
+    sp = run.server_period
+    sp = sp[sp["variant"] == variant] if not sp.empty else sp
+    if sp.empty:
+        return pd.DataFrame(columns=["s", "name", "zone", *SERVER_STATS])
+    g = sp.groupby("s")
+    out = pd.DataFrame({
+        "util_mean_pct": g["utilization"].mean() * 100,
+        "util_max_pct": g["utilization"].max() * 100,
+        "T_mean_C": g["temperature_C"].mean(),
+        "T_max_C": g["temperature_C"].max(),
+        "H_mean_C": g["headroom_C"].mean(),
+        "H_min_C": g["headroom_C"].min(),
+        "DPF_mean": g["DPF"].mean(),
+        "DPF_min": g["DPF"].min(),
+        "periods_throttled": g["DPF"].apply(lambda d: int((d < 1 - 1e-9).sum())),
+        "E_IT_kWh": g["P_IT_W"].sum() * run.dt_seconds / 3600 / 1000,
+    }).reset_index()
+    return run.servers[["s", "name", "zone"]].merge(out, on="s", how="left")
+
+
+def chapter6_table(runs: list[RunRef], infos: dict[str, RunInfo] | None = None,
+                   configs: list[str] | None = None) -> pd.DataFrame:
+    """One row per configuration, section and test, in that order, with the columns of
+    CHAPTER6_COLUMNS. The base run appears in 6.1, 6.3 and 6.4, so every test sits right
+    below its section's reference. A test without a run says why in *status*."""
+    infos = infos if infos is not None else run_infos(runs)
+    cat = catalogue(runs, infos)
+    rows, cache = [], {}
+    for config in CONFIGURATIONS:
+        if configs is not None and config.key not in configs:
             continue
-        for tr in thesis_labels(s, ref.scenario):
-            matches[tr].append((str(provenance(s).get("created_utc") or ""), ref))
-    out = []
-    for tr in THESIS_RUNS:
-        found = sorted(matches[tr], key=lambda m: m[0])
-        out.append((tr, found[-1][1] if found else None, [r for _, r in found]))
-    return out
-
-
-def chapter6_table(runs: list[RunRef]) -> pd.DataFrame:
-    """One row per Chapter 6 entry in section order, with the columns of CHAPTER6_COLUMNS."""
-    rows = []
-    for tr, ref, _ in chapter6_runs(runs):
-        row = dict(section=tr.section, label=tr.label)
-        if ref is None:
-            row.update(run=None, status=NOT_RUN_YET)
-        else:
-            row.update(chapter6_row(ref, load_summary(ref.path)))
-        rows.append(row)
+        for section in SECTIONS:
+            for tag, tid in section.tests:
+                test = ex.TEST_BY_ID[tid]
+                used, _ = cat[(config.key, tid)]
+                row = dict(configuration=config.label, section=section.key, tag=tag,
+                           label=test.name)
+                missing = cell_status(config, test, used)
+                if missing:
+                    row.update(run=None, status=missing)
+                else:
+                    if used.key not in cache:
+                        cache[used.key] = chapter6_row(used, load_summary(used.path))
+                    row.update(cache[used.key])
+                rows.append(row)
     return pd.DataFrame(rows, columns=list(CHAPTER6_COLUMNS))
 
 
+def has_result(table: pd.DataFrame) -> pd.Series:
+    return ~table["status"].isin([NOT_RUN_YET, NOT_APPLICABLE])
+
+
+def _clean(x: float, tol: float = 1e-9) -> float:
+    """Round float noise (e.g. -7e-16) to an exact 0 so it does not print as -0.00."""
+    return 0.0 if abs(x) < tol else x
+
+
 def chapter6_changes(table: pd.DataFrame) -> pd.DataFrame:
-    """Each result against the first row of its section (the section's reference), in %.
-    Zero against zero is 0 %; anything against zero is left blank."""
+    """Each result against the first row of its configuration and section (the section's
+    reference), in %. Zero against zero is 0 %; anything against zero is left blank."""
     out = table.copy()
-    for _, idx in table.groupby("section", sort=False).groups.items():
+    groups = table.groupby(["configuration", "section"], sort=False).groups
+    for _, idx in groups.items():
         ref = table.loc[idx[0], list(CHAPTER6_METRICS)]
         for i in idx:
             for col in CHAPTER6_METRICS:
@@ -970,7 +974,6 @@ def settings_badges(summary: dict) -> list[tuple[str, str]]:
         ("Zones", "servers.csv" if not st.get("zone_map")
          else ",".join(map(str, st["zone_map"]))),
         ("Carbon intensity", _carbon_label(st)),
-        ("Fan power", "on" if st.get("fan_power") else "off"),
         ("Time limit", f"{st.get('time_limit_s', 0):g} s"),
         ("MIP gap", f"{st.get('mip_rel_gap', 0):g}"),
     ]

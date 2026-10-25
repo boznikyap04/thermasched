@@ -14,6 +14,30 @@ run.
   section 4 shows which scenarios differ from before), then solve again. The site warns when
   a run was solved on a different scenario build than the one it holds.
 
+## Unreleased
+
+**Re-run:** nothing yet. The model is unchanged; only the site and the run folders changed.
+
+- The site is organized by **configuration** (2, 6 or 10 servers; for 2 servers, a pair of
+  server tiers) and by the tests of the four Chapter 6 scenarios. The sidebar picks the
+  configuration, then a run named by its test, for example *6.1 · Test 1 · Same-type servers
+  regrouped into one zone*. A run is still matched to its test by its settings, so runs from
+  the batch notebook and uploads are named the same way.
+- New pages: the Chapter 6 *Overview* (which test has a run in each configuration, and every
+  result in one CSV) and one page per scenario, 6.1 to 6.4, with what that scenario measures:
+  the Base next to each test, a chart, per-server figures (utilization, temperature,
+  headroom, DPF) and, for 6.1 and 6.4, every workload's original and new server and zone.
+  *Across configurations* shows one measure for every configuration.
+- The runs kept on the site have short names: `results/servers10/base`, `s1_t1_zones`,
+  `s2_t1_crac`, ... and `results/servers6/`. Their `summary.json` still records the name they
+  were solved under. The 10-server runs are the 1800 s solves of `thesis10`; 6.4 Test 3b
+  (deeper carbon swing) is the 600 s `thesis10_swing` run, and the two 6-server runs are the
+  600 s `consolidated6` runs. The five validation runs are `results/servers10/v_*`.
+- Every other run (the 600 s solves replaced at 1800 s, `thesis10_tight`, `_warm`, the other
+  `_swing` run and the earlier `archive-*` folders) moved to `archive/results_2026-10-25/`.
+- Still to run: 6.3 Test 1 (H_min 19 °C) on 10 servers, most tests on 6 servers, and every
+  2-server pair.
+
 ## 1.2.1 (2026-10-22)
 
 **Re-run:** nothing. Only the site changed.

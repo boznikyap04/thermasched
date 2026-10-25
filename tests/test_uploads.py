@@ -10,11 +10,12 @@ import pytest
 
 from dashboard import data, uploads
 
-RUNS = {r.key: r for r in data.discover_runs()}
+# A small run, archived on 2026-10-25 (archive/results_2026-10-25/).
+RUNS = {r.key: r for r in data.discover_runs(data.REPO_ROOT / "archive" / "results_2026-10-25")}
 KEY = "small/least_loaded_base18_free_optimize"          # as named by its summary.json
-SOURCE = "archive-small/least_loaded_base18_free_optimize"  # where it sits under results/
+SOURCE = "archive-small/least_loaded_base18_free_optimize"  # where it sits in the archive
 
-pytestmark = pytest.mark.skipif(SOURCE not in RUNS, reason="no run outputs under results/")
+pytestmark = pytest.mark.skipif(SOURCE not in RUNS, reason="the archived small run is missing")
 
 
 def _zip(files: dict[str, bytes | str]) -> io.BytesIO:

@@ -567,12 +567,38 @@ def cold_plate_rows(run_dir: Path, scenario: Scenario,
 # B3 and A1: how complete each solver result is
 # ---------------------------------------------------------------------------
 
+def runs_of(results_dir: Path, scenario_name: str) -> list[Path]:
+    """Every run folder under ``<results_dir>/<folder>/<run>/`` solved on the scenario, by the
+    name in its summary.json: ``results/<scenario>/`` as the notebooks write it, or a folder
+    such as ``results/servers10/`` that holds renamed runs."""
+    out = []
+    for d in sorted(Path(results_dir).glob("*/*/summary.json")):
+        if d.parent.parent.name.startswith("archive-"):
+            continue
+        try:
+            name = (json.loads(d.read_text()).get("scenario") or {}).get("name")
+        except (OSError, ValueError):
+            continue
+        if (name or d.parent.parent.name) == scenario_name:
+            out.append(d.parent)
+    return out
+
+
+def _named_run(runs: list[Path], names: tuple[str, ...]) -> Path | None:
+    for name in names:
+        for d in runs:
+            if d.name == name:
+                return d
+    return None
+
+
 def solver_rows(results_dir: Path, scenario_name: str) -> list[dict]:
     """One row per run of the scenario: what it allowed, the solver's status in plain words,
     the gap, the solve time, carbon, the solver's lower bound, and the most a better
     schedule could still save (carbon minus bound)."""
     rows = []
-    for d in sorted((Path(results_dir) / scenario_name).glob("*/summary.json")):
+    for run in runs_of(results_dir, scenario_name):
+        d = run / "summary.json"
         s = json.loads(d.read_text())
         st, sol = s.get("settings") or {}, s.get("solver") or {}
         opt = (s.get("optimized") or {}).get("metrics") or {}
@@ -624,8 +650,10 @@ def write_table(path: Path, rows: list[dict]) -> None:
 
 
 # Runs the run-based checks read, under results/<scenario>/ (or another scenario's folder).
-COLD_PLATE_RUN = "least_loaded_base18_free_optimize_cp_tl1800"
-NO_PLATE_RUN = "least_loaded_base18_free_optimize_tl1800"
+# The run with cold plates on and the base run, by the names a run may have: the short
+# Chapter 6 name, or the name the solver gives it.
+COLD_PLATE_RUN = ("s2_base", "least_loaded_base18_free_optimize_cp_tl1800")
+NO_PLATE_RUN = ("base", "least_loaded_base18_free_optimize_tl1800")
 WARM_RUN = ("thesis10_warm", "least_loaded_base18_free_optimize")
 
 
@@ -671,10 +699,11 @@ def write_all(scenario_name: str = "thesis10", scenarios_dir="scenarios", result
         srv, wl = throttled_run_rows(warm_dir, load_scenario(WARM_RUN[0], scenarios_dir))
         table("throttled_servers", srv, note=f"{WARM_RUN[0]}/{WARM_RUN[1]}")
         table("throttled_workloads", wl, note=f"{WARM_RUN[0]}/{WARM_RUN[1]}")
-    cp_dir = results_dir / scenario_name / COLD_PLATE_RUN
-    if (cp_dir / "summary.json").is_file():
-        table("cold_plates", cold_plate_rows(cp_dir, sc, results_dir / scenario_name / NO_PLATE_RUN),
-              note=f"{scenario_name}/{COLD_PLATE_RUN}")
+    runs = runs_of(results_dir, scenario_name)
+    cp_dir, base_dir = _named_run(runs, COLD_PLATE_RUN), _named_run(runs, NO_PLATE_RUN)
+    if cp_dir is not None:
+        table("cold_plates", cold_plate_rows(cp_dir, sc, base_dir),
+              note=f"{cp_dir.parent.name}/{cp_dir.name}")
     table("solver", solver_rows(results_dir, scenario_name))
 
     meta = {"scenario": scenario_name, "scenario_fingerprint": sc.fingerprint,

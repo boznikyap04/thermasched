@@ -34,7 +34,7 @@ def _last_import() -> None:
             st.caption("Server names and clock times from the zip for: "
                        + ", ".join(f"`{s}`" for s in scenarios))
         if state.OVERVIEW_PAGE is not None:
-            st.page_link(state.OVERVIEW_PAGE, label="Open in Overview",
+            st.page_link(state.OVERVIEW_PAGE, label="Open in Run summary",
                          icon=":material/arrow_forward:")
     for p in problems:
         st.error(p, icon="⚠️")

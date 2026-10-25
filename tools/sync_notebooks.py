@@ -33,7 +33,7 @@ SOLVER_ONLY_MARKER = "# --- Only notebooks/solver.ipynb uses what follows"
 SOLVER_MODULES = (
     "scheduler/version.py", "scheduler/types.py", "scheduler/io.py", "scheduler/baseline.py", "scheduler/build.py",
     "scheduler/optimize.py", "scheduler/evaluate.py", "scheduler/report.py", "scheduler/run.py",
-    "scheduler/validate.py",
+    "scheduler/validate.py", "scheduler/experiments.py",
     "dashboard/data.py", "dashboard/theme.py", "dashboard/uploads.py",
 )
 

@@ -8,12 +8,17 @@ import pytest
 
 from dashboard import data
 
+# The runs on the site, and the runs taken off it on 2026-10-25 (small, infeasible and older
+# runs the loader tests use).
 RUNS = data.discover_runs()
-BY_KEY = {r.key: r for r in RUNS}
+ARCHIVE_DIR = data.REPO_ROOT / "archive" / "results_2026-10-25"
+ARCHIVED = data.discover_runs(ARCHIVE_DIR)
+BY_KEY = {r.key: r for r in RUNS + ARCHIVED}
 INFEASIBLE = "archive-small/infeasible_demo_hmin20"
 CONSOLIDATED6_FREE = "archive-consolidated6/least_loaded_base18_free_optimize"
 SMALL_FREE = "archive-small/least_loaded_base18_free_optimize"
 FASTEST = "archive-small/fastest_first_base27_free_optimize"
+COLD_PLATES = "servers10/s2_base"
 
 pytestmark = pytest.mark.skipif(not RUNS, reason="no run outputs under results/")
 
@@ -35,8 +40,8 @@ def test_discovers_every_run_folder_with_a_summary():
     on_disk = sorted(p.parent for p in data.RESULTS_DIR.glob("*/*/summary.json"))
     assert sorted(r.path for r in RUNS) == on_disk
     assert {INFEASIBLE, CONSOLIDATED6_FREE, SMALL_FREE, FASTEST} <= set(BY_KEY)
-    assert RUNS == sorted(RUNS, key=data.run_order)        # current scenarios, then archives
-    archived = [data.is_archive(r.scenario) for r in RUNS]
+    assert ARCHIVED == sorted(ARCHIVED, key=data.run_order)  # current scenarios, then archives
+    archived = [data.is_archive(r.scenario) for r in ARCHIVED]
     assert archived == sorted(archived)
     assert all(r.key == f"{r.scenario}/{r.name}" for r in RUNS)
 
@@ -79,18 +84,13 @@ def test_infeasible_run_derived_views(loaded):
     run = loaded(INFEASIBLE)
     kpis = data.kpi_frame(run.summary)
     assert kpis["optimized"].isna().all() and kpis["diff"].isna().all()
-    assert data.savings_breakdown(run).empty
-    assert data.cumulative_savings(run).empty
-    moves = data.workload_moves(run)
-    assert len(moves) == run.summary["scenario"]["I"]
-    assert moves["server_name_optimized"].isna().all() and not moves["reassigned"].any()
     diag = data.infeasibility_frame(run.summary)
     assert dict(zip(diag["family"], diag["result"]))["thermal_cap"] == "feasible"
     assert run.thermal_cap_C == 70.0 and run.H_min_C == pytest.approx(20.0)
 
 
 def test_compare_runs_handles_infeasible(loaded):
-    df = data.compare_runs([r for r in RUNS if r.scenario == "archive-small"]).set_index("run")
+    df = data.compare_runs([r for r in ARCHIVED if r.scenario == "archive-small"]).set_index("run")
     assert np.isnan(df.loc["infeasible_demo_hmin20", "carbon_saved_pct"])
     assert df.loc["infeasible_demo_hmin20", "status"] == "infeasible"
     assert df.loc["least_loaded_base18_free_optimize", "carbon_saved_pct"] > 0
@@ -178,31 +178,39 @@ def test_server_names_and_zones_from_scenario(loaded):
     assert not sch["server_name"].isna().any()
 
 
-def test_savings_breakdown_adds_up(loaded):
-    run = loaded(CONSOLIDATED6_FREE)
-    sb = data.savings_breakdown(run)
-    total_kg = run.summary["comparison"]["carbon_kg"]["diff"]
-    assert sb["carbon_saved_kg"].sum() == pytest.approx(-total_kg, rel=1e-9)
-    assert (sb["energy_effect_kg"] + sb["timing_effect_kg"]).tolist() == \
-        pytest.approx(sb["carbon_saved_kg"].tolist())
-    it = sb.set_index("component").loc["E_IT_kWh"]
-    assert it["energy_saved_kWh"] == 0.0               # same IT energy, shifted in time
-    cum = data.cumulative_savings(run)
-    assert cum["carbon_saved_kg"].iloc[-1] == pytest.approx(-total_kg)
-
-
 def test_kpis_match_summary(loaded):
     kpis = data.kpi_frame(loaded(CONSOLIDATED6_FREE).summary).set_index("key")
     assert kpis.loc["carbon_kg", "pct"] == pytest.approx(-14.3145, abs=1e-3)
     assert kpis.loc["min_headroom_C", "better"] == "higher"
+    assert list(kpis.index) == ["carbon_kg", "E_total_kWh", "E_IT_kWh", "E_crac_kWh",
+                                "hottest_T_C", "min_headroom_C", "n_late", "n_reassigned"]
 
 
-def test_moves_and_lanes(loaded):
+def test_pump_energy_kpi_is_in_wh():
+    summary = data.load_summary(BY_KEY[COLD_PLATES].path) if COLD_PLATES in BY_KEY else None
+    if summary is None:
+        pytest.skip("the 6.2 cold-plate run is not under results/")
+    row = data.kpi_frame(summary).set_index("key").loc["E_cp_kWh"]
+    assert row["unit"] == "Wh"
+    assert row["optimized"] == pytest.approx(summary["optimized"]["metrics"]["E_cp_kWh"] * 1000)
+
+
+def test_server_stats_match_server_period(loaded):
     run = loaded(SMALL_FREE)
-    moves = data.workload_moves(run)
-    assert moves["reassigned"].sum() == run.summary["optimized"]["metrics"]["n_reassigned"]
-    moved = moves[moves["reassigned"]]
-    assert (moved["original_server_name"] != moved["server_name_optimized"]).all()
+    stats = data.server_stats(run).set_index("s")
+    sp = run.server_period[run.server_period["variant"] == "optimized"]
+    assert list(stats.index) == run.servers["s"].tolist()
+    assert set(data.SERVER_STATS) <= set(stats.columns)
+    for s, g in sp.groupby("s"):
+        assert stats.loc[s, "T_max_C"] == g["temperature_C"].max()
+        assert stats.loc[s, "util_max_pct"] == pytest.approx(g["utilization"].max() * 100)
+        assert stats.loc[s, "E_IT_kWh"] == pytest.approx(g["P_IT_W"].sum() * run.dt_seconds
+                                                         / 3.6e6)
+    assert data.server_stats(loaded(INFEASIBLE)).empty
+
+
+def test_gantt_lanes_never_overlap(loaded):
+    run = loaded(SMALL_FREE)
     sch = run.schedule.copy()
     sch["lane"] = data.gantt_lanes(sch)
     assert (sch["lane"] >= 0).all()
@@ -230,7 +238,7 @@ def test_unzipped_export_carries_its_scenario(tmp_path):
 
     from dashboard import uploads
 
-    src = data.RESULTS_DIR / "archive-small"
+    src = ARCHIVE_DIR / "archive-small"
     run_dir = next(p.parent for p in sorted(src.glob("*/summary.json")))
     ref = data.RunRef("small", run_dir.name, run_dir)
     zipfile.ZipFile(io.BytesIO(uploads.runs_zip([(ref, data.SCENARIOS_DIR)]))).extractall(
@@ -290,99 +298,90 @@ def test_archived_scenarios_come_last_and_use_the_real_scenario(tmp_path):
     assert "small/servers.csv" in names and "small/carbon.csv" in names
 
 
-# -- Chapter 6 labels and results table --------------------------------------------------
+# -- Chapter 6: configurations, tests and the results table -------------------------------
 
-BASE = "thesis10/least_loaded_base18_free_optimize"
-# docs/PRD_CH6_RESULTS.md §1.1: the 1.0.1 runs of thesis10 and their labels.
-THESIS10_LABELS = {
-    BASE: ["6.1 Base", "6.3 Base 10 °C safety margin", "6.4 Reassignment allowed"],
-    "thesis10/least_loaded_base18_free_optimize_zones1111222222": ["6.1 Regrouped zones"],
-    "thesis10/least_loaded_base18_same_zone_optimize": ["6.1 Same-zone moves only"],
-    "thesis10/least_loaded_base18_free_optimize_cp_cpfixed":
-        ["6.2 CRAC changed, cold plates fixed"],
-    "thesis10/least_loaded_base18_free_fixed18_cp": ["6.2 Cold plates changed, CRAC fixed"],
-    "thesis10/least_loaded_base18_free_optimize_hmin5": ["6.3 Low 5 °C safety margin"],
-    "thesis10/least_loaded_base18_free_optimize_hmin15": ["6.3 High 15 °C safety margin"],
-    "thesis10/least_loaded_base18_none_optimize": ["6.4 No reassignment"],
-    "thesis10/least_loaded_base18_free_optimize_ciflat_tl1800": ["6.4 Flat carbon intensity"],
+BASE = "servers10/base"
+# The runs kept on the site on 2026-10-25, renamed by their test.
+SERVERS10_TESTS = {
+    "servers10/base": "base", "servers10/s1_t1_zones": "s1_t1_zones",
+    "servers10/s1_t2_same_zone": "s1_t2_same_zone", "servers10/s2_base": "s2_base",
+    "servers10/s2_t1_crac": "s2_t1_crac", "servers10/s2_t2_cold_plate": "s2_t2_cold_plate",
+    "servers10/s3_t2_hmin_med": "s3_t2_hmin_med", "servers10/s3_t3_hmin_low": "s3_t3_hmin_low",
+    "servers10/s4_t1_no_moves": "s4_t1_no_moves", "servers10/s4_t2_blind": "s4_t2_blind",
+    "servers10/s4_t3a_ci_flat": "s4_t3a_ci_flat", "servers10/s4_t3b_ci_swing": "s4_t3b_ci_swing",
+    "servers6/base": "base", "servers6/s4_t1_no_moves": "s4_t1_no_moves",
 }
-needs_thesis10 = pytest.mark.skipif(not set(THESIS10_LABELS) <= set(BY_KEY),
-                                    reason="the 1.0.1 thesis10 runs are not under results/")
+needs_site_runs = pytest.mark.skipif(not set(SERVERS10_TESTS) <= set(BY_KEY),
+                                     reason="the Chapter 6 runs are not under results/")
 
 
-def _titles(key: str) -> list[str]:
+@needs_site_runs
+@pytest.mark.parametrize("key", sorted(SERVERS10_TESTS))
+def test_each_site_run_matches_the_test_in_its_folder_name(key):
     ref = BY_KEY[key]
-    return [tr.title for tr in data.thesis_labels(data.load_summary(ref.path), ref.scenario)]
+    info = data.run_info(ref)
+    assert info.config.key == ref.scenario                  # results/<configuration>/
+    assert [t.id for t in info.tests] == [SERVERS10_TESTS[key]] == [ref.name]
 
 
-@needs_thesis10
-@pytest.mark.parametrize("key", sorted(THESIS10_LABELS))
-def test_thesis10_runs_get_their_labels(key):
-    assert _titles(key) == THESIS10_LABELS[key]
+@needs_site_runs
+def test_validation_runs_match_no_test_but_their_configuration():
+    for ref in RUNS:
+        if ref.name.startswith("v_"):
+            info = data.run_info(ref)
+            assert info.config.key == "servers10" and info.tests == ()
 
 
-@needs_thesis10
-def test_label_text_and_map():
-    texts = data.thesis_label_texts(RUNS)
-    assert texts[BASE] == "6.1 Base / 6.3 Base 10 °C safety margin / 6.4 Reassignment allowed"
-    assert {k for k, r in BY_KEY.items() if r.scenario != "thesis10"}.isdisjoint(texts)
+def test_archived_runs_get_no_configuration():
+    for ref in ARCHIVED:
+        if data.is_archive(ref.scenario):
+            assert data.run_info(ref).config is None, ref.key
+
+
+@needs_site_runs
+def test_run_titles():
+    infos = data.run_infos(RUNS)
+    ref = BY_KEY["servers10/s1_t1_zones"]
+    assert data.run_title(infos[ref.key], ref) == \
+        "6.1 · Test 1 · Same-type servers regrouped into one zone"
+    assert data.run_long_title(infos[ref.key], ref).startswith("10 servers · 6.1 · Test 1")
+    base = BY_KEY[BASE]
+    assert data.run_title(infos[base.key], base) == "Base"
+    v = BY_KEY["servers10/v_crac27_moves"]
+    assert data.run_title(infos[v.key], v) == "v_crac27_moves"
     row = data.compare_runs([BY_KEY[BASE]]).iloc[0]
-    assert row["thesis_label"] == texts[BASE]
-    assert list(data.compare_runs([BY_KEY[BASE]]).columns[:3]) == ["scenario", "run",
-                                                                  "thesis_label"]
+    assert (row["configuration"], row["test"]) == ("10 servers", "Base")
 
 
-def test_archived_and_other_scenarios_get_no_label():
-    others = [k for k, r in BY_KEY.items() if r.scenario != "thesis10"]
-    assert any(data.is_archive(BY_KEY[k].scenario) for k in others)
-    assert any(BY_KEY[k].scenario == "consolidated6" for k in others)
-    for key in others:
-        assert _titles(key) == [], key
-    # An archived thesis10 run carries thesis10 in its summary.json; the folder decides.
-    archived = BY_KEY.get("archive-thesis10/least_loaded_base18_free_optimize")
-    if archived is not None:
-        summary = data.load_summary(archived.path)
-        assert data.thesis_labels(summary, archived.scenario) == []
-
-
-def test_labels_match_settings_not_names():
-    blind = {"scenario": {"name": "thesis10"}, "settings": {"placement": "thermal_blind"}}
-    assert [tr.title for tr in data.thesis_labels(blind)] == \
-        ["6.4 Temperature ignored when choosing servers"]
-    # A run made before a switch existed (no "placement", no "ci_flat") is at the defaults.
-    old = {"scenario": {"name": "thesis10"},
-           "settings": {"reassignment": "free", "time_limit_s": 1800, "run_name": "x"}}
-    assert [tr.title for tr in data.thesis_labels(old)] == \
-        ["6.1 Base", "6.3 Base 10 °C safety margin", "6.4 Reassignment allowed"]
-    two = {"scenario": {"name": "thesis10"},
-           "settings": {"reassignment": "none", "H_min_C": 5}}
-    assert data.thesis_labels(two) == []                   # two switches: no label
-    assert data.thesis_labels({"scenario": {"name": "consolidated6"}, "settings": {}}) == []
-    assert data.thesis_labels(blind, "archive-thesis10") == []
-
-
-@needs_thesis10
+@needs_site_runs
 def test_chapter6_table_rows_and_columns():
+    from scheduler import experiments as ex
     table = data.chapter6_table(RUNS)
-    assert len(table) == len(data.THESIS_RUNS) == 13
+    per_config = sum(len(s.tests) for s in ex.SECTIONS)
+    assert len(table) == per_config * len(ex.CONFIGURATIONS)
     assert list(table.columns) == list(data.CHAPTER6_COLUMNS)
-    assert list(zip(table["section"], table["label"])) == \
-        [(tr.section, tr.label) for tr in data.THESIS_RUNS]
-    assert table["section"].tolist() == sorted(table["section"])
-    # One base run is the reference (first row) of 6.1, 6.3 and 6.4; which one is the newest
-    # match, so a later rerun of the base may take the place of BASE.
-    firsts = table.groupby("section", sort=False)["run"].first()
-    assert firsts["6.1"] == firsts["6.3"] == firsts["6.4"]
-    assert "6.1 Base" in _titles(f"thesis10/{firsts['6.1']}")
+    ten = table[table["configuration"] == "10 servers"]
+    assert list(zip(ten["section"], ten["tag"])) == \
+        [(s.key, tag) for s in ex.SECTIONS for tag, _ in s.tests]
+    # One base run is the reference (first row) of 6.1, 6.3 and 6.4.
+    firsts = ten.groupby("section", sort=False)["run"].first()
+    assert firsts["6.1"] == firsts["6.3"] == firsts["6.4"] == "base"
+    assert firsts["6.2"] == "s2_base"
     for _, row in table.iterrows():
         if row["run"] is None or pd.isna(row["run"]):
-            assert row["status"] == data.NOT_RUN_YET
+            assert row["status"] in (data.NOT_RUN_YET, data.NOT_APPLICABLE)
             assert row[list(data.CHAPTER6_METRICS)].isna().all()
         else:
-            assert row["status"] != data.NOT_RUN_YET
+            assert row["status"] not in (data.NOT_RUN_YET, data.NOT_APPLICABLE)
+    status = table.set_index(["configuration", "section", "tag"])["status"]
+    assert status["10 servers", "6.3", "Test 1"] == data.NOT_RUN_YET
+    assert status["2 servers · slow + mid", "6.1", "Test 1"] == data.NOT_APPLICABLE
+    assert status["2 servers · slow + mid", "6.2", "Base"] == data.NOT_APPLICABLE
+    assert status["2 servers · mid + mid", "6.1", "Test 1"] == data.NOT_RUN_YET
+    assert status["2 servers · slow + fast", "6.2", "Test 2"] == data.NOT_RUN_YET
 
 
-@needs_thesis10
+@needs_site_runs
 def test_chapter6_base_row_matches_summary_and_schedule():
     ref = BY_KEY[BASE]
     summary = data.load_summary(ref.path)
@@ -390,6 +389,7 @@ def test_chapter6_base_row_matches_summary_and_schedule():
     tot, met = summary["optimized"]["totals"], summary["optimized"]["metrics"]
     assert row["release"] == summary["provenance"]["thermasched_version"]
     assert [row["E_crac_zone1_kWh"], row["E_crac_zone2_kWh"]] == tot["E_crac_by_zone_kWh"][:2]
+    assert row["E_crac_kWh"] == tot["E_crac_kWh"]
     assert row["E_IT_kWh"] == tot["E_IT_kWh"] and row["E_total_kWh"] == tot["E_total_kWh"]
     assert row["E_cp_Wh"] == pytest.approx(tot["E_cp_kWh"] * 1000)
     assert row["carbon_kg"] == pytest.approx(31.017, abs=1e-3) == tot["carbon_kg"]
@@ -402,10 +402,11 @@ def test_chapter6_base_row_matches_summary_and_schedule():
     assert row["pct_late"] == pytest.approx(met["n_late"] / summary["scenario"]["I"] * 100)
     assert (row["status"], row["mip_gap"]) == (summary["solver"]["status"],
                                                summary["solver"]["mip_gap"])
-    assert row["time_limit_s"] == summary["settings"]["time_limit_s"]
+    assert row["time_limit_s"] == summary["settings"]["time_limit_s"] == 1800
 
-    # By hand from schedule.csv: wait and finish - arrival, in 5-minute periods.
+    # By hand from schedule.csv and server_period.csv.
     sch = pd.read_csv(ref.path / "optimized" / "schedule.csv")
+    sp = pd.read_csv(ref.path / "optimized" / "server_period.csv")
     placed = sch[sch["placed"] == 1]
     assert row["n_unplaced"] == len(sch) - len(placed) == 0
     assert (placed["wait"] == placed["start"] - placed["arrival"]).all()
@@ -414,47 +415,66 @@ def test_chapter6_base_row_matches_summary_and_schedule():
     turnaround = placed["finish"] - placed["arrival"]
     assert row["turnaround_mean_min"] == pytest.approx(turnaround.mean() * 5)
     assert row["turnaround_max_min"] == turnaround.max() * 5
-    assert row["wait_mean_min"] == pytest.approx(71.28, abs=0.01)
-    assert row["turnaround_mean_min"] == pytest.approx(229.94, abs=0.01)
+    assert row["exec_mean_min"] == pytest.approx(sch["periods_run"].mean() * 5)
+    assert row["util_mean_pct"] == pytest.approx(sp["utilization"].mean() * 100)
+    assert row["H_mean_C"] == pytest.approx(sp["headroom_C"].mean())
+    assert row["DPF_min"] == sp["DPF"].min() == 1.0
+    assert row["E_cooling_kWh"] == pytest.approx(row["E_crac_kWh"] + row["E_cp_Wh"] / 1000)
 
 
-@needs_thesis10
+@needs_site_runs
 def test_chapter6_changes_against_section_reference():
     table = data.chapter6_table(RUNS)
     changes = data.chapter6_changes(table)
     metrics = list(data.CHAPTER6_METRICS)
-    for _, idx in table.groupby("section", sort=False).groups.items():
+    for _, idx in table.groupby(["configuration", "section"], sort=False).groups.items():
         ref = changes.loc[idx[0], metrics]
-        if table.loc[idx[0], "status"] != data.NOT_RUN_YET:
+        if data.has_result(table.loc[[idx[0]]]).iloc[0]:
             assert (ref.dropna() == 0).all() and ref.notna().any()
-    # Non-metric columns are left as they are.
     others = [c for c in table.columns if c not in metrics]
     pd.testing.assert_frame_equal(changes[others], table[others])
-    zones = table.index[table["label"] == "Regrouped zones"][0]
+    zones = table.index[(table["configuration"] == "10 servers") & (table["section"] == "6.1")
+                        & (table["tag"] == "Test 1")][0]
     assert changes.at[zones, "E_crac_zone1_kWh"] == pytest.approx(
         (table.at[zones, "E_crac_zone1_kWh"] / table.at[0, "E_crac_zone1_kWh"] - 1) * 100)
 
 
 def test_chapter6_uses_the_newest_matching_run(tmp_path):
-    """Several runs match a label: the table shows the newest, and lists every match."""
+    """Several runs match a test: the table shows the newest, and the catalogue lists every
+    match. The folder name decides nothing."""
     import json
     import shutil
     if BASE not in BY_KEY:
-        pytest.skip("the thesis10 base run is not under results/")
+        pytest.skip("the servers10 base run is not under results/")
     for name, created in (("old", "2026-01-01T00:00:00Z"), ("new", "2026-12-01T00:00:00Z")):
-        dst = tmp_path / "thesis10" / name
+        dst = tmp_path / "anything" / name
         shutil.copytree(BY_KEY[BASE].path, dst)
         summary = json.loads((dst / "summary.json").read_text())
         summary["provenance"]["created_utc"] = created
         (dst / "summary.json").write_text(json.dumps(summary))
     runs = data.discover_runs(tmp_path)
-    entries = {tr.title: (used, found) for tr, used, found in data.chapter6_runs(runs)}
-    used, found = entries["6.1 Base"]
+    cat = data.catalogue(runs)
+    used, found = cat[("servers10", "base")]
     assert used.name == "new" and [r.name for r in found] == ["old", "new"]
-    assert entries["6.1 Regrouped zones"] == (None, [])
-    table = data.chapter6_table(runs)
-    assert table.loc[table["label"] == "Base", "run"].tolist() == ["new"]
-    assert (table.loc[table["run"].isna(), "status"] == data.NOT_RUN_YET).all()
+    assert cat[("servers10", "s1_t1_zones")] == (None, [])
+    table = data.chapter6_table(runs, configs=["servers10"])
+    assert table.loc[(table["tag"] == "Base") & (table["section"] != "6.2"), "run"].tolist() \
+        == ["new"] * 3
+    groups = data.config_runs(runs)
+    assert [r.name for r in groups["servers10"]] == ["new", "old"]   # used first, then older
+
+
+@needs_site_runs
+def test_config_runs():
+    groups = data.config_runs(RUNS)
+    assert list(groups) == ["servers10", "servers6"]
+    every = [r.key for refs in groups.values() for r in refs]
+    assert sorted(every) == sorted(r.key for r in RUNS)            # each run once
+    ten = [r.name for r in groups["servers10"]]
+    assert ten[:12] == [k.split("/")[1] for k in SERVERS10_TESTS if k.startswith("servers10")]
+    assert all(n.startswith("v_") for n in ten[12:])
+    mixed = data.config_runs(RUNS + [r for r in ARCHIVED if r.scenario == "archive-small"])
+    assert data.OTHER in mixed
 
 
 def test_chapter6_row_of_a_run_without_optimized_schedule(loaded):

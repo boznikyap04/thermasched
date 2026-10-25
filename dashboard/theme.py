@@ -3,6 +3,8 @@
 Categorical colours come from a validated colour-blind-safe palette with a light and a
 dark step per hue. Baseline and optimized keep the same hue everywhere (orange and blue).
 Other dimensions (energy component, workload type) use hues distinct from those two.
+Charts with one line per server or zone use ``series``; there a schedule is told apart by
+the dash (baseline dashed), not the hue.
 Thresholds are drawn in neutral ink with a text label, never in a series colour.
 """
 
@@ -27,10 +29,15 @@ class Palette:
     axis: str
     surface: str
     seq: tuple[str, ...]           # sequential ramp, low -> high (low recedes into surface)
+    series: tuple[str, ...] = ()   # one hue per server or zone, in display order
     status: dict[str, str] = field(default_factory=lambda: dict(STATUS))
 
     def variant(self, v: str) -> str:
         return self.baseline if v == "baseline" else self.optimized
+
+    def nth(self, k: int) -> str:
+        """The k-th series colour (servers, zones), cycling past the end."""
+        return self.series[k % len(self.series)]
 
 
 STATUS = {"good": "#0ca30c", "warning": "#fab219", "serious": "#ec835a", "critical": "#d03b3b"}
@@ -44,6 +51,8 @@ LIGHT = Palette(
     types={"time_sensitive": "#e87ba4", "delay_tolerant": "#008300"},
     ink="#0b0b0b", ink2="#52514e", muted="#898781", grid="#e1e0d9", axis="#c3c2b7",
     surface="#fcfcfb", seq=_BLUE_RAMP,
+    series=("#2a78d6", "#eb6834", "#1baf7a", "#6250d6", "#e87ba4", "#c98500", "#0f8f8f",
+            "#8c564b", "#7a7974", "#b8336a"),
 )
 DARK = Palette(
     mode="dark", baseline="#d95926", optimized="#3987e5",
@@ -52,6 +61,8 @@ DARK = Palette(
     types={"time_sensitive": "#d55181", "delay_tolerant": "#008300"},
     ink="#f0efec", ink2="#c3c2b7", muted="#898781", grid="#2c2c2a", axis="#383835",
     surface="#1a1a19", seq=tuple(reversed(_BLUE_RAMP)),
+    series=("#3987e5", "#d95926", "#199e70", "#9085e9", "#d55181", "#eda100", "#2bb5b5",
+            "#b07a6a", "#a8a7a1", "#e0628f"),
 )
 
 

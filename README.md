@@ -106,8 +106,11 @@ branch, so work in progress on `main` never reaches them.
 **Adding a run the group sent:** unzip it into `results/` (you get
 `results/<scenario>/<run>/summary.json`, with the scenario's `servers.csv` and `carbon.csv`
 next to the run folders), check it on the local dashboard, commit, and push `main` and
-`release`. The Overview page warns if it was solved on another scenario build than the one
-in `scenarios/`.
+`release`. The site names a Chapter 6 run by its test whatever its folder; to match the
+others, move it to `results/<configuration>/<test id>/` (for example
+`results/servers10/s3_t1_hmin_high/`; the test ids are in `scheduler/experiments.py`). The
+Run summary page warns if it was solved on another scenario build than the one in
+`scenarios/`.
 
 ## Setup
 
@@ -172,11 +175,14 @@ Run every command from the repository root.
 │   ├── evaluate.py            scores any schedule against every limit
 │   ├── report.py              writes the result files, with the run's provenance
 │   ├── validate.py            validation checks → results/validation/<scenario>/ (python -m scheduler.validate)
+│   ├── experiments.py         the Chapter 6 configurations and tests, and how a run is matched to its test
 │   ├── types.py               shared data types and constants
 │   └── version.py             the release version and the summary.json layout version
 │
-├── results/                   SOLVER OUTPUTS: results/<scenario>/<run-name>/ (the deployed dashboard shows these)
-│   ├── <scenario>/<run>/      summary.json, comparison_period.csv, baseline/, optimized/
+├── results/                   SOLVER OUTPUTS (the deployed dashboard shows these)
+│   ├── servers10/<test>/      the 10-server Chapter 6 runs by test (base, s1_t1_zones, ...), and v_* validation runs
+│   ├── servers6/<test>/       the 6-server runs; servers2_<pair>/ for the 2-server pairs
+│   │                          (each run: summary.json, comparison_period.csv, baseline/, optimized/)
 │   └── validation/<scenario>/ validation tables (CSV) and validation.json, for the Validation page
 ├── exports/                   zips of notebook runs, for the dashboard (not in git)
 │
