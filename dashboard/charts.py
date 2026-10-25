@@ -35,6 +35,37 @@ def _variant_line(pal: Palette, variants, v: str, width: float = 2.0) -> dict:
 
 
 # ---------------------------------------------------------------------------
+# Per-tick re-planning
+# ---------------------------------------------------------------------------
+
+def tick_solve_times(ticks: pd.DataFrame, clock: pd.DataFrame, pal: Palette,
+                     cap_s: float | None) -> go.Figure:
+    """Solve time of every tick of a per-tick run, at the local time of its period. Ticks that
+    stopped at the cap are in the warning colour; the hover gives each tick's MIP gap and how
+    many workloads were waiting."""
+    d = ticks.merge(clock[["t", "time"]], left_on="tick", right_on="t", how="left")
+    at_cap = d["status"] == "time_limit"
+    fig = go.Figure()
+    for stopped, name, color in ((False, "solved to the gap", pal.optimized),
+                                 (True, "stopped at the cap", pal.status["serious"])):
+        part = d[at_cap == stopped]
+        if part.empty:
+            continue
+        fig.add_bar(x=part["time"], y=part["solve_s"], name=name, marker_color=color,
+                    customdata=np.stack([part["tick"], part["mip_gap"] * 100,
+                                         part["n_waiting"]], axis=-1),
+                    hovertemplate="tick %{customdata[0]}: %{y:.1f} s, gap %{customdata[1]:.2f} "
+                                  "%, %{customdata[2]} waiting<extra></extra>")
+    if cap_s:
+        threshold(fig, pal, cap_s, f"cap {cap_s:g} s")
+    style(fig, pal, height=320)
+    fig.update_layout(barmode="overlay", bargap=0)
+    fig.update_yaxes(title_text="Solve time (s)")
+    fig.update_xaxes(title_text=TIME_TITLE)
+    return fig
+
+
+# ---------------------------------------------------------------------------
 # Energy and carbon
 # ---------------------------------------------------------------------------
 

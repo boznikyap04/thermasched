@@ -55,7 +55,9 @@ def _header(run: data.Run) -> None:
 
 
 def _same_schedule_note(run: data.Run, base: data.Run, tag: str) -> None:
-    stopped = all(r.solver.get("status") == "time_limit" for r in (run, base))
+    # whole-day runs only: a per-tick run's status says only whether some tick hit its cap
+    stopped = all(r.solver.get("status") == "time_limit" and data.per_tick_info(r.summary) is None
+                  for r in (run, base))
     st.info(f"**{tag} has the same optimized schedule as the Base:** every workload runs on "
             "the same server and starts in the same period, so the server and workload "
             "charts match the Base's. Cooling, energy and carbon still differ where this test "
@@ -98,23 +100,47 @@ def _violations(run: data.Run) -> None:
         st.warning(f"**The optimized schedule breaks limits:**\n{items}", icon="⚠️")
 
 
+def _per_tick(run: data.Run, sol: dict, ticks: dict) -> None:
+    """The solver figures of a run re-planned at every tick, and its solve time per tick."""
+    n, cap, limit = ticks.get("n_ticks"), data.ticks_at_cap(ticks), ticks.get("tick_time_limit_s")
+    c1, c2, c3 = st.columns(3)
+    c1.metric("Solve time, all ticks", state.fmt_num(sol.get("solve_time_s"), 0, "s"))
+    gap = sol.get("mip_gap")
+    c2.metric("Worst tick's MIP gap", "–" if gap is None else f"{gap * 100:.2f}%",
+              help=f"Requested for every tick: {run.settings.get('mip_rel_gap', 0) * 100:g}%")
+    c3.metric("Ticks at the cap", f"{cap} of {n}",
+              help=f"Each tick's solve stops after {limit:g} s with the best plan found so far.")
+    frame = data.load_ticks(run.ref.path)
+    if frame is not None:
+        state.chart(charts.tick_solve_times(frame, run.clock, state.pal(), limit), key="ticks")
+        st.caption("Solve time of each tick, at the time of its period. A tick sees the "
+                   "workloads that have arrived and plans to the end of the day; only its own "
+                   "period's decisions are kept. Hover a bar for its MIP gap and how many "
+                   "workloads were waiting.")
+
+
 def _solver(run: data.Run) -> None:
     sol = run.solver
     status = sol.get("status", "unknown")
+    ticks = data.per_tick_info(run.summary)
     with st.container(border=True):
         with st.container(horizontal=True, gap="small", vertical_alignment="center"):
             st.markdown("**Solver**")
-            st.badge(data.solver_short(sol) if status != "unknown" else "unknown",
+            st.badge(data.solver_short(sol, ticks) if status != "unknown" else "unknown",
                      color=STATUS_COLOR.get(status, "gray"))
-        st.caption(data.solver_sentence(sol))
-        c1, c2, c3 = st.columns(3)
-        c1.metric("Solve time", state.fmt_num(sol.get("solve_time_s"), 0, "s"))
-        gap = sol.get("mip_gap")
-        c2.metric("MIP gap", "–" if gap is None else f"{gap * 100:.2f}%",
-                  help=f"Requested: {run.settings.get('mip_rel_gap', 0) * 100:g}%")
-        bound = sol.get("best_bound_g")
-        c3.metric("Best bound", state.fmt_num(None if bound is None else bound / 1000, 3, "kg"),
-                  help="Lower bound on the optimum: no schedule can emit less.")
+        st.caption(data.solver_sentence(sol, ticks))
+        if ticks is not None:
+            _per_tick(run, sol, ticks)
+        else:
+            c1, c2, c3 = st.columns(3)
+            c1.metric("Solve time", state.fmt_num(sol.get("solve_time_s"), 0, "s"))
+            gap = sol.get("mip_gap")
+            c2.metric("MIP gap", "–" if gap is None else f"{gap * 100:.2f}%",
+                      help=f"Requested: {run.settings.get('mip_rel_gap', 0) * 100:g}%")
+            bound = sol.get("best_bound_g")
+            c3.metric("Best bound",
+                      state.fmt_num(None if bound is None else bound / 1000, 3, "kg"),
+                      help="Lower bound on the optimum: no schedule can emit less.")
         with st.expander("Solver details"):
             obj = sol.get("objective_g")
             st.caption(f"Objective (carbon) {state.fmt_num(None if obj is None else obj / 1000, 3, 'kg')}"

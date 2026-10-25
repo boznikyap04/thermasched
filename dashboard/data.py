@@ -562,6 +562,8 @@ def provenance_caption(summary: dict) -> str:
     return (f"Made with ThermaSched {p.get('thermasched_version')} {where}"
             + (f" on {when}" if when else "")
             + (f" (commit {p['git_commit']})" if p.get("git_commit") else "")
+            + (f"; labelled {p['relabelled_from']} when solved, before the release's version "
+               "was set" if p.get("relabelled_from") else "")
             + f" · scenario build `{p.get('scenario_fingerprint') or UNKNOWN_BUILD}`")
 
 
@@ -583,20 +585,63 @@ def provenance_warnings(summary: dict, scenarios_dir: str | Path = SCENARIOS_DIR
     return out
 
 
-def solver_short(solver: dict) -> str:
+def per_tick_info(summary: dict) -> dict | None:
+    """The per-tick block of a run re-planned at every tick (n_ticks, n_ticks_time_limit,
+    tick_time_limit_s, max_mip_gap, ...); None for a run planned for the whole day at once."""
+    return (summary.get("per_tick") or None) if summary.get("mode") == "per_tick" else None
+
+
+def ticks_at_cap(ticks: dict) -> int:
+    return int(ticks.get("n_ticks_time_limit") or 0)
+
+
+def load_ticks(run_dir: str | Path) -> pd.DataFrame | None:
+    """ticks.csv of a per-tick run (one row per tick: status, solve_s, mip_gap, n_waiting,
+    ...); None when the run has none."""
+    path = Path(run_dir) / "ticks.csv"
+    if not path.is_file():
+        return None
+    df = pd.read_csv(path)
+    df["mip_gap"] = pd.to_numeric(df["mip_gap"], errors="coerce").fillna(0.0)
+    return df
+
+
+def solver_short(solver: dict, ticks: dict | None = None) -> str:
     """The solver's outcome in a few words: 'Proven best', or 'Stopped at time limit, gap
-    1.60 %' (the gap tells how far from the best possible the schedule may be)."""
+    1.60 %' (the gap tells how far from the best possible the schedule may be). A per-tick
+    run (``ticks``, from per_tick_info): 'Every tick solved', or '48 of 288 ticks at the
+    cap, worst gap 24.62 %'."""
     status, gap = solver.get("status"), solver.get("mip_gap")
+    if ticks is not None and status in (STATUS_OPTIMAL, STATUS_TIME_LIMIT):
+        n, cap = ticks.get("n_ticks"), ticks_at_cap(ticks)
+        if not cap:
+            return "Every tick solved"
+        return f"{cap} of {n} ticks at the cap" + (
+            f", worst gap {gap * 100:.2f} %" if gap is not None else "")
     text = status_text(status)
     if status == STATUS_TIME_LIMIT and gap is not None:
         text += f", gap {gap * 100:.2f} %"
     return text
 
 
-def solver_sentence(solver: dict) -> str:
+def solver_sentence(solver: dict, ticks: dict | None = None) -> str:
     """How complete the result is, in one sentence for the thesis."""
     status, gap, t = solver.get("status"), solver.get("mip_gap"), solver.get("solve_time_s")
     took = f" in {t:,.0f} s" if t is not None else ""
+    if ticks is not None and status in (STATUS_OPTIMAL, STATUS_TIME_LIMIT):
+        n, cap, limit = ticks.get("n_ticks"), ticks_at_cap(ticks), ticks.get("tick_time_limit_s")
+        slow = ticks.get("slowest_tick_solve_s")
+        head = (f"Re-planned at each of {n} ticks{took} in all"
+                + (f" (slowest tick {slow:,.0f} s, tick {ticks.get('slowest_tick')})"
+                   if slow is not None else "") + ". ")
+        if not cap:
+            body = "Every tick was solved to the requested gap. "
+        else:
+            body = (f"{n - cap} ticks were solved to the requested gap and {cap} stopped at the "
+                    f"{limit:g} s per-tick cap; the worst of these is within "
+                    f"{(gap or 0) * 100:.2f} % of the best plan for what that tick could see. ")
+        return body.join([head, "Each tick sees only the workloads that have arrived, so the "
+                          "day as a whole is not proven best."])
     if status == STATUS_OPTIMAL:
         return f"Proven best{took}: no valid schedule emits less carbon (within the requested gap)."
     if status == STATUS_TIME_LIMIT and gap is not None:
@@ -794,14 +839,18 @@ CHAPTER6_COLUMNS = {
     "DPF_min": "Lowest DPF",
     "n_unplaced": "Unplaced workloads",
     "status": "Solver status",
-    "mip_gap": "MIP gap",
-    "solve_time_s": "Solve time (s)",
+    "mip_gap": "MIP gap (per tick: the worst tick's)",
+    "solve_time_s": "Solve time (s; per tick: all ticks)",
     "time_limit_s": "Time limit (s)",
+    "n_ticks": "Ticks re-planned",
+    "n_ticks_at_cap": "Ticks at the per-tick cap",
+    "tick_time_limit_s": "Per-tick cap (s)",
 }
 # Columns that hold results, for the change against each section's reference.
 CHAPTER6_METRICS = tuple(k for k in CHAPTER6_COLUMNS if k not in {
     "configuration", "servers", "level", "section", "tag", "label", "run", "release",
-    "n_unplaced", "status", "mip_gap", "solve_time_s", "time_limit_s"})
+    "n_unplaced", "status", "mip_gap", "solve_time_s", "time_limit_s", "n_ticks",
+    "n_ticks_at_cap", "tick_time_limit_s"})
 # What each section measures (the Chapter 6 document's "What to measure"), in its order.
 SECTION_MEASURES = {
     "6.1": ("n_moved_server", "n_moved_zone", "util_mean_pct", "E_crac_zone1_kWh",
@@ -844,6 +893,11 @@ def chapter6_row(ref: RunRef, summary: dict) -> dict:
     row = dict(run=ref.name, release=pv.get("thermasched_version") or UNVERSIONED,
                status=sol.get("status"), mip_gap=sol.get("mip_gap"),
                solve_time_s=sol.get("solve_time_s"), time_limit_s=st.get("time_limit_s"))
+    ticks = per_tick_info(summary)
+    if ticks is not None:       # the whole-day time limit plays no part in a per-tick run
+        row.update(time_limit_s=None, n_ticks=ticks.get("n_ticks"),
+                   n_ticks_at_cap=ticks_at_cap(ticks),
+                   tick_time_limit_s=ticks.get("tick_time_limit_s"))
     if not summary.get("has_optimized_schedule"):
         return row
     opt = summary.get("optimized") or {}
@@ -1038,7 +1092,9 @@ def settings_badges(summary: dict) -> list[tuple[str, str]]:
         ("Zones", "servers.csv" if not st.get("zone_map")
          else ",".join(map(str, st["zone_map"]))),
         ("Carbon intensity", carbon),
-        ("Time limit", f"{st.get('time_limit_s', 0):g} s"),
+        *([("Planning", "re-planned every period"),
+           ("Per-tick cap", f"{st.get('tick_time_limit_s') or 0:g} s")]
+          if st.get("per_tick") else [("Time limit", f"{st.get('time_limit_s', 0):g} s")]),
         ("MIP gap", f"{st.get('mip_rel_gap', 0):g}"),
     ]
 

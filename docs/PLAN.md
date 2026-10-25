@@ -271,7 +271,11 @@ names, is `<scenario>__<test id>`, e.g. `servers6_heavy__base`.
    day and the heaviest case on the heavy day (63 ticks at the cap, gaps up to 29 %).
    The owner kept these results as they are (2026-10-26); no re-run at a higher cap.
 7. **Release** with the per-tick results (version, changelog, notebooks), which replaces the
-   whole-day results on the deployed site.
+   whole-day results on the deployed site. **Prepared (2026-10-26), not pushed:** version 1.3.0, its
+   changelog entry, notebooks and scenarios stamped 1.3.0 (fingerprints unchanged), the 39
+   runs relabelled 1.3.0 (`relabelled_from: 1.2.1` in their provenance), and the site reads
+   per-tick runs (status per tick, per-tick chart, opens on 6 servers). Pushing `main` and
+   `release` needs the owner's go.
 
 ### Who does what
 

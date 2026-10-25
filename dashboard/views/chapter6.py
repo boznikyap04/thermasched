@@ -19,10 +19,12 @@ FORMATS = {
     "n_moved_server": "%d", "n_moved_zone": "%d", "n_late": "%d", "pct_late": "%.2f",
     "n_throttled_servers": "%d", "DPF_min": "%.3f", "n_unplaced": "%d",
     "mip_gap": "percent", "solve_time_s": "%.0f", "time_limit_s": "%d",
+    "n_ticks": "%d", "n_ticks_at_cap": "%d", "tick_time_limit_s": "%d",
 }
 PINNED = ("configuration", "section", "tag", "label")
 COUNTS = [k for k in FORMATS if k.startswith("n_")]
-# Above this MIP gap, a run stopped at its time limit may be far from its best schedule.
+# Above this MIP gap, a run stopped at its time limit may be far from its best schedule; for a
+# per-tick run, a tick stopped at the cap may be far from the best decision for what it saw.
 GAP_WARN = 0.05
 NOTES = (
     "Airflow is not modelled, so in 6.2 the CRAC changes only its supply air temperature. "
@@ -47,12 +49,23 @@ def fmt_value(key: str, v) -> str:
     return str(v)
 
 
+def row_ticks(row) -> dict | None:
+    """The per-tick figures of a table row (a Series or an itertuples row); None for a
+    whole-day run."""
+    n = getattr(row, "n_ticks", None) if not isinstance(row, pd.Series) else row.get("n_ticks")
+    if n is None or pd.isna(n):
+        return None
+    get = (lambda k: row.get(k)) if isinstance(row, pd.Series) else (lambda k: getattr(row, k))
+    return {"n_ticks": int(n), "n_ticks_time_limit": int(get("n_ticks_at_cap") or 0),
+            "tick_time_limit_s": get("tick_time_limit_s")}
+
+
 def status_cell(row: pd.Series) -> str:
     """The solver outcome of a table row, in a few words."""
     status = row["status"]
     if status in (data.NOT_RUN_YET, data.NOT_APPLICABLE):
         return status
-    return data.solver_short({"status": status, "mip_gap": row.get("mip_gap")})
+    return data.solver_short({"status": status, "mip_gap": row.get("mip_gap")}, row_ticks(row))
 
 
 def csv_bytes(df: pd.DataFrame, headers: dict[str, str]) -> bytes:
@@ -67,12 +80,21 @@ def csv_bytes(df: pd.DataFrame, headers: dict[str, str]) -> bytes:
 def gap_warning(table: pd.DataFrame, where: str = "") -> None:
     gap = pd.to_numeric(table["mip_gap"], errors="coerce")
     unproven = table[(table["status"] == "time_limit") & (gap > GAP_WARN)]
-    if not unproven.empty:
-        names = ", ".join(dict.fromkeys(f"{r.configuration} {r.section} {r.tag}"
-                                        for r in unproven.itertuples()))
-        st.warning(f"Not proven best{where}: {names} stopped at the time limit with a MIP gap "
-                   f"above {GAP_WARN:.0%}. Differences against these runs may be the solver's, "
-                   "not the model's.", icon=":material/hourglass_bottom:")
+    per_tick = pd.to_numeric(unproven["n_ticks"], errors="coerce").notna()
+
+    def names(rows: pd.DataFrame) -> str:
+        return ", ".join(dict.fromkeys(f"{r.configuration} {r.section} {r.tag}"
+                                       for r in rows.itertuples()))
+    if (~per_tick).any():
+        st.warning(f"Not proven best{where}: {names(unproven[~per_tick])} stopped at the time "
+                   f"limit with a MIP gap above {GAP_WARN:.0%}. Differences against these runs "
+                   "may be the solver's, not the model's.", icon=":material/hourglass_bottom:")
+    if per_tick.any():
+        st.warning(f"Ticks stopped at the per-tick cap{where}: in {names(unproven[per_tick])}, "
+                   f"some ticks stopped at the cap with a MIP gap above {GAP_WARN:.0%}. The "
+                   "decisions of those ticks may not be the best for what they saw, so small "
+                   "differences against these runs may be the solver's, not the model's. Each "
+                   "test's page charts every tick.", icon=":material/hourglass_bottom:")
 
 
 def _status_grid(table: pd.DataFrame) -> pd.DataFrame:
@@ -83,6 +105,10 @@ def _status_grid(table: pd.DataFrame) -> pd.DataFrame:
             else "Base (6.1, 6.3, 6.4)"
         if r.status in (data.NOT_RUN_YET, data.NOT_APPLICABLE):
             icon = {"not run yet": "·", "not applicable": "n/a"}[r.status]
+        elif (ticks := row_ticks(r)) is not None and r.status in ("optimal", "time_limit"):
+            cap = ticks["n_ticks_time_limit"]
+            icon = ("✅ every tick" if not cap else
+                    f"⏱ {cap} at cap, gap {(r.mip_gap or 0) * 100:.2f} %")
         elif r.status == "optimal":
             icon = "✅ proven best"
         elif r.status == "time_limit" and pd.notna(r.mip_gap):
@@ -123,8 +149,11 @@ def render() -> None:
     grid = _status_grid(table)
     st.dataframe(grid, hide_index=True, column_config={
         "Test": st.column_config.TextColumn("Test", pinned=True)})
-    st.caption("Columns: number of servers · load level. ✅ proven best · ⏱ stopped at the time limit (with its MIP gap) · ❌ no valid "
-               "schedule · **·** not run yet · **n/a** not applicable: 6.1 Test 1 needs two "
+    st.caption("Columns: number of servers · load level. Runs re-planned every period (per "
+               "tick): ✅ every tick solved to the requested gap · ⏱ ticks stopped at the "
+               "per-tick cap (how many, and the worst tick's MIP gap). Runs planned for the "
+               "whole day at once: ✅ proven best · ⏱ stopped at the time limit (with its MIP "
+               "gap). ❌ no valid schedule · **·** not run yet · **n/a** not applicable: 6.1 Test 1 needs two "
                "servers of the same tier, 6.2 needs a server with a cold plate (3000 MHz).")
 
     st.subheader("All results")

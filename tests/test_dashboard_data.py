@@ -542,3 +542,38 @@ def test_against_base_stacks_the_two_optimized_schedules(loaded):
     alone = data.against_base(test, "Test 1")
     assert alone.variants == ("Test 1",) and set(alone.period["variant"]) == {"Test 1"}
     assert test.variants == ("baseline", "optimized")       # the loaded run is left as it is
+
+
+# -- per-tick runs --------------------------------------------------------------------
+
+PER_TICK_SOLVER = {"status": "time_limit", "mip_gap": 0.2462, "solve_time_s": 3851.0}
+TICKS = {"n_ticks": 288, "n_ticks_time_limit": 48, "tick_time_limit_s": 60.0,
+         "slowest_tick": 110, "slowest_tick_solve_s": 66.0}
+
+
+def test_per_tick_solver_wording():
+    assert data.solver_short(PER_TICK_SOLVER, TICKS) == "48 of 288 ticks at the cap, worst gap 24.62 %"
+    assert data.solver_short({"status": "optimal"}, TICKS | {"n_ticks_time_limit": 0}) \
+        == "Every tick solved"
+    text = data.solver_sentence(PER_TICK_SOLVER, TICKS)
+    assert "Re-planned at each of 288 ticks" in text and "60 s per-tick cap" in text
+    assert "not proven best" in text and "best possible" not in text
+    # a whole-day run keeps its wording
+    assert data.solver_short(PER_TICK_SOLVER) == "Stopped at time limit, gap 24.62 %"
+
+
+def test_per_tick_run_in_the_chapter6_table(loaded):
+    ref = BY_KEY[SERVERS6_BASE]
+    summary = data.load_summary(ref.path)
+    assert data.per_tick_info(summary)["n_ticks"] == 288
+    row = data.chapter6_row(ref, summary)
+    assert row["n_ticks"] == 288 and row["tick_time_limit_s"] == 60.0
+    assert row["time_limit_s"] is None          # the whole-day limit plays no part
+    ticks = data.load_ticks(ref.path)
+    assert len(ticks) == 288 and ticks["mip_gap"].notna().all()
+
+
+def test_relabelled_run_says_so():
+    summary = data.load_summary(BY_KEY[SERVERS6_BASE].path)
+    text = data.provenance_caption(summary)
+    assert "ThermaSched 1.3.0" in text and "labelled 1.2.1 when solved" in text

@@ -14,12 +14,19 @@ run.
   section 4 shows which scenarios differ from before), then solve again. The site warns when
   a run was solved on a different scenario build than the one it holds.
 
-## Unreleased
+## 1.3.0 (2026-10-26)
 
 **Re-run:** cleaning, then solver. The cleaned data and the scenarios are rebuilt with 64 GB
 per server, and the notebooks now re-plan per tick by default, which gives other schedules
 than the whole-day plan; the whole-day model itself is unchanged.
 
+- **Per-tick re-planning** (`--per-tick`, in the notebooks `per_tick=True`, their new default):
+  the optimizer re-plans at every 5-minute period with only the workloads that have arrived,
+  keeps that period's decisions and moves on, carrying the running workloads, the server
+  temperatures and the supply-ramp history from tick to tick. Each tick has its own time limit
+  (`--tick-time-limit`, 60 s); the run saves its state after every tick and resumes when run
+  again; a tick with no valid schedule stops the run and names the limit. The whole-day plan
+  stays available with the switch off. The plan behind it is [`docs/PLAN.md`](docs/PLAN.md).
 - **64 GB per server.** Each UniMelb host has 64 GB of memory, not 516 GB: `data/clean/` and
   the scenarios are rebuilt with 66,036 MB per server. Workloads on hosts that never report
   usage are kept, with borrowed usage (`usage_imputed`), so the catalogue has 741 workloads;
@@ -27,31 +34,28 @@ than the whole-day plan; the whole-day model itself is unchanged.
   and both baseline rules check memory as well as cores.
 - **Scenarios.** `scenarios/` holds the six-server fleet on a light, normal and heavy day,
   `servers6_light`, `servers6` and `servers6_heavy` (45, 132 and 210 workloads; peak memory
-  34, 60 and 86 % of the fleet), and `small` and `small_running`, rebuilt. The baseline has no
-  late or unplaced workload in any of them. The 10- and 2-server fleets are added when they
-  are run. The earlier 516 GB scenarios (`thesis10`, `thesis10_tight`, `_swing`, `_warm`,
-  `consolidated6`, `consolidated6_swing`, `servers2`, `servers2_swing`) moved to
-  `archive/scenarios_516GB/`.
-- The solver notebook starts on `servers6`, and the batch notebook's list is the first set of
-  thesis runs: 6.1 and 6.2 on the three load levels, 18 runs.
-- The plan going forward is [`docs/PLAN.md`](docs/PLAN.md): per-tick re-planning replaces the
-  whole-day solve. Until its runs are in, `results/` is empty: the whole-day runs moved to
-  `archive/results_2026-10-25_whole_day/`, the staged 1.2.1 runs (solved on 516 GB servers,
-  invalid) to `archive/runs_staging_516GB_invalid/`, and the 1.0.0 run logs to
-  `archive/logs_1.0.0/`.
-- **Per-tick re-planning** (`--per-tick`, in the notebooks `per_tick=True`, their new default):
-  the optimizer re-plans at every 5-minute period with only the workloads that have arrived,
-  keeps that period's decisions and moves on, carrying the running workloads, the server
-  temperatures and the supply-ramp history from tick to tick. Each tick has its own time limit
-  (`--tick-time-limit`, 60 s); the run saves its state after every tick and resumes when run
-  again; a tick with no valid schedule stops the run and names the limit. The whole-day plan
-  stays available with the switch off.
+  34, 60 and 86 % of the fleet), their `_swing` twins with a deeper daily carbon swing (the
+  same workloads, amplitude 0.50) for 6.4 Test 3b, and `small` and `small_running`, rebuilt.
+  The baseline has no late or unplaced workload in any of them. The 10- and 2-server fleets
+  are added when they are run. The earlier 516 GB scenarios (`thesis10`, `thesis10_tight`,
+  `_swing`, `_warm`, `consolidated6`, `consolidated6_swing`, `servers2`, `servers2_swing`)
+  moved to `archive/scenarios_516GB/`.
+- **Results.** `results/` holds the 39 per-tick runs of the six-server fleet: every test of
+  6.1 to 6.4 on the light, normal and heavy day, solved on GitHub Actions with a 60 s cap per
+  tick. Every run finished with no broken limit and no missed deadline. 6.4 Test 3b ran on
+  each day's `_swing` scenario and is filed under the day's folder. The runs were solved with
+  the code of this release before its version number was set, so their `summary.json` was
+  relabelled 1.3.0 and keeps the original label as `relabelled_from: 1.2.1`, next to the
+  commit that solved it. The whole-day runs of 1.2.x moved to
+  `archive/results_2026-10-25_whole_day/`, the staged runs on 516 GB servers (invalid) to
+  `archive/runs_staging_516GB_invalid/`, and the 1.0.0 run logs to `archive/logs_1.0.0/`.
+- The solver notebook starts on `servers6`, and the batch notebook's list is the 39 runs.
 - The site shows only the four Chapter 6 scenarios. The sidebar lists the pages: the
   Chapter 6 *Overview* (which test has a run in each configuration, and every result in one
   CSV), one page per scenario, 6.1 to 6.4, and *Output files*.
 - On each scenario page, pick **10 servers**, **6 servers** or **2 servers** at the top, or
-  *Across configurations*. The choice stays the same from page to page and is kept in the
-  link (`?config=servers6`). A page shows what its scenario measures: the Base next to each
+  *Across configurations*; a first visit opens on the first fleet with runs. The choice
+  stays the same from page to page and is kept in the link (`?config=servers6`). A page shows what its scenario measures: the Base next to each
   test, a chart, per-server figures (utilization, temperature, headroom, DPF) and, for 6.1
   and 6.4, every workload's original and new server and zone.
 - *Output files* shows every CSV a run wrote, as it is, with a download for each: pick the
@@ -65,30 +69,19 @@ than the whole-day plan; the whole-day model itself is unchanged.
 - When a test ends with the same optimized schedule as its Base (every workload on the same
   server, starting in the same period), the scenario page and *Test charts* say so, so equal
   figures don't look like a mistake.
-- 2 servers is one configuration: two mid servers (`results/servers2/`). 6.2 does not apply
-  to it (no server with a cold plate).
+- 2 servers is one configuration: two mid servers. 6.2 does not apply to it (no server with
+  a cold plate).
 - A run is matched to its test by its settings, so runs from the batch notebook show under
   their test whatever their folder name.
 - Removed from the site: the run picker, the nine Chapter 5 *Tables* (*Output files* has the
   same data), *Inputs*, *Upload results* and *New run*. *Run summary* and the Chapter 5
   *Charts* are now *Test charts*. The *Validation* page is kept in the code but not
   shown. To put a run on the site, send its zip (the notebooks write one) to the project owner.
-- The runs kept on the site have short names: `results/servers10/base`, `s1_t1_zones`,
-  `s2_t1_crac`, ... and `results/servers6/`. Their `summary.json` still records the name they
-  were solved under. The 10-server runs are the 1800 s solves of `thesis10`; 6.4 Test 3b
-  (deeper carbon swing) is the 600 s `thesis10_swing` run, and the two 6-server runs are the
-  600 s `consolidated6` runs. The five validation runs are `results/servers10/v_*`.
-- Every other run (the 600 s solves replaced at 1800 s, `thesis10_tight`, `_warm`, the other
-  `_swing` run and the earlier `archive-*` folders) moved to `archive/results_2026-10-25/`.
-- New scenarios, built by the cleaning notebook: `servers2` (two 2.4 GHz servers, one per
-  zone, no cold plate, 123 workloads: drawn until peak demand is 60% of the fleet, as for
-  every scenario), and `consolidated6_swing` and `servers2_swing`, the 6- and 2-server
-  fleets with the carbon swing of `thesis10_swing`, for 6.4 Test 3b. The other scenarios are
-  unchanged.
-- The missing Chapter 6 runs, 6.3 Test 1 on 10 servers, the other 11 tests on 6 servers and
-  the 10 tests on 2 servers, are solved with a 600 s time limit. The 10-server runs solved
-  at 1800 s are solved again at 600 s, so every Chapter 6 run has the same limit; the 1800 s
-  runs move to `archive/`.
+- **Per-tick runs on the site.** The solver outcome of a per-tick run reads *Every tick
+  solved*, or how many ticks stopped at the cap with the worst tick's MIP gap, instead of
+  *proven best* or a whole-day gap. Its test page shows the solve time, the worst tick's gap
+  and the ticks at the cap, with a chart of every tick's solve time; the tables show the
+  per-tick cap instead of the whole-day time limit.
 
 ## 1.2.1 (2026-10-22)
 

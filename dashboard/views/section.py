@@ -24,8 +24,8 @@ NOT_APPLICABLE = {"regroup": "it needs two servers of the same tier to regroup",
                   "cold_plates": "it needs a server with a cold plate (a fast, 3000 MHz "
                                  "server)"}
 # Rows under the measures in the comparison table: key -> label.
-RUN_ROWS = {"run": "Run folder", "status": "Solver status", "time_limit_s": "Time limit (s)",
-            "release": "Release"}
+RUN_ROWS = {"run": "Run folder", "status": "Solver status",
+            "time_limit_s": "Time limit (s; per tick: the cap of each tick)", "release": "Release"}
 # Sections that list every workload's original and new server.
 MOVES = {"6.1", "6.4"}
 
@@ -55,7 +55,9 @@ def _comparison(rows: pd.DataFrame, section: str, changes: bool) -> pd.DataFrame
                 text += f" ({pct.at[i, k]:+.1f} %)"
             values.append(text)
         values += [r["run"] if ran else "–", status_cell(r),
-                   fmt_value("time_limit_s", r["time_limit_s"]) if ran else "–",
+                   (fmt_value("time_limit_s", r["tick_time_limit_s"]
+                              if pd.notna(r.get("tick_time_limit_s")) else r["time_limit_s"])
+                    if ran else "–"),
                    r["release"] if ran else "–"]
         out[col] = values
     return pd.DataFrame(out)

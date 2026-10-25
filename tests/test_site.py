@@ -68,12 +68,12 @@ def test_across_both_is_never_offered():
 
 def test_picking_a_configuration_carries_to_the_next_page():
     at = _section("6.1").run()
-    assert at.segmented_control(key="config-6.1").value == "servers10"   # first visit
+    assert at.segmented_control(key="config-6.1").value == "servers6"    # first fleet with runs
     assert at.segmented_control(key="level-6.1").value == "normal"
-    at.segmented_control(key="config-6.1").set_value("servers6").run()
+    at.segmented_control(key="config-6.1").set_value("servers2").run()
     _ok(at)
-    assert at.session_state["config"] == "servers6"
-    assert at.query_params["config"] == "servers6"
+    assert at.session_state["config"] == "servers2"
+    assert at.query_params["config"] == "servers2"
 
     other = _section("6.4")
     at.segmented_control(key="level-6.1").set_value("heavy").run()
@@ -81,7 +81,7 @@ def test_picking_a_configuration_carries_to_the_next_page():
     other.session_state["config"] = at.session_state["config"]
     other.session_state["level"] = at.session_state["level"]
     other.run()
-    assert other.segmented_control(key="config-6.4").value == "servers6"
+    assert other.segmented_control(key="config-6.4").value == "servers2"
     assert other.segmented_control(key="level-6.4").value == "heavy"
 
 
@@ -183,3 +183,16 @@ def test_scenario_page_says_which_tests_keep_the_base_schedule():
     at.session_state["level"] = "light"
     at.run()
     assert any("same optimized schedule" in c.value for c in at.caption)
+
+
+def test_per_tick_run_shows_its_ticks():
+    """A per-tick run's solver block counts the ticks at the cap and charts every tick, and
+    says nothing of a whole-day time limit or best bound."""
+    at = _charts("servers6", "6.1", "Test 1", level="heavy")
+    _ok(at)
+    labels = {m.label for m in at.metric}
+    assert {"Ticks at the cap", "Worst tick's MIP gap"} <= labels
+    assert "Best bound" not in labels
+    assert next(m.value for m in at.metric if m.label == "Ticks at the cap").endswith("of 288")
+    assert any("Re-planned at each of 288 ticks" in c.value for c in at.caption)
+    assert not any("Time limit:" in md.value for md in at.markdown)

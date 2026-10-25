@@ -78,7 +78,7 @@ view. *Test charts* keeps its scenario, test and topic the same way
 
 | Page | What it shows |
 |---|---|
-| **Chapter 6 › Overview** | which test has a run in each configuration (✅ proven best, ⏱ stopped at the time limit with its gap, · not run yet, n/a not applicable), and every result of every configuration in one table, downloadable as CSV |
+| **Chapter 6 › Overview** | which test has a run in each configuration (per-tick runs: ✅ every tick solved, ⏱ ticks stopped at the per-tick cap with the worst tick's gap; whole-day runs: ✅ proven best, ⏱ stopped at the time limit with its gap; · not run yet, n/a not applicable), and every result of every configuration in one table, downloadable as CSV |
 | **Chapter 6 › 6.1 to 6.4** | one page per scenario, with its question and goal. For a configuration: the Base next to each test, one row per measure the scenario asks for (with the change against the Base on request), a chart, per-server figures (utilization, temperature, headroom, DPF, periods slowed) and, for 6.1 and 6.4, every workload's original and new server and zone. *Across configurations*: one measure for every configuration and test, as a table and a chart. Everything downloads as CSV |
 | **Test charts › Charts and key results** | one test of one configuration: pick the scenario, then the test (Base, Test 1, ...). It shows the run's settings, its key results (carbon, energy, hottest server, lowest headroom, missed deadlines, workloads moved) with their change against the Base of its scenario, the solver's outcome and the run's self-checks. Then one topic at a time: **Servers** (utilization, temperature, headroom, effective capability, IT power and DPF per server, and a temperature heatmap), **Cooling** (CRAC supply temperature and energy per zone; coolant and flow of the cold plates in 6.2), **Energy and carbon** (energy by component, carbon and carbon intensity per period) and **Workloads** (a Gantt chart with filters). The Base's optimized schedule is drawn dashed; switch it off with *Base dashed*. When a test has the same schedule as the Base, the page says so |
 | **Outputs › Output files** | every CSV of a run, as the run wrote it: pick the configuration, the run (named by its test; the validation runs `v_…` and older solves of a test come after) and the file. Each file downloads as it is. A warning shows if the run was solved on a different build of its scenario than the one in `scenarios/` |
@@ -89,9 +89,10 @@ view. *Test charts* keeps its scenario, test and topic the same way
 Every comparison is with the Base test of the same scenario and configuration: 6.2 compares
 with its own Base (both cooling systems optimized), 6.1, 6.3 and 6.4 with the shared Base. The
 heuristic baseline schedule each run also writes (`baseline/`) is on *Output files* only.
-Many tests end with the same optimized schedule as the Base (most runs stop at their time
-limit), so their charts look the same; the scenario page and *Test charts* say when that
-happens.
+A test can end with the same optimized schedule as the Base (in the per-tick runs, 6.1
+Test 1 on the light day), so their charts look the same; the scenario page and *Test charts*
+say when that happens. For a per-tick run, *Test charts* also shows the solve time of every
+tick and how many stopped at the per-tick cap.
 
 Most charts are interactive. Hover for values, drag to zoom, and double-click to reset.
 

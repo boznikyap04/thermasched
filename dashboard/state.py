@@ -130,13 +130,21 @@ def pick_scope(page: str, across: bool = False) -> Scope:
         fleet = _picker(CONFIG_KEY, "Servers",
                         fleets + ([ACROSS] if across and st.session_state.get(LEVEL_KEY) != ACROSS
                                   else []),
-                        page, fleets[0],
+                        page, first_fleet_with_runs(),
                         lambda k: ACROSS_FLEETS_LABEL if k == ACROSS else ex.FLEETS[k].size_label)
         level = _picker(LEVEL_KEY, "Load level",
                         levels + ([ACROSS] if across and fleet != ACROSS else []),
                         page, ex.NORMAL,
                         lambda k: ACROSS_LEVELS_LABEL if k == ACROSS else ex.LEVEL_BY_KEY[k].label)
     return Scope(fleet, level)
+
+
+def first_fleet_with_runs() -> str:
+    """The fleet a first visit opens on: the first (10, 6, 2 servers) with a run under
+    results/, so the site never opens on an empty page; the first fleet when none has."""
+    with_runs = {ex.CONFIGURATION_BY_KEY[k].fleet_key
+                 for k in data.config_runs(discover_runs()) if k in ex.CONFIGURATION_BY_KEY}
+    return next((f for f in ex.FLEETS if f in with_runs), next(iter(ex.FLEETS)))
 
 
 def pick_config(page: str) -> ex.Configuration:
