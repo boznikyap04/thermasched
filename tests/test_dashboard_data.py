@@ -562,6 +562,23 @@ def test_per_tick_solver_wording():
     assert data.solver_short(PER_TICK_SOLVER) == "Stopped at time limit, gap 24.62 %"
 
 
+def test_per_tick_ticks_without_a_bound(tmp_path):
+    """Ticks at the cap that stopped before the solver had a bound: their gap is unknown, so
+    the wording counts them apart and ticks.csv keeps their gap empty."""
+    some = TICKS | {"n_ticks_no_bound": 2}
+    assert data.solver_short(PER_TICK_SOLVER, some) == \
+        "48 of 288 ticks at the cap, worst gap 24.62 %, 2 with no bound"
+    assert "except 2 that stopped before the solver had a bound" in \
+        data.solver_sentence(PER_TICK_SOLVER, some)
+    assert "how close their plans are to the best is unknown" in \
+        data.solver_sentence(PER_TICK_SOLVER, TICKS | {"n_ticks_no_bound": 48})
+    (tmp_path / "ticks.csv").write_text("tick,status,solve_s,mip_gap,n_waiting\n"
+                                        "1,optimal,0.5,,0\n2,time_limit,61.0,,3\n"
+                                        "3,time_limit,60.5,0.1,4\n")
+    gap = data.load_ticks(tmp_path)["mip_gap"]
+    assert gap[0] == 0.0 and pd.isna(gap[1]) and gap[2] == 0.1
+
+
 def test_per_tick_run_in_the_chapter6_table(loaded):
     ref = BY_KEY[SERVERS6_BASE]
     summary = data.load_summary(ref.path)

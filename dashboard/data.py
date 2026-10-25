@@ -595,14 +595,21 @@ def ticks_at_cap(ticks: dict) -> int:
     return int(ticks.get("n_ticks_time_limit") or 0)
 
 
+def ticks_no_bound(ticks: dict) -> int:
+    """Ticks at the cap stopped before the solver had a bound: their gap is unknown."""
+    return int(ticks.get("n_ticks_no_bound") or 0)
+
+
 def load_ticks(run_dir: str | Path) -> pd.DataFrame | None:
     """ticks.csv of a per-tick run (one row per tick: status, solve_s, mip_gap, n_waiting,
-    ...); None when the run has none."""
+    ...); None when the run has none. A tick at the cap with no gap stopped before the solver
+    had a bound: its gap stays NaN (unknown)."""
     path = Path(run_dir) / "ticks.csv"
     if not path.is_file():
         return None
     df = pd.read_csv(path)
-    df["mip_gap"] = pd.to_numeric(df["mip_gap"], errors="coerce").fillna(0.0)
+    gap = pd.to_numeric(df["mip_gap"], errors="coerce")
+    df["mip_gap"] = gap.where(gap.notna() | (df["status"] == STATUS_TIME_LIMIT), 0.0)
     return df
 
 
@@ -616,8 +623,10 @@ def solver_short(solver: dict, ticks: dict | None = None) -> str:
         n, cap = ticks.get("n_ticks"), ticks_at_cap(ticks)
         if not cap:
             return "Every tick solved"
+        nb = ticks_no_bound(ticks)
         return f"{cap} of {n} ticks at the cap" + (
-            f", worst gap {gap * 100:.2f} %" if gap is not None else "")
+            f", worst gap {gap * 100:.2f} %" if gap is not None else "") + (
+            f", {nb} with no bound" if nb else "")
     text = status_text(status)
     if status == STATUS_TIME_LIMIT and gap is not None:
         text += f", gap {gap * 100:.2f} %"
@@ -637,9 +646,17 @@ def solver_sentence(solver: dict, ticks: dict | None = None) -> str:
         if not cap:
             body = "Every tick was solved to the requested gap. "
         else:
+            nb = ticks_no_bound(ticks)
             body = (f"{n - cap} ticks were solved to the requested gap and {cap} stopped at the "
                     f"{limit:g} s per-tick cap; the worst of these is within "
                     f"{(gap or 0) * 100:.2f} % of the best plan for what that tick could see. ")
+            if nb == cap:
+                body = (f"{n - cap} ticks were solved to the requested gap and {cap} stopped at "
+                        f"the {limit:g} s per-tick cap before the solver had a bound, so how "
+                        "close their plans are to the best is unknown. ")
+            elif nb:
+                body = body[:-2] + (f", except {nb} that stopped before the solver had a bound, "
+                                    "whose gap is unknown. ")
         return body.join([head, "Each tick sees only the workloads that have arrived, so the "
                           "day as a whole is not proven best."])
     if status == STATUS_OPTIMAL:
