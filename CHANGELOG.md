@@ -16,8 +16,9 @@ run.
 
 ## Unreleased
 
-**Re-run:** cleaning, then solver. The model is unchanged, but the cleaned data and the
-scenarios are rebuilt with 64 GB per server.
+**Re-run:** cleaning, then solver. The cleaned data and the scenarios are rebuilt with 64 GB
+per server, and the notebooks now re-plan per tick by default, which gives other schedules
+than the whole-day plan; the whole-day model itself is unchanged.
 
 - **64 GB per server.** Each UniMelb host has 64 GB of memory, not 516 GB: `data/clean/` and
   the scenarios are rebuilt with 66,036 MB per server. Workloads on hosts that never report
@@ -38,6 +39,13 @@ scenarios are rebuilt with 64 GB per server.
   `archive/results_2026-10-25_whole_day/`, the staged 1.2.1 runs (solved on 516 GB servers,
   invalid) to `archive/runs_staging_516GB_invalid/`, and the 1.0.0 run logs to
   `archive/logs_1.0.0/`.
+- **Per-tick re-planning** (`--per-tick`, in the notebooks `per_tick=True`, their new default):
+  the optimizer re-plans at every 5-minute period with only the workloads that have arrived,
+  keeps that period's decisions and moves on, carrying the running workloads, the server
+  temperatures and the supply-ramp history from tick to tick. Each tick has its own time limit
+  (`--tick-time-limit`, 60 s); the run saves its state after every tick and resumes when run
+  again; a tick with no valid schedule stops the run and names the limit. The whole-day plan
+  stays available with the switch off.
 - The site shows only the four Chapter 6 scenarios. The sidebar lists the pages: the
   Chapter 6 *Overview* (which test has a run in each configuration, and every result in one
   CSV), one page per scenario, 6.1 to 6.4, and *Output files*.

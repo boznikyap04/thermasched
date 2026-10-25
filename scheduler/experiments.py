@@ -242,8 +242,10 @@ def switches_for(test: Test, config: Configuration) -> dict:
 # Matching a run to its configuration and tests
 # ---------------------------------------------------------------------------
 
-# Settings that never decide a test: names, solver limits, and the seed of a rule not used.
-IGNORED = frozenset({"scenario", "run_name", "time_limit_s", "mip_rel_gap", "seed"})
+# Settings that never decide a test: names, solver limits, the seed of a rule not used, and
+# whether the optimizer re-plans every tick or plans the whole day at once.
+IGNORED = frozenset({"scenario", "run_name", "time_limit_s", "mip_rel_gap", "seed", "per_tick",
+                     "tick_time_limit_s"})
 
 
 def configuration_of(scenario: str | None) -> tuple[Configuration, dict] | None:

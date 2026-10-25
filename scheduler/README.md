@@ -48,7 +48,47 @@ uv run python -m scheduler.run --scenario servers6 --cold-plate-count 1 --run-na
 
 # baseline only, no optimization
 uv run python -m scheduler.run --scenario servers6 --baseline-only
+
+# per-tick re-planning (what the results use), stopping after 5 h; the same command resumes
+uv run python -m scheduler.run --scenario servers6 --per-tick --wall-time-limit 18000
 ```
+
+### Per-tick re-planning
+
+With `--per-tick` the optimizer does not plan the whole day at once
+([`docs/PLAN.md`](../docs/PLAN.md) section 2). At every period t (a *tick*) it solves the
+same MILP from t to the end of the horizon with only what is known at t: the workloads that
+have arrived and not started, the running ones (server and start fixed, only their remaining
+work), each server's temperature at the end of t - 1 as T0, the supply temperatures of the
+last hour as fixed history for the ramp limits, and the carbon intensity of every remaining
+period. It keeps only period t's decisions (which workloads start and where, each zone's
+supply temperature, the cold-plate settings) and moves on. Period t is then played out with
+the evaluator's physics, and a running workload ends once it has delivered its work. The
+kept decisions of all ticks are the schedule, which the evaluator scores like any other. The
+baseline is the same as in a whole-day run. The code is in `pertick.py`.
+
+- `--tick-time-limit` (default 60 s) is the HiGHS time limit of each tick; `--mip-gap`
+  applies to each tick, `--time-limit` does not apply. The run name ends in `_pertick` (and
+  `_ttl<s>` for another tick limit).
+- The state is saved after every tick in `<run folder>/checkpoint/`. Running the same
+  command again resumes from it (other settings are refused); the folder is deleted when the
+  run ends. A resumed run gives the same schedule as an unbroken one, as long as no tick
+  stops at its time limit (a solve cut off by time can differ between any two runs).
+- `--wall-time-limit S`: after a tick, if S seconds have passed, save and exit with code 3.
+  The folder then holds `checkpoint/` and `ticks.csv` but no `summary.json`.
+- A tick with no valid schedule stops the run with exit code 4. Nothing is relaxed; the
+  tick is diagnosed (one group of limits relaxed at a time, plus the ramp history), and
+  `summary.json` (`per_tick.stuck`) and the printout name the tick and the limit.
+  `partial_schedule.csv` lists the starts kept before it.
+- `ticks.csv` has one row per tick: status, solve time, gap, workloads waiting, started this
+  tick, running, arrived and done, the window's objective, the tick's own carbon, model size.
+- `summary.json` has `"mode": "per_tick"` and a `per_tick` block (ticks, slowest tick,
+  ticks at the time limit, outcome). The solver status is `optimal` when every tick was, the
+  gap is the largest of any tick, and the objective is the sum of each tick's own carbon,
+  which the checks compare with the evaluator's.
+
+Exit codes of `scheduler.run`: 0 done, every check passed; 1 done, a check failed; 2 a switch
+that is not defined yet; 3 stopped by `--wall-time-limit`; 4 stuck at a tick.
 
 To run the same steps one at a time, with tables and charts in between, open
 [`notebooks/solver.ipynb`](../notebooks/solver.ipynb) (see the
@@ -108,6 +148,9 @@ One period is 5 minutes. Scenarios built in `notebooks/solver.ipynb` (see
 | `--no-warm-start` | off | don't give the solver a starting schedule |
 | `--solver-log` | off | print the HiGHS log |
 | `--diagnosis-time-limit` | `120` | seconds per relaxed re-solve when the model is infeasible |
+| `--per-tick` | off | re-plan at every period with only the arrived workloads (see [Per-tick re-planning](#per-tick-re-planning)) |
+| `--tick-time-limit` | `60` | per tick: HiGHS time limit of each tick's solve, seconds |
+| `--wall-time-limit` | none | per tick: after a tick, save the checkpoint and exit with code 3 once this many seconds have passed |
 
 Run `uv run python -m scheduler.run --help` for the full list.
 
@@ -131,6 +174,8 @@ Each run folder contains:
   whether it moved, whether the move crossed zones, and a reason. The reason is a reading
   of the scored schedule (original server full, faster server, less IT energy, cooler
   server, zone with higher COP); the solver itself only minimises carbon.
+- Per tick only: `ticks.csv` (one row per tick), `checkpoint/` while the run is not finished,
+  and `partial_schedule.csv` when a tick got stuck.
 
 ## 5. Thesis scenarios (Ch. 6)
 
@@ -257,7 +302,8 @@ The figures in these points come from the whole-day runs on the earlier 516 GB s
 - **Server availability, Eq. (11)** comes from an optional `availability.csv` (`s, t, AV`);
   unlisted server-periods are available. An unavailable server takes no work but stays on
   at idle power. Running workloads (B_i = 1) keep their server, Eq. (29), but may still
-  be shifted in time.
+  be shifted in time. Per tick, a workload's start is fixed from the tick it starts in; a
+  B_i = 1 workload keeps its server and starts when a tick starts it.
 - **Not modelled:** fan power and airflow (`--fan-power` exits with "not defined yet"; decided
   with the thesis group on 2026-10-22) and turning servers on and off (every server stays on
   and draws idle power, so a move changes only the power a workload adds above idle).

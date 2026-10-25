@@ -261,6 +261,9 @@ class RunSettings:
     ci_flat: bool = False                      # CI_t held at the scenario's mean
     # slot that is not defined yet
     fan_power: bool = False
+    # per-tick re-planning (docs/PLAN.md section 2): re-solve every period, keep its decisions
+    per_tick: bool = False
+    tick_time_limit_s: float = 60.0            # HiGHS time cap of each tick's solve
 
     def validate(self) -> None:
         if self.baseline_rule not in BASELINE_RULES:
@@ -282,6 +285,8 @@ class RunSettings:
                 raise ValueError("cold_plate_count is set but cold_plates is off")
             if self.cold_plate_count < 0:
                 raise ValueError("cold_plate_count must be 0 or more")
+        if not self.tick_time_limit_s > 0:
+            raise ValueError("tick_time_limit_s must be positive")
         if self.fan_power:
             raise NotDefinedYet(
                 "fan_power: not defined yet. The model document has no fan-power "
