@@ -35,8 +35,8 @@ SECTIONS = ("6.1", "6.2")
 # The run of the timing confirmation (docs/PLAN.md §5 item 3): heavy day, 6.1 Base.
 TIMING_RUN = "servers6_heavy__base"
 
-# Per-tick solve-time cap, seconds; None leaves the per-tick mode's default. Set it from the
-# timing run before the batch starts (docs/PLAN.md §5 item 3).
+# Per-tick solve-time cap, seconds; None leaves the per-tick mode's default of 60 s, the cap
+# chosen after the timing run (docs/PLAN.md §5 item 3).
 TICK_TIME_LIMIT_S: float | None = None
 # Stop after the current tick and save the checkpoint once this much time has passed, so a
 # job saves its state before GitHub's 6-hour limit stops it: 5 h 30 min.

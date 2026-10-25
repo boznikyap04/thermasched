@@ -230,6 +230,12 @@ names, is `<scenario>__<test id>`, e.g. `servers6_heavy__base`.
    valid schedule; it only makes the run timing-dependent (see *Same schedule on resume*).
 3. **Time one heavy-day run** on this machine (6.1 Base, `servers6_heavy`) and set the
    per-tick cap from it with margin; the first Actions job confirms it on the 4-core runner.
+   **Done (2026-10-26).** `servers6_heavy` 6.1 Base, per-tick, 60 s cap: 288 ticks in 19.7
+   min, all 288 solved to the 0.1 % gap, none at the cap; slowest ticks 49.6 s (tick 131) and
+   40.0 s, 11 ticks over 20 s; up to 36 workloads waiting. Evaluator: no violations, 0 late;
+   carbon 22,044 g (baseline) → 18,670 g (−15.3 %). **Cap: 60 s** (the default; the owner's
+   choice). On the slower runners a few midday ticks may reach it; `ticks.csv` of each run
+   shows any that did, and such a run is valid but timing-dependent.
 4. **Add the GitHub Actions workflow** for the 18 jobs: a matrix of 18, resume from the
    checkpoint, upload each run folder. It starts on a push to a dedicated runs branch, so
    `main` and `release` are not touched. **Done (thread D, 2026-10-25), not run:**
@@ -260,7 +266,6 @@ separate go.
 
 ## 6. Open items
 
-- The per-tick solve-time cap (after the timing run).
 - When to add the 10- and 2-server fleets, 6.3 and 6.4, and the validation runs.
 - The tests that read whole-day runs (`tests/test_validate.py`) now skip; they need per-tick
   runs or a rewrite.
@@ -290,10 +295,10 @@ All on 2026-10-25.
 | First batch | 6 servers × light/normal/heavy × 6.1 and 6.2 = 18 runs |
 | Validation runs | left out for now |
 | Where to run | GitHub Actions |
-| Per-tick cap | set after timing one heavy run |
+| Per-tick cap | 60 s, after the heavy timing run (2026-10-26) |
 | Deployed site | unchanged until the per-tick release |
 | Whole-day results and staged 516 GB runs | moved to `archive/` |
 | Scenarios to rebuild now | the three 6-server ones only |
 | How the work is split | one thread per phase (A, B, D); this planning thread coordinates |
 | Where to time the cap | this machine first, confirmed by the first Actions job |
-| Start | not yet: nothing starts until the owner says go |
+| Start | A, B, D went ahead 2026-10-25; push and all 18 runs at once: go on 2026-10-26 |
