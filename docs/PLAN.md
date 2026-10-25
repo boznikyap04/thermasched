@@ -101,6 +101,40 @@ downloaded as a zip and unzipped into `results/`.
   6 hours can resume; one heavy run is timed first to set the per-tick solve-time cap.
 - **Visibility:** workflow logs and run artifacts of a public repository are public. The
   results are meant for the public site anyway; the thesis PDFs are never in the repository.
+  The jobs check out only `pyproject.toml`, `uv.lock`, `scheduler/`, `tools/` and
+  `scenarios/` (no `docs/`, no README), and upload only run folders.
+
+### How to start, resume and collect
+
+The workflow is `.github/workflows/per-tick-batch.yml`; its run list comes from
+`tools/runlist.py` (`uv run python tools/runlist.py` prints the 18 runs and their commands).
+Each run is `python -m scheduler.run --scenario <scenario> --run-name <test id> <switches>
+--per-tick [--tick-time-limit S] --wall-time-limit 19800`. Its id, used for job and artifact
+names, is `<scenario>__<test id>`, e.g. `servers6_heavy__base`.
+
+- **Before starting:** the three servers6 scenarios (A) and the per-tick mode (B) are merged,
+  and the per-tick cap is set in `TICK_TIME_LIMIT_S` in `tools/runlist.py` (or given at start).
+- **Timing confirmation (one job):** Actions → "per-tick batch" → Run workflow, on branch
+  `per-tick-runs`, `batch` = `timing`: runs only `servers6_heavy__base` (6.1 Base, heavy day).
+  `tick_time_limit` overrides the cap for this start.
+- **The whole batch:** push to the branch `per-tick-runs` (never `main` or `release`), or Run
+  workflow with `batch` = `all`. `runs` takes a list of run ids to run only those.
+- **Each job** solves for up to 5 h 30 min (`--wall-time-limit`), then uploads its run folder,
+  checkpoint included, as artifact `run-<id>`. Exit 0 passes, 1 passes with a warning (failed
+  checks), 3 (wall-time stop) or a job stopped by its step limit fails with "needs a resume"
+  and leaves a marker artifact `resume-<id>`, 4 (stuck tick) fails with an error; summary.json
+  names the limit.
+- **Resume:** Run workflow with `resume_from_run_id` = the earlier run's id (the number in its
+  URL, `.../actions/runs/<id>`). With `runs` empty it resumes every job that left a
+  `resume-<id>` marker; with `runs` it resumes those. Each job downloads `run-<id>` of the
+  earlier run and re-runs the identical command, which continues from the checkpoint. Keep
+  the same `tick_time_limit` as the earlier run. Artifacts expire after 90 days.
+- **Collect:** the last job, `collect results`, merges the run folders into one artifact,
+  `per-tick-results`, laid out as `results/<scenario>/<run-name>/`. After a resume it starts
+  from the earlier run's `per-tick-results`, so the newest one holds every run. Download it
+  from the run's page (or `gh run download <run id> -n per-tick-results -D .` in the repo
+  root), and unzip it in the repo root. The job summary lists each folder as finished or not
+  finished; a folder with `checkpoint/` is not finished and stays out of `results/`.
 
 ## 5. Work items, in order
 
@@ -134,7 +168,10 @@ downloaded as a zip and unzipped into `results/`.
    per-tick cap from it with margin; the first Actions job confirms it on the 4-core runner.
 4. **Add the GitHub Actions workflow** for the 18 jobs: a matrix of 18, resume from the
    checkpoint, upload each run folder. It starts on a push to a dedicated runs branch, so
-   `main` and `release` are not touched.
+   `main` and `release` are not touched. **Done (thread D, 2026-10-25), not run:**
+   `.github/workflows/per-tick-batch.yml` and `tools/runlist.py` (`tests/test_runlist.py`),
+   checked with `actionlint`; see "How to start, resume and collect" in §4. Its argv parse test
+   with `--per-tick` skips until B lands.
 5. **Push and start it.** This is the first step that publishes anything, and it needs the
    project owner's go.
 6. **Put the results into `results/`** and check them on the local site.
