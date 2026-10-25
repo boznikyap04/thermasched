@@ -3,7 +3,8 @@
     uv run streamlit run dashboard/app.py
 
 Reads the run outputs under results/<configuration>/<run>/ and shows the four Chapter 6
-scenarios (6.1 to 6.4) for 10, 6 and 2 servers, plus every output CSV as it is. Read-only.
+scenarios (6.1 to 6.4) for 10, 6 and 2 servers, the charts and key results of each test
+against its Base, and every output CSV as it is. Read-only.
 """
 
 from __future__ import annotations
@@ -43,7 +44,7 @@ def _drop_stale_modules() -> None:
 
 _drop_stale_modules()
 
-from dashboard.views import chapter6, files, section  # noqa: E402
+from dashboard.views import chapter6, detail, files, section  # noqa: E402
 from scheduler import experiments as ex  # noqa: E402
 from scheduler.version import VERSION  # noqa: E402
 
@@ -63,6 +64,10 @@ def main() -> None:
             *(st.Page(section.page(s.key), title=f"{s.key} {section.SHORT_TITLES[s.key]}",
                       icon=section.ICONS[s.key], url_path=f"section-{s.key.replace('.', '-')}")
               for s in ex.SECTIONS),
+        ],
+        "Test charts": [
+            st.Page(detail.render, title="Charts and key results", icon=":material/monitoring:",
+                    url_path="test-charts"),
         ],
         "Outputs": [
             st.Page(files.render, title="Output files", icon=":material/table_view:",

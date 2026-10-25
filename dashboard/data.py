@@ -11,6 +11,7 @@ There is no Streamlit here so the loaders can be tested directly; the UI caches 
 
 from __future__ import annotations
 
+import dataclasses
 import json
 import os
 from dataclasses import dataclass, field
@@ -32,13 +33,32 @@ VALIDATION_DIR = RESULTS_DIR / "validation"
 
 VARIANTS = ("baseline", "optimized")
 VARIANT_LABELS = {"baseline": "Baseline", "optimized": "Optimized"}
+# The variant name of the Base in against_base: the test charts draw it dashed.
+BASE_LABEL = "Base"
 
+# Energy components in stacking order: column -> label.
+ENERGY_COMPONENTS = {
+    "E_IT_kWh": "IT",
+    "E_crac_kWh": "CRAC",
+    "E_cp_kWh": "Cold-plate pumps",
+    "E_fan_kWh": "Fans",
+}
 
 # Workload types as written in schedule.csv.
 WORKLOAD_TYPES = {"time_sensitive": "Time-sensitive", "delay_tolerant": "Delay-tolerant"}
 
+# Constraint families relaxed one at a time by scheduler.optimize.diagnose_infeasibility.
+RELAX_FAMILY_LABELS = {
+    "deadlines_and_waiting": "Deadlines and waiting limits, Eq. (27)-(28)",
+    "thermal_cap": "Thermal cap T <= T_max - H_min, Eq. (31)-(33)",
+    "capacity": "CPU and memory capacity, Eq. (12)-(13)",
+    "cooling_capacity": "CRAC cooling capacity, Eq. (54)",
+    "priority": "Priority order, Eq. (56)-(57)",
+}
+
 # Monday 2000-01-03 as a dummy date: only the clock time is shown.
 CLOCK_ORIGIN = pd.Timestamp("2000-01-03")
+ZERO_TOL = 1e-12
 
 
 # ---------------------------------------------------------------------------
@@ -171,6 +191,19 @@ def load_clock(scenario: str, T: int, dt_seconds: float,
     t["time"] = hours_to_clock(t["hour_local"])
     t["clock"] = t["time"].dt.strftime("%H:%M")
     return t
+
+
+def period_bounds(clock: pd.DataFrame, dt_seconds: float):
+    """Function t -> Timestamp of the *start* of period t, extrapolated past 1..T.
+
+    Used for schedule bars: a workload starting in period ``start`` with exclusive end
+    ``finish`` spans ``bound(start)`` to ``bound(finish)``.
+    """
+    t0 = clock["time"].iloc[0] - pd.Timedelta(seconds=dt_seconds / 2)
+
+    def bound(t):
+        return t0 + pd.to_timedelta((np.asarray(t, dtype=float) - 1) * dt_seconds, unit="s")
+    return bound
 
 
 # ---------------------------------------------------------------------------
@@ -334,6 +367,167 @@ def _max_t(path: Path) -> int:
 # Derived views
 # ---------------------------------------------------------------------------
 
+def is_all_zero(series: pd.Series) -> bool:
+    """True when a column has no non-zero number (all zero, blank or non-numeric)."""
+    values = pd.to_numeric(series, errors="coerce").to_numpy(float)
+    return bool(np.all(np.isnan(values) | (np.abs(values) <= ZERO_TOL)))
+
+
+def nonzero_columns(df: pd.DataFrame, columns) -> list[str]:
+    """The given columns that exist in ``df`` and are not all zero, in the given order."""
+    return [c for c in columns if c in df and not is_all_zero(df[c])]
+
+
+def active_energy_components(run: Run) -> list[str]:
+    """Energy columns with any non-zero value in any variant (E_IT and E_crac always)."""
+    always = ["E_IT_kWh", "E_crac_kWh"]
+    extra = nonzero_columns(run.period, [c for c in ENERGY_COMPONENTS if c not in always])
+    return always + extra
+
+
+# (key, label, unit, better) for the key results tiles; better is "lower", "higher" or
+# "neutral".
+KPIS = [
+    ("carbon_kg", "Total carbon", "kg CO₂", "lower"),
+    ("E_total_kWh", "Total energy", "kWh", "lower"),
+    ("E_IT_kWh", "IT energy", "kWh", "lower"),
+    ("E_crac_kWh", "CRAC energy", "kWh", "lower"),
+    ("E_cp_kWh", "Cold-plate pumps", "Wh", "lower"),
+    ("hottest_T_C", "Hottest server", "°C", "lower"),
+    ("min_headroom_C", "Lowest headroom", "°C", "higher"),
+    ("n_late", "Missed deadlines", "", "lower"),
+    ("n_reassigned", "Workloads moved", "", "neutral"),
+]
+# Stored in kWh but shown in Wh: the pumps use a fraction of a watt-hour a day.
+KPI_SCALE = {"E_cp_kWh": 1000.0}
+
+
+def _optimized_metrics(summary: dict | None) -> dict:
+    if not summary or not summary.get("has_optimized_schedule"):
+        return {}
+    return (summary.get("optimized") or {}).get("metrics", {})
+
+
+def kpi_frame(summary: dict, base: dict | None = None) -> pd.DataFrame:
+    """One row per KPI of the optimized schedule: key, label, unit, better, value, base,
+    diff, pct.
+
+    ``base`` is the summary of the run to compare with (the Base of the test's section);
+    ``base``/``diff``/``pct`` are NaN without it, ``value`` without an optimized schedule,
+    and ``pct`` when the Base's value is 0. Cold-plate pump energy is dropped when it is zero
+    in both (plates off).
+    """
+    mine, other = _optimized_metrics(summary), _optimized_metrics(base)
+    rows = []
+    for key, label, unit, better in KPIS:
+        v, b = mine.get(key), other.get(key)
+        if key == "E_cp_kWh" and not v and not b:
+            continue
+        scale = KPI_SCALE.get(key, 1.0)
+        v = np.nan if v is None else float(v) * scale
+        b = np.nan if b is None else float(b) * scale
+        diff = v - b
+        pct = diff / abs(b) * 100 if b and not np.isnan(diff) else np.nan
+        rows.append(dict(key=key, label=label, unit=unit, better=better,
+                         value=v, base=b, diff=diff, pct=pct))
+    return pd.DataFrame(rows, columns=["key", "label", "unit", "better", "value", "base",
+                                       "diff", "pct"])
+
+
+def checks_frame(summary: dict) -> pd.DataFrame:
+    """Self-checks: name, label, passed (True/False/None), detail."""
+    rows = []
+    for name, c in (summary.get("checks") or {}).items():
+        c = c if isinstance(c, dict) else {"passed": c}
+        detail = {k: v for k, v in c.items() if k != "passed"}
+        rows.append(dict(name=name, label=name.replace("_", " ").capitalize(),
+                         passed=c.get("passed"),
+                         detail="; ".join(f"{k.replace('_', ' ')}: {_fmt_detail(v)}"
+                                          for k, v in detail.items())))
+    return pd.DataFrame(rows, columns=["name", "label", "passed", "detail"])
+
+
+def _fmt_detail(v) -> str:
+    if isinstance(v, float):
+        return f"{v:,.6g}"
+    if isinstance(v, list):
+        return "none" if not v else "; ".join(map(str, v))
+    return str(v)
+
+
+def infeasibility_frame(summary: dict) -> pd.DataFrame:
+    """family, label, result: one row per constraint family the diagnosis relaxed."""
+    diag = summary.get("infeasibility") or {}
+    return pd.DataFrame(
+        [dict(family=k, label=RELAX_FAMILY_LABELS.get(k, k.replace("_", " ")), result=v)
+         for k, v in diag.items()], columns=["family", "label", "result"])
+
+
+def gantt_lanes(schedule: pd.DataFrame) -> pd.Series:
+    """Lane index per row so workloads running at once on a server get separate rows.
+
+    Greedy interval partitioning per (variant, server) on [start, finish); unplaced
+    workloads (no server or start) get lane -1.
+    """
+    lanes = pd.Series(-1, index=schedule.index, dtype=int)
+    ok = schedule["server"].notna() & schedule["start"].notna() & schedule["finish"].notna()
+    for _, grp in schedule[ok].groupby(["variant", "server"]):
+        ends: list[float] = []
+        for idx, row in grp.sort_values(["start", "finish", "i"]).iterrows():
+            for k, end in enumerate(ends):
+                if end <= row["start"]:
+                    ends[k] = row["finish"]
+                    lanes[idx] = k
+                    break
+            else:
+                ends.append(row["finish"])
+                lanes[idx] = len(ends) - 1
+    return lanes
+
+
+def same_schedule(a: Run, b: Run) -> bool:
+    """True when two runs' optimized schedules put every workload on the same server at the
+    same start. Cooling and carbon can still differ (other zones, another carbon intensity)."""
+    def key(run: Run) -> pd.DataFrame:
+        sch = run.schedule
+        sch = sch[sch["variant"] == "optimized"] if not sch.empty else sch
+        return sch[["i", "server", "start"]].sort_values("i").reset_index(drop=True)
+    if not (a.has_optimized and b.has_optimized):
+        return False
+    ka, kb = key(a), key(b)
+    return len(ka) > 0 and ka.equals(kb)
+
+
+def against_base(run: Run, label: str, base: Run | None = None) -> Run:
+    """The optimized schedule of ``run`` as variant ``label`` and, when given, that of
+    ``base`` as variant BASE_LABEL, in one Run for the test charts (the first variant drawn
+    solid, the Base dashed). The Base's per-server rows take this run's server names and
+    zones, so a test that regroups the zones lines up server by server. The limits (thermal
+    cap, DVFS temperature, H_min) stay this run's."""
+    pairs = [(run, label)]
+    if base is not None and base.has_optimized:
+        pairs.append((base, BASE_LABEL))
+    server_cols = run.servers[["s", "name", "zone", "zone_label", "label"]]
+
+    def stack(attr: str) -> pd.DataFrame:
+        frames = []
+        for r, name in pairs:
+            df = getattr(r, attr)
+            if df.empty or "variant" not in df:
+                continue
+            df = df[df["variant"] == "optimized"].assign(variant=name)
+            if attr == "server_period" and r is not run:
+                df = (df.drop(columns=[c for c in server_cols if c != "s" and c in df])
+                      .merge(server_cols, on="s", how="left"))
+            frames.append(df)
+        return pd.concat(frames, ignore_index=True) if frames else getattr(run, attr).iloc[0:0]
+
+    return dataclasses.replace(
+        run, variants=tuple(name for _, name in pairs), period=stack("period"),
+        server_period=stack("server_period"), zone_period=stack("zone_period"),
+        schedule=stack("schedule"), compliance_zones=stack("compliance_zones"))
+
+
 def throttled_servers(run: Run) -> pd.DataFrame:
     """Servers with DPF < 1 anywhere: variant, s, name, periods_throttled, min_DPF."""
     sp = run.server_period
@@ -354,6 +548,21 @@ def provenance(summary: dict) -> dict:
     """summary.json's provenance block; empty for runs made before release 1.0.0."""
     p = summary.get("provenance")
     return p if isinstance(p, dict) else {}
+
+
+def provenance_caption(summary: dict) -> str:
+    """One line on what made a run: release, where, when, and the scenario build."""
+    p = provenance(summary)
+    if not p:
+        return (f"Made {UNVERSIONED}: this run records no release or scenario build, so it "
+                "cannot be checked against other runs.")
+    where = {"command line": "from the command line", "dashboard": "on the dashboard"}.get(
+        p.get("made_with"), f"in the {p.get('made_with')}")
+    when = str(p.get("created_utc", "")).replace("T", " ").replace("Z", " UTC")
+    return (f"Made with ThermaSched {p.get('thermasched_version')} {where}"
+            + (f" on {when}" if when else "")
+            + (f" (commit {p['git_commit']})" if p.get("git_commit") else "")
+            + f" · scenario build `{p.get('scenario_fingerprint') or UNKNOWN_BUILD}`")
 
 
 def provenance_warnings(summary: dict, scenarios_dir: str | Path = SCENARIOS_DIR) -> list[str]:
@@ -553,6 +762,8 @@ def config_runs(runs: list[RunRef], infos: dict[str, RunInfo] | None = None
 # Columns of the Chapter 6 results table: key -> header (with its unit).
 CHAPTER6_COLUMNS = {
     "configuration": "Configuration",
+    "servers": "Servers",
+    "level": "Load level",
     "section": "Section",
     "tag": "Test",
     "label": "Run",
@@ -589,8 +800,8 @@ CHAPTER6_COLUMNS = {
 }
 # Columns that hold results, for the change against each section's reference.
 CHAPTER6_METRICS = tuple(k for k in CHAPTER6_COLUMNS if k not in {
-    "configuration", "section", "tag", "label", "run", "release", "n_unplaced", "status",
-    "mip_gap", "solve_time_s", "time_limit_s"})
+    "configuration", "servers", "level", "section", "tag", "label", "run", "release",
+    "n_unplaced", "status", "mip_gap", "solve_time_s", "time_limit_s"})
 # What each section measures (the Chapter 6 document's "What to measure"), in its order.
 SECTION_MEASURES = {
     "6.1": ("n_moved_server", "n_moved_zone", "util_mean_pct", "E_crac_zone1_kWh",
@@ -747,7 +958,8 @@ def chapter6_table(runs: list[RunRef], infos: dict[str, RunInfo] | None = None,
             for tag, tid in section.tests:
                 test = ex.TEST_BY_ID[tid]
                 used, _ = cat[(config.key, tid)]
-                row = dict(configuration=config.label, section=section.key, tag=tag,
+                row = dict(configuration=config.label, servers=config.size_label,
+                           level=config.level_label, section=section.key, tag=tag,
                            label=test.name)
                 missing = cell_status(config, test, used)
                 if missing:
@@ -797,6 +1009,38 @@ def _carbon_label(settings: dict) -> str:
     if settings.get("carbon_file"):
         return Path(settings["carbon_file"]).name
     return "flat (mean)" if settings.get("ci_flat") else "scenario"
+
+
+def settings_badges(summary: dict) -> list[tuple[str, str]]:
+    """(label, value) pairs that describe a run's switches, in display order."""
+    st = summary.get("settings", {})
+    supply = (f"fixed at {_supply_fixed(st):g} °C" if st.get("supply_temp_mode") == "fixed"
+              else "optimized")
+    cp = "off"
+    if st.get("cold_plates"):
+        n = st.get("cold_plate_count")
+        cp = "on (servers.csv)" if n is None else f"{n} per server"
+        if st.get("cp_mode") == "fixed":
+            flow = st.get("fixed_cp_flow_Lmin") or st.get("baseline_cp_flow_Lmin")
+            cool = st.get("fixed_cp_coolant_C") or st.get("baseline_cp_coolant_C")
+            cp += f", fixed at {flow:g} L/min, {cool:g} °C"
+    h_min = st.get("H_min_C")
+    carbon = _carbon_label(st)
+    if carbon == "scenario":
+        carbon = f"scenario {(summary.get('scenario') or {}).get('name', '?')}"
+    return [
+        ("Reassignment", str(st.get("reassignment", "?")).replace("_", " ")),
+        ("Server choice", "temperature ignored (two passes)"
+         if st.get("placement") == "thermal_blind" else "temperature-aware"),
+        ("Supply temperature", supply),
+        ("H_min", "scenario default" if h_min is None else f"{h_min:g} °C"),
+        ("Cold plates", cp),
+        ("Zones", "servers.csv" if not st.get("zone_map")
+         else ",".join(map(str, st["zone_map"]))),
+        ("Carbon intensity", carbon),
+        ("Time limit", f"{st.get('time_limit_s', 0):g} s"),
+        ("MIP gap", f"{st.get('mip_rel_gap', 0):g}"),
+    ]
 
 
 # ---------------------------------------------------------------------------

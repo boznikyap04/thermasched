@@ -208,6 +208,7 @@ def build_scenario(name, sc, const, cold_plate, *, clean_dir, scenarios_dir, f_r
     write_csv(out / "baseline_schedule.csv", sched)
 
     top_f = max(sc["freq_mhz"])
+    top_cores = sum(s["C_s_cores"] for s in servers if s["f_s_MHz"] == top_f)   # 0: no server of that tier
     diag = {
         "I_workloads": len(workloads), "S_servers": len(servers), "Z_zones": sc["n_zones"], "T_periods": T,
         # Y_ist can only be 1 between arrival and deadline, so this is the real count
@@ -216,7 +217,7 @@ def build_scenario(name, sc, const, cold_plate, *, clean_dir, scenarios_dir, f_r
         "fleet_cores": fleet,
         "peak_requested_vcpus": peak,
         "peak_load_share_of_fleet": round(peak / fleet, 3),
-        "peak_load_share_of_fastest_tier": round(peak / sum(s["C_s_cores"] for s in servers if s["f_s_MHz"] == top_f), 3),
+        "peak_load_share_of_fastest_tier": round(peak / top_cores, 3) if top_cores else None,
         "time_sensitive_workloads": sum(w["RT_i"] for w in workloads),
         "workloads_with_imputed_usage": sum(w["usage_imputed"] for w in workloads),
         "median_slack_periods_delay_tolerant": sorted(w["AD_i"] for w in workloads if not w["RT_i"])[
@@ -348,7 +349,7 @@ def scenario_fingerprint(folder):
 # Written by data_prep.ipynb from its Settings cell.
 # derive_scenario never overwrites them.
 SHIPPED_SCENARIOS = ("thesis10", "consolidated6", "small", "thesis10_tight", "thesis10_swing", "thesis10_warm",
-                     "small_running")
+                     "servers2", "consolidated6_swing", "servers2_swing", "small_running")
 
 
 def _changed(base: dict, changes: dict | None, what: str) -> dict:

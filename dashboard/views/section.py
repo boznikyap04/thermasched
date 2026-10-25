@@ -1,6 +1,7 @@
 """One page per Chapter 6 scenario (6.1-6.4): the Base next to its tests for the configuration
-picked at the top (10, 6 or 2 servers), with what the scenario measures, per-server figures
-and moved workloads; or the same measures across every configuration."""
+picked at the top (10, 6 or 2 servers, on a light, normal or heavy day), with what the scenario
+measures, per-server figures and moved workloads; or one measure across the server counts on
+one load level, or across the load levels of one server count."""
 
 from __future__ import annotations
 
@@ -69,6 +70,23 @@ def _loaded(rows: pd.DataFrame, cat, config: ex.Configuration, section: ex.Secti
         if ref is not None and ex.applicable(ex.TEST_BY_ID[tid], config):
             out.append((tag, state.load_run(ref)))
     return out
+
+
+def _same_schedules(loaded: list[tuple[str, data.Run]], section: ex.Section) -> None:
+    """Say which tests have the Base's optimized schedule, so equal figures do not look like a
+    mistake."""
+    if not loaded or loaded[0][0] != section.tests[0][0]:
+        return
+    base = loaded[0][1]
+    same = [tag for tag, run in loaded[1:] if data.same_schedule(run, base)]
+    if not same:
+        return
+    names = " and ".join([", ".join(same[:-1]), same[-1]] if len(same) > 1 else same)
+    st.caption(f"**{names} {'has' if len(same) == 1 else 'have'} the same optimized schedule "
+               "as the Base:** every workload on the same server, starting in the same "
+               "period. Their figures differ from the Base's only where the test changes "
+               "cooling, zones or carbon intensity. *Test charts* shows each test against the "
+               "Base.")
 
 
 def _chart(rows: pd.DataFrame, section: str) -> None:
@@ -194,28 +212,42 @@ def _this_configuration(table, cat, config: ex.Configuration, section: ex.Sectio
     if not loaded:
         st.info(f"No run of {section.key} for {config.label} yet.")
         return
+    _same_schedules(loaded, section)
     _chart(rows, section.key)
     _servers(loaded, section.key)
     if section.key in MOVES:
         _moves(loaded, section.key)
 
 
-def _across(table: pd.DataFrame, section: ex.Section) -> None:
+def _across(table: pd.DataFrame, section: ex.Section, scope: state.Scope) -> None:
+    """One measure of the section, Base and tests across, for every server count on one load
+    level, or for every load level of one server count."""
+    if scope.fleet == state.ACROSS:
+        level = ex.LEVEL_BY_KEY[scope.level]
+        rows = table[(table["section"] == section.key) & (table["level"] == level.label)]
+        by, header, what = "servers", "Servers", f"server_counts_{level.key}"
+        st.caption(f"{level.label}: {level.description}.")
+    else:
+        fleet = ex.FLEETS[scope.fleet]
+        rows = table[(table["section"] == section.key) & (table["servers"] == fleet.size_label)]
+        by, header, what = "level", "Load level", f"levels_{fleet.fleet_key}"
+        st.caption(f"{fleet.size_label}: {fleet.fleet}. Each day's workloads are drawn until "
+                   "peak demand reaches its share of the fleet's cores or memory, whichever "
+                   "fills first: " + ", ".join(f"{lv.label.lower()} {lv.target:.0%}"
+                                               for lv in ex.LEVELS) + ".")
     measures = data.SECTION_MEASURES[section.key]
     measure = st.selectbox("Measure", measures, format_func=data.CHAPTER6_COLUMNS.get,
                            key=f"across-measure-{section.key}", width=420)
-    rows = table[table["section"] == section.key]
     grid = (rows.assign(value=pd.to_numeric(rows[measure], errors="coerce"))
-            .pivot_table(index="configuration", columns="tag", values="value", sort=False,
-                         dropna=False))
+            .pivot_table(index=by, columns="tag", values="value", sort=False, dropna=False))
     order = [t for t, _ in section.tests]
     grid = grid.reindex(columns=order)
     grid = grid.dropna(how="all")
     if grid.empty:
-        st.info("No configuration has a run of this section yet.")
+        st.info("No run of this section yet.")
         return
     shown = grid.map(lambda v: fmt_value(measure, v)).reset_index()
-    st.dataframe(shown.rename(columns={"configuration": "Configuration"}), hide_index=True)
+    st.dataframe(shown.rename(columns={by: header}), hide_index=True)
     names = dict(section.tests)
     st.caption(" · ".join(f"**{tag}** {ex.TEST_BY_ID[names[tag]].name}" for tag in order
                           if ex.TEST_BY_ID[names[tag]].name != "Base"))
@@ -224,8 +256,9 @@ def _across(table: pd.DataFrame, section: ex.Section) -> None:
                               state.pal(), y_title=data.CHAPTER6_COLUMNS[measure], fmt=fmt)
     state.chart(fig, key=f"across-chart-{section.key}")
     st.download_button("Download (CSV)",
-                       grid.reset_index().to_csv(index=False).encode("utf-8-sig"),
-                       file_name=f"chapter6_{section.key}_{measure}_by_configuration.csv",
+                       grid.reset_index().rename(columns={by: header})
+                       .to_csv(index=False).encode("utf-8-sig"),
+                       file_name=f"chapter6_{section.key}_{measure}_{what}.csv",
                        mime="text/csv", icon=":material/download:",
                        key=f"dl-across-{section.key}")
 
@@ -238,11 +271,13 @@ def page(key: str) -> Callable[[], None]:
         st.markdown(f"*{section.question}*")
         st.caption(f"**Goal:** {section.goal} {section.note}")
         table, cat = state.chapter6()
-        config = state.pick_config(key, across=True)
+        scope = state.pick_scope(key, across=True)
+        config = scope.config
         if config is None:
-            _across(table, section)
+            _across(table, section, scope)
         else:
-            st.caption(f"Servers: {config.fleet}.")
+            level = ex.LEVEL_BY_KEY[config.level]
+            st.caption(f"Servers: {config.fleet}. {level.label}: {level.description}.")
             _this_configuration(table, cat, config, section)
         st.caption(NOTES)
 

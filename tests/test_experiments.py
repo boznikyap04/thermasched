@@ -12,13 +12,27 @@ def _ids(settings: dict, scenario: str) -> list[str]:
 
 
 def test_configurations():
-    assert [c.key for c in ex.CONFIGURATIONS] == ["servers10", "servers6", "servers2"]
-    assert [c.label for c in ex.CONFIGURATIONS] == ["10 servers", "6 servers", "2 servers"]
-    assert ex.CONFIGURATION_BY_KEY["servers2"].fleet == "2 mid"
-    ten = ex.CONFIGURATION_BY_KEY["servers10"]
+    assert list(ex.FLEETS) == ["servers10", "servers6", "servers2"]
+    assert [c.key for c in ex.CONFIGURATIONS] == [
+        f"servers{n}{suffix}" for n in (10, 6, 2) for suffix in ("_light", "", "_heavy")]
+    assert ex.configuration("servers10").label == "10 servers · normal day"
+    assert ex.configuration("servers2", "heavy").label == "2 servers · heavy day"
+    assert [lv.target for lv in ex.LEVELS] == [0.30, 0.60, 0.85]
+    assert ex.FLEETS["servers2"].fleet == "2 mid"
+    ten = ex.FLEETS["servers10"]
     assert ten.tiers.count("slow") == 4 and ten.tiers.count("fast") == 3
     assert len(ten.regroup_zone_map) == ten.n_servers
     assert all(len(c.regroup_zone_map or c.tiers) == c.n_servers for c in ex.CONFIGURATIONS)
+
+
+def test_a_scenario_name_gives_the_load_level():
+    assert ex.identify({}, "servers10_light")[0].key == "servers10_light"
+    assert ex.identify({}, "servers6_heavy_swing") == (
+        ex.configuration("servers6", "heavy"), [ex.TEST_BY_ID["s4_t3b_ci_swing"]])
+    # The earlier names are the normal day.
+    assert ex.identify({}, "thesis10")[0].key == "servers10"
+    assert ex.identify({}, "consolidated6_swing")[0].key == "servers6"
+    assert ex.identify({}, "thesis10_light") == (None, [])
 
 
 def test_sections_list_known_tests_with_the_reference_first():
@@ -31,7 +45,7 @@ def test_sections_list_known_tests_with_the_reference_first():
 
 
 def test_not_applicable_tests():
-    config = ex.CONFIGURATION_BY_KEY
+    config = ex.FLEETS
     regroup, cold = ex.TEST_BY_ID["s1_t1_zones"], ex.TEST_BY_ID["s2_base"]
     assert ex.applicable(regroup, config["servers2"])
     assert not ex.applicable(cold, config["servers2"])

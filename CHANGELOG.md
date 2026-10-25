@@ -28,12 +28,22 @@ run.
   and 6.4, every workload's original and new server and zone.
 - *Output files* shows every CSV a run wrote, as it is, with a download for each: pick the
   configuration, the run (named by its test) and the file.
+- *Test charts › Charts and key results* brings back the run's charts and key results, for one
+  test at a time: pick the configuration, the scenario and the test. Key results (carbon,
+  energy, hottest server, lowest headroom, missed deadlines, workloads moved) show their change
+  against the Base of the scenario; the solver's outcome, the settings and the self-checks
+  follow. The charts of *Servers*, *Cooling*, *Energy and carbon* and *Workloads* (Gantt) draw
+  the Base's optimized schedule dashed. The heuristic baseline is no longer drawn.
+- When a test ends with the same optimized schedule as its Base (every workload on the same
+  server, starting in the same period), the scenario page and *Test charts* say so, so equal
+  figures don't look like a mistake.
 - 2 servers is one configuration: two mid servers (`results/servers2/`). 6.2 does not apply
   to it (no server with a cold plate).
 - A run is matched to its test by its settings, so runs from the batch notebook show under
   their test whatever their folder name.
-- Removed from the site: the run picker, *Run summary*, the Chapter 5 *Charts* and *Tables*,
-  *Inputs*, *Upload results* and *New run*. The *Validation* page is kept in the code but not
+- Removed from the site: the run picker, the nine Chapter 5 *Tables* (*Output files* has the
+  same data), *Inputs*, *Upload results* and *New run*. *Run summary* and the Chapter 5
+  *Charts* are now *Test charts*. The *Validation* page is kept in the code but not
   shown. To put a run on the site, send its zip (the notebooks write one) to the project owner.
 - The runs kept on the site have short names: `results/servers10/base`, `s1_t1_zones`,
   `s2_t1_crac`, ... and `results/servers6/`. Their `summary.json` still records the name they
@@ -42,8 +52,15 @@ run.
   600 s `consolidated6` runs. The five validation runs are `results/servers10/v_*`.
 - Every other run (the 600 s solves replaced at 1800 s, `thesis10_tight`, `_warm`, the other
   `_swing` run and the earlier `archive-*` folders) moved to `archive/results_2026-10-25/`.
-- Still to run: 6.3 Test 1 (H_min 19 °C) on 10 servers, most tests on 6 servers, and every
-  2-server test.
+- New scenarios, built by the cleaning notebook: `servers2` (two 2.4 GHz servers, one per
+  zone, no cold plate, 123 workloads: drawn until peak demand is 60% of the fleet, as for
+  every scenario), and `consolidated6_swing` and `servers2_swing`, the 6- and 2-server
+  fleets with the carbon swing of `thesis10_swing`, for 6.4 Test 3b. The other scenarios are
+  unchanged.
+- The missing Chapter 6 runs, 6.3 Test 1 on 10 servers, the other 11 tests on 6 servers and
+  the 10 tests on 2 servers, are solved with a 600 s time limit. The 10-server runs solved
+  at 1800 s are solved again at 600 s, so every Chapter 6 run has the same limit; the 1800 s
+  runs move to `archive/`.
 
 ## 1.2.1 (2026-10-22)
 

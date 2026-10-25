@@ -4,10 +4,13 @@ One list for the solver, the batch notebook and the site. A run belongs to a tes
 configuration and its switches match the test's, so a folder name never decides it: a run
 made in the batch notebook or uploaded on the site is recognized too.
 
-Configurations: 10 servers (4 slow / 3 mid / 3 fast), 6 servers (2 / 2 / 2) and 2 servers
-(2 mid). Each configuration lists the scenario names that hold it; ``thesis10`` and ``consolidated6`` are the names of the 10- and 6-server scenarios
-until they are rebuilt as ``servers10`` and ``servers6``, and ``thesis10_swing`` is the
-10-server scenario with a deeper daily carbon swing (6.4 Test 3b).
+A configuration is a fleet on a load level. Fleets: 10 servers (4 slow / 3 mid / 3 fast),
+6 servers (2 / 2 / 2) and 2 servers (2 mid). Load levels: a light, normal and heavy day, whose
+workloads are drawn until peak demand reaches 30, 60 or 85 % of the fleet's cores or memory,
+whichever fills first. The normal day of a fleet is scenario ``servers10`` (``servers6``,
+``servers2``), the others ``servers10_light`` and ``servers10_heavy``; each has a ``_swing``
+twin with a deeper daily carbon swing (6.4 Test 3b). ``thesis10`` and ``consolidated6`` (and
+their ``_swing``) are the earlier names of the 10- and 6-server normal days.
 """
 
 from __future__ import annotations
@@ -21,14 +24,38 @@ TIERS = {"slow": 2100.0, "mid": 2400.0, "fast": 3000.0}
 COLD_PLATE_TIER = "fast"        # servers of this tier carry a cold plate (CT_s = 1)
 
 Switches = tuple[tuple[str, object], ...]
+SWING: Switches = (("ci_amplitude", 0.5),)
+
+
+@dataclass(frozen=True)
+class Level:
+    key: str                    # "light", "normal", "heavy"
+    label: str                  # "Normal day"
+    target: float               # peak demand, as a share of the fleet's cores or memory
+
+    @property
+    def description(self) -> str:
+        return (f"workloads drawn until peak demand reaches {self.target:.0%} of the fleet's "
+                "cores or memory, whichever fills first")
+
+
+LEVELS: tuple[Level, ...] = (
+    Level("light", "Light day", 0.30),
+    Level("normal", "Normal day", 0.60),
+    Level("heavy", "Heavy day", 0.85),
+)
+LEVEL_BY_KEY = {lv.key: lv for lv in LEVELS}
+NORMAL = "normal"
 
 
 @dataclass(frozen=True)
 class Configuration:
-    key: str                    # results/<key>/ and, once rebuilt, the scenario name
+    key: str                    # results/<key>/ and the scenario name: servers10, servers10_light
     tiers: tuple[str, ...]      # tier of each server, in server order
     aliases: tuple[tuple[str, Switches], ...]   # scenario names holding it -> switches implied
     regroup_zone_map: tuple[int, ...] | None    # 6.1 Test 1; None: not applicable
+    fleet_key: str = ""         # servers10, servers6, servers2
+    level: str = NORMAL         # a LEVELS key
 
     @property
     def n_servers(self) -> int:
@@ -39,8 +66,13 @@ class Configuration:
         return f"{self.n_servers} servers"
 
     @property
+    def level_label(self) -> str:
+        return LEVEL_BY_KEY[self.level].label
+
+    @property
     def label(self) -> str:
-        return self.size_label
+        """'10 servers · normal day'."""
+        return f"{self.size_label} · {self.level_label.lower()}"
 
     @property
     def fleet(self) -> str:
@@ -52,19 +84,41 @@ class Configuration:
         return COLD_PLATE_TIER in self.tiers
 
 
+def scenario_name(fleet_key: str, level: str) -> str:
+    """The scenario of a fleet on a load level: servers10, servers10_light, servers10_heavy."""
+    return fleet_key if level == NORMAL else f"{fleet_key}_{level}"
+
+
+def _fleet(fleet_key: str, tiers: tuple[str, ...], regroup: tuple[int, ...] | None,
+           earlier: tuple[str, ...] = ()) -> tuple[Configuration, ...]:
+    """The fleet on each load level; ``earlier`` names its normal day had before."""
+    out = []
+    for level in LEVELS:
+        names = [scenario_name(fleet_key, level.key)]
+        if level.key == NORMAL:
+            names += earlier
+        aliases = tuple(a for n in names for a in ((n, ()), (f"{n}_swing", SWING)))
+        out.append(Configuration(names[0], tiers, aliases, regroup, fleet_key, level.key))
+    return tuple(out)
+
+
 CONFIGURATIONS: tuple[Configuration, ...] = (
-    Configuration("servers10", ("slow",) * 4 + ("mid",) * 3 + ("fast",) * 3,
-                  (("servers10", ()), ("thesis10", ()),
-                   ("thesis10_swing", (("ci_amplitude", 0.5),))),
-                  (1, 1, 1, 1, 2, 2, 2, 2, 2, 2)),
-    Configuration("servers6", ("slow",) * 2 + ("mid",) * 2 + ("fast",) * 2,
-                  (("servers6", ()), ("consolidated6", ())),
-                  (1, 1, 2, 2, 2, 2)),
+    *_fleet("servers10", ("slow",) * 4 + ("mid",) * 3 + ("fast",) * 3,
+            (1, 1, 1, 1, 2, 2, 2, 2, 2, 2), earlier=("thesis10",)),
+    *_fleet("servers6", ("slow",) * 2 + ("mid",) * 2 + ("fast",) * 2,
+            (1, 1, 2, 2, 2, 2), earlier=("consolidated6",)),
     # Base zones alternate (server 1 in zone 1, server 2 in zone 2); regrouping puts both in
     # one zone. No fast server, so no cold plate: 6.2 does not apply.
-    Configuration("servers2", ("mid", "mid"), (("servers2", ()),), (1, 1)),
+    *_fleet("servers2", ("mid", "mid"), (1, 1)),
 )
 CONFIGURATION_BY_KEY = {c.key: c for c in CONFIGURATIONS}
+# The fleets, in order: key -> its normal-day configuration (for the size and fleet labels).
+FLEETS = {c.fleet_key: c for c in CONFIGURATIONS if c.level == NORMAL}
+
+
+def configuration(fleet_key: str, level: str = NORMAL) -> Configuration:
+    return CONFIGURATION_BY_KEY[scenario_name(fleet_key, level)]
+
 
 # A switch whose value comes from the configuration (6.1 Test 1's zone map).
 REGROUP = "<regroup zone map>"

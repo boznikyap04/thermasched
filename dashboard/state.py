@@ -1,20 +1,26 @@
-"""Streamlit glue: cached loaders, the configuration and run pickers, the active palette."""
+"""Streamlit glue: cached loaders, the server-count, load-level, run and kept pickers, the
+active palette."""
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from pathlib import Path
 
+import pandas as pd
 import streamlit as st
 
 from dashboard import data
 from scheduler import experiments as ex
 from dashboard.theme import PLOTLY_CONFIG, Palette, palette
 
-# The configuration picked on any page. Streamlit drops a widget's state when its page is
-# left, so the choice lives here and every page's picker starts from it (and from ?config=).
+# The server count and load level picked on any page. Streamlit drops a widget's state when
+# its page is left, so the choices live here and every page's pickers start from them (and
+# from ?config= and ?level=). CONFIG_KEY holds the fleet: servers10, servers6 or servers2.
 CONFIG_KEY = "config"
+LEVEL_KEY = "level"
 ACROSS = "across"
-ACROSS_LABEL = "Across configurations"
+ACROSS_FLEETS_LABEL = "Across server counts"
+ACROSS_LEVELS_LABEL = "Across load levels"
 
 
 def _mtime(path: Path) -> float:
@@ -84,29 +90,80 @@ def config_runs() -> dict[str, list[data.RunRef]]:
     return data.config_runs(refs, run_infos())
 
 
-def _keep_config(widget: str) -> None:
-    st.session_state[CONFIG_KEY] = st.session_state[widget]
+@dataclass(frozen=True)
+class Scope:
+    """What a page shows: a fleet key and a load level key, one of which may be ACROSS."""
+    fleet: str
+    level: str
+
+    @property
+    def config(self) -> ex.Configuration | None:
+        """The configuration, or None when the page compares across one of the two."""
+        return None if ACROSS in (self.fleet, self.level) else ex.configuration(self.fleet, self.level)
 
 
-def pick_config(page: str, across: bool = False) -> ex.Configuration | None:
-    """The 10 / 6 / 2 servers picker of a page; with ``across``, also *Across
-    configurations* (returned as None). Every page starts from the last choice."""
-    keys = [c.key for c in ex.CONFIGURATIONS] + ([ACROSS] if across else [])
-    current = st.session_state.get(CONFIG_KEY)
+def _picker(name: str, label: str, keys: list[str], page: str, default: str,
+            format_func) -> str:
+    """A segmented control kept in st.session_state[name] and ?<name>=. A page that does not
+    offer the kept choice (*Across ...*) shows ``default`` and leaves the choice for the next
+    page that offers it."""
+    current = st.session_state.get(name)
     if current not in keys:
-        query = st.query_params.get("config")
-        current = query if query in keys else keys[0]
-        # A page without *Across configurations* leaves that choice for the next page.
-        if st.session_state.get(CONFIG_KEY) is None:
-            st.session_state[CONFIG_KEY] = current
-    widget = f"config-{page}"
+        query = st.query_params.get(name)
+        current = query if query in keys else default
+        if st.session_state.get(name) is None:
+            st.session_state[name] = current
+    widget = f"{name}-{page}"
     st.session_state[widget] = current
-    st.segmented_control("Configuration", keys, key=widget, required=True,
-                         format_func=lambda k: ACROSS_LABEL if k == ACROSS
-                         else ex.CONFIGURATION_BY_KEY[k].label,
-                         on_change=_keep_config, args=(widget,))
-    st.query_params["config"] = current
-    return ex.CONFIGURATION_BY_KEY.get(current)
+    st.segmented_control(label, keys, key=widget, required=True, format_func=format_func,
+                         on_change=_keep, args=(name, widget))
+    st.query_params[name] = current
+    return current
+
+
+def pick_scope(page: str, across: bool = False) -> Scope:
+    """The server-count picker (10 / 6 / 2 servers) and the load-level picker (light / normal /
+    heavy day) of a page. With ``across``, one of them may be set to *Across ...*, never
+    both. Every page starts from the last choice."""
+    fleets, levels = list(ex.FLEETS), [lv.key for lv in ex.LEVELS]
+    with st.container(horizontal=True, gap="large"):
+        fleet = _picker(CONFIG_KEY, "Servers",
+                        fleets + ([ACROSS] if across and st.session_state.get(LEVEL_KEY) != ACROSS
+                                  else []),
+                        page, fleets[0],
+                        lambda k: ACROSS_FLEETS_LABEL if k == ACROSS else ex.FLEETS[k].size_label)
+        level = _picker(LEVEL_KEY, "Load level",
+                        levels + ([ACROSS] if across and fleet != ACROSS else []),
+                        page, ex.NORMAL,
+                        lambda k: ACROSS_LEVELS_LABEL if k == ACROSS else ex.LEVEL_BY_KEY[k].label)
+    return Scope(fleet, level)
+
+
+def pick_config(page: str) -> ex.Configuration:
+    """The configuration (a fleet on a load level) picked at the top of a page."""
+    return pick_scope(page).config
+
+
+def _keep(name: str, widget: str) -> None:
+    st.session_state[name] = st.session_state[widget]
+
+
+def pick_kept(name: str, label: str, options: list[str], page: str,
+              format_func=str) -> str:
+    """A segmented control whose choice is kept across pages and reruns, in
+    st.session_state[name] and ?<name>=, like the configuration picker. When the kept choice
+    is not among ``options`` (another section's test), the first option is shown and the
+    kept choice is left for the next page that offers it."""
+    current = st.session_state.get(name)
+    if current not in options:
+        query = st.query_params.get(name)
+        current = query if query in options else options[0]
+    widget = f"{name}-{page}"
+    st.session_state[widget] = current
+    st.segmented_control(label, options, key=widget, required=True, format_func=format_func,
+                         on_change=_keep, args=(name, widget))
+    st.query_params[name] = current
+    return current
 
 
 def run_label(ref: data.RunRef, used: set[str]) -> str:
@@ -137,3 +194,13 @@ def pal() -> Palette:
 
 def chart(fig, key: str | None = None) -> None:
     st.plotly_chart(fig, config=PLOTLY_CONFIG, key=key, theme=None)
+
+
+def fmt_num(v, digits: int = 2, unit: str = "") -> str:
+    if v is None or (isinstance(v, float) and pd.isna(v)):
+        return "–"
+    if isinstance(v, (int,)) or float(v).is_integer() and digits == 0:
+        s = f"{int(round(float(v))):,}"
+    else:
+        s = f"{float(v):,.{digits}f}"
+    return f"{s} {unit}".strip()

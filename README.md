@@ -158,6 +158,9 @@ Run every command from the repository root.
 │   ├── thesis10_tight/        experiment: stricter deadlines, more time-sensitive workloads
 │   ├── thesis10_swing/        experiment: deeper daily swing in carbon intensity
 │   ├── thesis10_warm/         experiment: CRAC supply air up to 32 °C instead of 27 °C
+│   ├── servers2/              2 servers (both 2.4 GHz), 123 workloads, 24 h: the 2-server runs
+│   ├── consolidated6_swing/   consolidated6 with the deeper carbon swing (6.4 Test 3b)
+│   ├── servers2_swing/        servers2 with the deeper carbon swing (6.4 Test 3b)
 │   ├── small/                 3 servers, 99 workloads, 8 h: quick tests
 │   ├── small_running/         small + already-running workloads and a server outage
 │   └── <name>/                any scenario built in notebooks/solver.ipynb

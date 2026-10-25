@@ -68,6 +68,9 @@ folders, and how to start a run from the browser.
 | `thesis10_tight` | 10 | same as `thesis10` | 288 periods | experiment: 50% time-sensitive, delay-tolerant slack 30 min to 2 h (not 2 to 8 h) |
 | `thesis10_swing` | 10 | same as `thesis10` | 288 periods | experiment: carbon intensity swings ±50% over the day (not ±25%) |
 | `thesis10_warm` | 10 | same as `thesis10` | 288 periods | experiment: CRAC supply air up to 32 °C (not 27 °C) |
+| `servers2` | 2 (both 2.4 GHz, no cold plate) | 123 | 288 periods | the 2-server configuration of Chapter 6: workloads drawn until peak demand is 62% of the fleet |
+| `consolidated6_swing` | 6 (2/2/2) | same as `thesis10` | 288 periods | `consolidated6` with the carbon swing of `thesis10_swing` (6.4 Test 3b on 6 servers) |
+| `servers2_swing` | 2 | same as `servers2` | 288 periods | `servers2` with the carbon swing of `thesis10_swing` (6.4 Test 3b on 2 servers) |
 | `small` | 3 | 99 | 96 periods (8 h, 12:00-20:00) | quick tests, debugging |
 | `small_running` | 3 | same as `small` | 96 periods | `small` with 4 workloads already running (B_i = 1) and server 3 down 15:00-16:00 (`availability.csv`), to exercise Eq. (11) and (29) |
 

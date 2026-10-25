@@ -1,5 +1,5 @@
-"""Chapter 6 overview: which test has a run in each configuration, and every result in one
-table that downloads as a CSV."""
+"""Chapter 6 overview: which test has a run in each configuration (a server count on a load
+level), and every result in one table that downloads as a CSV."""
 
 from __future__ import annotations
 
@@ -76,7 +76,7 @@ def gap_warning(table: pd.DataFrame, where: str = "") -> None:
 
 
 def _status_grid(table: pd.DataFrame) -> pd.DataFrame:
-    """One row per test (the base once), one column per configuration."""
+    """One row per test (the base once), one column per configuration: servers · load level."""
     rows = {}
     for r in table.itertuples():
         test = f"{r.section} · {r.tag} · {r.label}" if r.tag != "Base" or r.section == "6.2" \
@@ -89,7 +89,9 @@ def _status_grid(table: pd.DataFrame) -> pd.DataFrame:
             icon = f"⏱ gap {r.mip_gap * 100:.2f} %"
         else:
             icon = "❌ " + data.status_text(r.status)
-        rows.setdefault(test, {})[r.configuration] = icon
+        # "10 · light": the server count and load level, short enough for nine columns
+        column = f"{r.servers.split()[0]} · {r.level.split()[0].lower()}"
+        rows.setdefault(test, {})[column] = icon
     grid = pd.DataFrame.from_dict(rows, orient="index")
     grid.index.name = "Test"
     return grid.reset_index()
@@ -108,8 +110,12 @@ def render() -> None:
     table, cat = state.chapter6()
     done, total = _counts(cat)
     st.caption(
-        f"Every fleet configuration goes through the tests of the four Chapter 6 scenarios. "
-        f"**{done} of {total} runs are on the site.** A run is matched to its test by its "
+        f"Every configuration goes through the tests of the four Chapter 6 scenarios. A "
+        f"configuration is a server count (10, 6 or 2 servers) on a load level: "
+        + ", ".join(f"a {lv.label.lower()} ({lv.target:.0%})" for lv in ex.LEVELS)
+        + ", the share of the fleet's cores or memory, whichever fills first, that the day's "
+        f"workloads reach at their peak. **{done} of {total} runs are on the site.** A run is "
+        "matched to its test by its "
         "settings, not its folder name, so runs made in the batch notebook are recognized "
         "too. When several runs match one test, the newest is used.")
 
@@ -117,7 +123,7 @@ def render() -> None:
     grid = _status_grid(table)
     st.dataframe(grid, hide_index=True, column_config={
         "Test": st.column_config.TextColumn("Test", pinned=True)})
-    st.caption("✅ proven best · ⏱ stopped at the time limit (with its MIP gap) · ❌ no valid "
+    st.caption("Columns: number of servers · load level. ✅ proven best · ⏱ stopped at the time limit (with its MIP gap) · ❌ no valid "
                "schedule · **·** not run yet · **n/a** not applicable: 6.1 Test 1 needs two "
                "servers of the same tier, 6.2 needs a server with a cold plate (3000 MHz).")
 
@@ -144,6 +150,7 @@ def render() -> None:
             config[key] = st.column_config.NumberColumn(header, format=FORMATS[key])
         else:
             config[key] = st.column_config.TextColumn(header, pinned=key in PINNED)
+    config.update(servers=None, level=None)     # in the Configuration column; kept in the CSV
     st.dataframe(shown, hide_index=True, column_config=config)
     gap_warning(table[table["configuration"].isin(picked)])
 
