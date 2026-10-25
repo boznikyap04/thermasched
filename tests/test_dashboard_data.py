@@ -18,7 +18,8 @@ INFEASIBLE = "archive-small/infeasible_demo_hmin20"
 CONSOLIDATED6_FREE = "archive-consolidated6/least_loaded_base18_free_optimize"
 SMALL_FREE = "archive-small/least_loaded_base18_free_optimize"
 FASTEST = "archive-small/fastest_first_base27_free_optimize"
-COLD_PLATES = "servers10/s2_base"
+COLD_PLATES = "servers6/s2_base"
+SERVERS6_BASE = "servers6/base"
 
 pytestmark = pytest.mark.skipif(not RUNS, reason="no run outputs under results/")
 
@@ -127,8 +128,8 @@ def test_unmodelled_columns_are_hidden(loaded, key):
 
 # -- time mapping --------------------------------------------------------------------
 
-def test_consolidated6_clock_covers_24_hours_from_6am(loaded):
-    run = loaded(CONSOLIDATED6_FREE)
+def test_six_server_clock_covers_24_hours_from_6am(loaded):
+    run = loaded(SERVERS6_BASE)
     clock = run.clock
     assert len(clock) == 288 and clock["t"].tolist() == list(range(1, 289))
     # hour_local is the middle of each 5-minute period

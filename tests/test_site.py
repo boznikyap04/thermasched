@@ -50,8 +50,8 @@ def test_section_pages(key, config, level):
     assert at.segmented_control(key=f"level-{key}").value == level
     if config == "servers2" and key == "6.2" and level != "across":
         assert "does not apply" in at.info[0].value
-    elif (config, level) == ("servers10", "normal"):
-        assert at.dataframe                 # every 10-server section has runs
+    elif (config, level) == ("servers6", "normal"):
+        assert at.dataframe                 # every 6-server section has runs (at least its base)
 
 
 def test_across_both_is_never_offered():
@@ -109,19 +109,24 @@ def test_output_files(fleet, level):
 
 
 def test_output_files_keeps_the_file_across_runs():
-    at = _page("from dashboard.views import files\nfiles.render()").run()
-    first = at.session_state["run-files-servers10"]
+    at = _page("from dashboard.views import files\nfiles.render()")
+    at.session_state["config"] = "servers6"
+    at.session_state["level"] = "normal"
+    at.run()
+    first = at.session_state["run-files-servers6"]
     at.selectbox(key=f"file-{first}").set_value("optimized/server_period.csv").run()
-    at.selectbox(key="run-files-servers10").select_index(1).run()
+    at.selectbox(key="run-files-servers6").select_index(1).run()
     _ok(at)
-    second = at.session_state["run-files-servers10"]
+    second = at.session_state["run-files-servers6"]
     assert second != first
     assert at.selectbox(key=f"file-{second}").value == "optimized/server_period.csv"
 
 
-def _charts(config: str, section: str, test: str, topic: str = "Servers") -> AppTest:
+def _charts(config: str, section: str, test: str, topic: str = "Servers",
+            level: str = "normal") -> AppTest:
     at = _page("from dashboard.views import detail\ndetail.render()")
     at.session_state["config"] = config
+    at.session_state["level"] = level
     at.session_state["section"] = section
     at.session_state["test"] = test
     at.session_state["topic"] = topic
@@ -131,8 +136,8 @@ def _charts(config: str, section: str, test: str, topic: str = "Servers") -> App
 @pytest.mark.parametrize("topic", ["Servers", "Cooling", "Energy and carbon", "Workloads"])
 @pytest.mark.parametrize("section,test", [(s.key, tag) for s in ex.SECTIONS
                                           for tag, _ in s.tests])
-def test_test_charts_10_servers(section, test, topic):
-    at = _charts("servers10", section, test, topic)
+def test_test_charts_6_servers(section, test, topic):
+    at = _charts("servers6", section, test, topic)
     _ok(at)
     assert at.segmented_control(key="test-detail").value == test
     if any("No run" in i.value for i in at.info):
@@ -150,14 +155,15 @@ def test_test_charts_other_configurations(config):
     if config == "servers2":
         assert "does not apply" in at.info[0].value
     else:
-        assert "No run" in at.info[0].value
+        assert at.metric                    # 6.2 Test 1 has a run on six servers
     _ok(_charts(config, "6.1", "Base"))
 
 
 def test_test_charts_say_when_a_test_keeps_the_base_schedule():
-    at = _charts("servers10", "6.1", "Test 2")
+    # per-tick results: on the light day, regrouping the zones leaves the schedule as it is
+    at = _charts("servers6", "6.1", "Test 1", level="light")
     assert any("same optimized schedule as the Base" in i.value for i in at.info)
-    assert not _charts("servers10", "6.4", "Test 3a").info
+    assert not _charts("servers6", "6.1", "Test 2", level="light").info
 
 
 def test_test_charts_keep_the_test_when_the_scenario_changes():
@@ -173,6 +179,7 @@ def test_test_charts_keep_the_test_when_the_scenario_changes():
 
 def test_scenario_page_says_which_tests_keep_the_base_schedule():
     at = _section("6.1")
-    at.session_state["config"] = "servers10"
+    at.session_state["config"] = "servers6"
+    at.session_state["level"] = "light"
     at.run()
     assert any("same optimized schedule" in c.value for c in at.caption)
