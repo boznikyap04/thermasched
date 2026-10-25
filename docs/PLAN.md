@@ -186,7 +186,7 @@ downloaded as a zip and unzipped into `results/`.
 
    Both `consolidated6` runs were cut off part-way and resumed from their checkpoint (at
    ticks 166 and 146), passed every check and are valid under the evaluator. On the base run
-   the cap binds in a block of midday ticks (about ticks 149–190) with 25–30 workloads
+   the cap binds at tick 70 and in a block of ticks 149–196 with 20–32 workloads
    waiting; HiGHS overruns the cap by up to 3 s. A tick that stops at the cap still has a
    valid schedule; it only makes the run timing-dependent (see *Same schedule on resume*).
 3. **Time one heavy-day run** on this machine (6.1 Base, `servers6_heavy`) and set the
