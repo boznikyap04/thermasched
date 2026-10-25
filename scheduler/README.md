@@ -177,15 +177,15 @@ breaks a limit when the evaluator re-checks it.
 
 ## 7. Run many scenarios in a row
 
-`logs/runs/runlist.txt` lists the switches of the runs saved in `results/`, one run per
-line (`runlist_rest.txt` is its last 12 lines), and
-`logs/runs/*.log` holds what each run printed. To repeat a list (macOS / Linux):
+`logs/runs/v<release>/runlist.txt` lists the switches of a release's runs, one run per line,
+and `logs/runs/v<release>/*.log` holds what each run printed (the 1.0.0 logs are in
+`archive/logs_1.0.0/`). To repeat a list (macOS / Linux):
 
 ```sh
-while read -r args; do uv run python -m scheduler.run $args < /dev/null; done < logs/runs/runlist.txt
+while read -r args; do uv run python -m scheduler.run $args < /dev/null; done < logs/runs/v1.1.0/runlist.txt
 ```
 
-Keep the printed output of a long run with `... | tee logs/runs/<name>.log`.
+Keep the printed output of a long run with `... | tee logs/runs/v<release>/<name>.log`.
 
 ## 7b. Validation checks
 

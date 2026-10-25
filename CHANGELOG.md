@@ -18,6 +18,11 @@ run.
 
 **Re-run:** nothing yet. The model is unchanged; only the site and the run folders changed.
 
+- The plan going forward is [`docs/PLAN.md`](docs/PLAN.md): per-tick re-planning replaces the
+  whole-day solve. Until its runs are in, `results/` is empty: the whole-day runs moved to
+  `archive/results_2026-10-25_whole_day/`, the staged 1.2.1 runs (solved on 516 GB servers,
+  invalid) to `archive/runs_staging_516GB_invalid/`, and the 1.0.0 run logs to
+  `archive/logs_1.0.0/`.
 - The site shows only the four Chapter 6 scenarios. The sidebar lists the pages: the
   Chapter 6 *Overview* (which test has a run in each configuration, and every result in one
   CSV), one page per scenario, 6.1 to 6.4, and *Output files*.

@@ -101,7 +101,9 @@ site. To show them again, add their page to the list in `dashboard/app.py`.
 
 To set old results aside without deleting them, move them into a dated folder under
 `archive/`, keeping the same `<folder>/<run-name>/` structure. The runs taken off the site
-when the Chapter 6 runs were renamed are in `archive/results_2026-10-25/`.
+when the Chapter 6 runs were renamed are in `archive/results_2026-10-25/`, and the whole-day
+runs set aside for per-tick re-planning ([`docs/PLAN.md`](../docs/PLAN.md)) in
+`archive/results_2026-10-25_whole_day/`.
 
 To view any folder with that structure, point the dashboard at it:
 

@@ -3,6 +3,11 @@
 **An Integrated Optimization Model for Thermal-Aware Workload Scheduling and Air-Liquid
 Cooling Control in Heterogeneous Data Centers.** DLSU Industrial Engineering thesis.
 
+> **Plan going forward:** [`docs/PLAN.md`](docs/PLAN.md). Since 2026-10-25 the method is
+> per-tick re-planning: the model re-solves every 5-minute period with only the workloads
+> that have arrived. This README describes the code as it is today, which still solves the
+> whole day at once; the whole-day results are in `archive/`.
+
 ## Project summary
 
 Data centers usually treat workload placement, server temperatures and cooling as
@@ -47,8 +52,9 @@ The project has three parts, each with its own guide:
 raw data ──► notebooks/data_prep.ipynb ──► scenarios/ ──► scheduler (solver) ──► results/ ──► dashboard
 ```
 
-The scenarios and a full set of results are already in the repository, so you can open
-the dashboard or run the solver right away. The cleaning notebook is only needed to
+The scenarios are already in the repository, so you can run the solver right away.
+`results/` is empty until the per-tick runs of [`docs/PLAN.md`](docs/PLAN.md) are solved; the
+earlier whole-day results are in `archive/results_2026-10-25_whole_day/`. The cleaning notebook is only needed to
 change the data. From the raw data it rebuilds the scenarios in the repository byte for
 byte, and checks that it did (fingerprints, its section 4).
 
@@ -180,14 +186,13 @@ Run every command from the repository root.
 │   ├── types.py               shared data types and constants
 │   └── version.py             the release version and the summary.json layout version
 │
-├── results/                   SOLVER OUTPUTS (the deployed dashboard shows these)
-│   ├── servers10/<test>/      the 10-server Chapter 6 runs by test (base, s1_t1_zones, ...), and v_* validation runs
-│   ├── servers6/<test>/       the 6-server runs; servers2/ for the 2-server (mid + mid) runs
-│   │                          (each run: summary.json, comparison_period.csv, baseline/, optimized/)
+├── results/                   SOLVER OUTPUTS (the dashboard shows these); empty until the per-tick runs
+│   ├── <configuration>/<test>/  one run: summary.json, comparison_period.csv, baseline/, optimized/
+│   │                          (for example servers6_heavy/s2_base/; the test ids are in scheduler/experiments.py)
 │   └── validation/<scenario>/ validation tables (CSV) and validation.json (not shown on the site)
 ├── exports/                   zips of notebook runs, for the dashboard (not in git)
 │
-├── logs/runs/                 console output of the runs in results/, and the list of their switches
+├── logs/runs/v<release>/      console output of each release's runs, and the list of their switches
 │
 ├── dashboard/                 DASHBOARD (Streamlit app)
 │   ├── README.md              how to use the dashboard
@@ -202,7 +207,9 @@ Run every command from the repository root.
 ├── tools/sync_notebooks.py    copies the code, the version and the scenario fingerprints into the notebooks
 │
 ├── docs/                      DOCUMENTATION
+│   ├── PLAN.md                THE PLAN GOING FORWARD: per-tick re-planning, the first batch, work items
 │   ├── PRD.md                 product requirements: what the model must do and output
+│   ├── PRD_CH6_RESULTS.md     requirements for the Chapter 6 results on the site
 │   ├── PROJECT_CONTEXT.md     full model specification, equations and every decision
 │   ├── DATA_PREP_REPORT.md    what the data cleaning found and decided
 │   └── references/            thesis source documents (PDF): NOT in the repository; the group's
@@ -217,7 +224,10 @@ Run every command from the repository root.
 └── archive/                   superseded material kept for reference (see archive/README.md)
     ├── notebooks/             old Colab notebook, before/after comparison notebook
     ├── data_2026-10-09_before_missing_data_fixes/
-    └── results_2026-10-13/
+    ├── results_2026-10-13/, results_2026-10-25/
+    ├── results_2026-10-25_whole_day/   the whole-day runs that were in results/ (516 GB servers)
+    ├── runs_staging_516GB_invalid/     staged 1.2.1 runs on 516 GB servers: invalid
+    └── logs_1.0.0/                     the 1.0.0 run logs
 ```
 
 ## Where to start
