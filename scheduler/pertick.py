@@ -289,6 +289,19 @@ def _solve_tick(tick: _Tick, settings: RunSettings, warm, warm_supply, log: bool
     return pass2
 
 
+def _gap(res: SolveResult) -> float | None:
+    """The tick's relative MIP gap; None when unknown. HiGHS gives inf when a tick stops at its
+    time limit with a schedule (e.g. the warm start) but no bound yet."""
+    if res.mip_gap is None or not math.isfinite(res.mip_gap):
+        return None
+    return float(res.mip_gap)
+
+
+def _no_bound(r: dict) -> bool:
+    """A tick that stopped at its time limit before HiGHS found a bound: its gap is unknown."""
+    return r["status"] == STATUS_TIME_LIMIT and r.get("mip_gap") is None
+
+
 def _kept_carbon_g(tick: _Tick, res: SolveResult) -> float | None:
     """Carbon of period t by the solver's own numbers (the objective's period-t terms)."""
     mv = res.model_values
@@ -407,6 +420,9 @@ def _aggregate(scenario: Scenario, state: _State) -> SolveResult:
     gaps = [r["mip_gap"] for r in ticks if r.get("mip_gap") is not None]
     kept = [r["kept_carbon_g"] for r in ticks]
     slow = max(ticks, key=lambda r: r["solve_s"]) if ticks else {"solve_s": 0.0, "tick": None}
+    n_nb = sum(1 for r in ticks if _no_bound(r))
+    no_bound = (f" {n_nb} of these stopped before a bound was found, so their gap is unknown "
+                "and not in the largest gap." if n_nb else "")
     notes = list(state.notes) + [
         "Per-tick re-planning: the model above is solved once per tick over a window from the "
         "tick to the end of the horizon, holding only the workloads that have arrived; running "
@@ -417,7 +433,7 @@ def _aggregate(scenario: Scenario, state: _State) -> SolveResult:
         f"{n} ticks: {n_opt} solved to the gap, {n_tl} stopped at the tick time limit "
         f"(slowest {slow['solve_s']:.1f} s, tick {slow['tick']}). "
         "The objective is the sum of each tick's own carbon for its period; the gap shown is "
-        "the largest of any tick.",
+        "the largest of any tick." + no_bound,
     ]
     return SolveResult(
         status=STATUS_OPTIMAL if n_tl == 0 else STATUS_TIME_LIMIT, schedule=None,
@@ -441,6 +457,8 @@ def per_tick_block(outcome: PerTickOutcome, settings: RunSettings) -> dict:
         "tick_time_limit_s": settings.tick_time_limit_s,
         "n_ticks_optimal": sum(1 for r in ticks if r["status"] == STATUS_OPTIMAL),
         "n_ticks_time_limit": sum(1 for r in ticks if r["status"] == STATUS_TIME_LIMIT),
+        # of those, stopped before a bound was found: gap unknown, left out of max_mip_gap
+        "n_ticks_no_bound": sum(1 for r in ticks if _no_bound(r)),
         "total_solve_s": float(sum(r["solve_s"] for r in ticks)),
         "slowest_tick": None if slow is None else slow["tick"],
         "slowest_tick_solve_s": None if slow is None else slow["solve_s"],
@@ -570,7 +588,7 @@ def run_per_tick(scenario: Scenario, original: dict[int, int], settings: RunSett
                           max(state.max_size[2], res.n_constraints)]
         state.ticks.append({
             "tick": t, "status": res.status, "solve_s": float(res.solve_time_s),
-            "mip_gap": None if res.mip_gap is None else float(res.mip_gap),
+            "mip_gap": _gap(res),
             "n_waiting": len(tick.waiting), "n_started": len(started_now),
             "n_running": n_running,
             "n_arrived": sum(1 for w in scenario.workloads if w.A == t),

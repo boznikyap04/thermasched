@@ -200,6 +200,32 @@ def test_stuck_mid_run_names_the_deadline(tmp_path):
     assert (tmp_path / "run" / "partial_schedule.csv").is_file()
 
 
+def test_tick_without_a_bound_is_saved_with_an_unknown_gap(tmp_path, monkeypatch):
+    """A tick stopped at its time limit with a schedule but no bound (HiGHS: gap inf) is saved
+    with no gap, and counted, instead of crashing the checkpoint."""
+    from scheduler import pertick
+    from scheduler.types import STATUS_TIME_LIMIT
+    calls = []
+
+    def no_bound_at_tick_3(*a, **kw):
+        res = solve(*a, **kw)
+        calls.append(1)
+        if len(calls) == 3:
+            res.status, res.mip_gap = STATUS_TIME_LIMIT, float("inf")
+        return res
+
+    monkeypatch.setattr(pertick, "solve", no_bound_at_tick_3)
+    argv = ARGS + ["--results-dir", str(tmp_path)]
+    assert main(argv) == 0
+    folder = tmp_path / "small" / parse_args(argv)[0].run_name
+    pt = json.loads((folder / "summary.json").read_text())["per_tick"]
+    assert pt["n_ticks_time_limit"] == pt["n_ticks_no_bound"] == 1
+    assert pt["max_mip_gap"] is not None
+    with open(folder / TICKS_FILE) as fh:
+        row = list(csv.DictReader(fh))[2]
+    assert (row["status"], row["mip_gap"]) == (STATUS_TIME_LIMIT, "")
+
+
 def test_per_tick_run_names_and_test_matching():
     names = {tuple(v): parse_args(["--scenario", "small"] + v)[0].run_name
              for v in ([], ["--per-tick"], ["--per-tick", "--tick-time-limit", "20"],
