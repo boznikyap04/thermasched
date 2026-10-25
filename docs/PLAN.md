@@ -113,23 +113,82 @@ downloaded as a zip and unzipped into `results/`.
    The step also settles those tests: the old scenarios (`thesis10`, `consolidated6` and their
    variants) no longer reproduce from 64 GB clean data, so they move to `archive/` or out of
    the test list.
-2. **Build the per-tick mode** (estimate 2–4 days):
-   - the loop over ticks: build the window's problem, solve, keep period *t*, advance;
+2. **Build the per-tick mode.** *Built on branch `pertick-b-mode` (thread B), tested on
+   `small`; not merged.*
+   - the loop over ticks: build the window's problem, solve, keep period *t*, advance
+     (`scheduler/pertick.py`; the MILP of `scheduler/optimize.py` is the engine of every tick);
    - only arrived, not-yet-started workloads are free; arrival, deadline and allowed delay are
-     measured from the window's start;
-   - running workloads keep their server (Eq. 29, supported) **and their start**, and only
-     their remaining work counts (work credit, Eq. 38–39); today a running workload's start
-     can still move;
-   - starting temperatures T⁰ from the previous tick (Eq. 30, supported);
-   - recent supply-air temperatures as fixed history, so the ramp limits (Eq. 35–36, 15 min
-     and 1 h) hold across ticks;
+     measured from the window's start (the latest start A + AD stays where it was);
+   - running workloads keep their server (Eq. 29) **and their start**: they occupy the window
+     from its first period, and only their remaining work counts (work credit, Eq. 38–39);
+   - starting temperatures T⁰ from the previous tick (Eq. 30);
+   - recent supply-air temperatures (the last hour) as fixed history, so the ramp limits
+     (Eq. 35–36, 15 min and 1 h) hold across ticks (`WindowExtras.supply_history`);
    - priority (Eq. 56–57) with started workloads fixed;
-   - a per-tick solve-time cap, and the state saved after every tick so a run can resume;
-   - a run switch for the mode, its log per tick (status, solve time) in the run folder, and
-     the copies in the solver and batch notebooks (`tools/sync_notebooks.py`).
-   - tests on `small`: the evaluator accepts every per-tick schedule; no workload starts
-     before it arrives and no started workload moves; a run resumed from its checkpoint gives
-     the same schedule as an unbroken run; a stuck tick stops and names the limit.
+   - a per-tick solve-time cap (`--tick-time-limit`, default 60 s), and the state saved after
+     every tick in `<run folder>/checkpoint/`; the same command resumes;
+   - the run switch `--per-tick` (`RunSettings.per_tick`, run names end in `_pertick`), the
+     per-tick log `ticks.csv`, `--wall-time-limit` (exit 3), a stuck tick exits 4 and names
+     its limit in `summary.json` (`per_tick.stuck`); `summary.json` has `"mode": "per_tick"`;
+   - the solver and batch notebooks have the switch (`per_tick`, `PER_TICK`), **on by
+     default** there (owner's choice, 2026-10-25); the command line defaults to whole-day;
+   - tests on `small` (`tests/test_pertick.py`): the evaluator accepts every per-tick
+     schedule; no workload starts before it arrives and no started workload moves; a run
+     stopped twice and resumed gives the same schedule as an unbroken run; a stuck tick stops
+     and names the limit (tight H_min at tick 1, an impossible deadline mid-run); the ramp
+     limits hold across ticks, and the history bounds a window's first periods.
+
+   **Decisions made while building** (B):
+
+   - *Remaining work.* Each kept period is played out with the evaluator's physics: the server
+     temperatures and, for every running workload, the work delivered at the DPF it actually
+     ran at. The remaining work is W minus that, and a workload ends in the period its work is
+     done. The next tick's T⁰ comes from the same physics, not from the solver's T (the
+     solver's cold-plate heat is at most the physical one, so the true temperature is never
+     above the solver's, which is within the cap).
+   - *Priority across ticks.* Pairs between waiting workloads keep their whole-day order (the
+     real arrivals, not the window's). A waiting *i* may not use the server of a started *j*
+     that started while *i* was waiting (A_i ≤ ST_j): on that server *j* already went first.
+     Every other pair with a started workload holds by construction.
+   - *Lookahead.* Always to the end of the horizon. Trimming to the latest deadline is not
+     used: it is not exact (the server temperatures and the supply ramp at that deadline
+     still change the cold-plate and CRAC cost after it), so it could change decisions.
+   - *Starting solution.* Each tick is offered the previous tick's plan (new arrivals left
+     open) instead of the whole-day mode's staged solve.
+   - *B_i = 1* (only `small_running`): the workload keeps its server (Eq. 29) and starts when
+     a tick starts it; from then on its start is fixed like any other.
+   - *Thermal-blind placement* (6.4 Test 2): its two passes run inside each tick, pass 1 with
+     70 % of the tick limit.
+   - *Stuck tick.* Diagnosed in this order: a workload with no start left (deadline and wait,
+     or priority when the barred servers cause it); no schedule within the tick limit
+     (`tick_time_limit`, not proven infeasible); feasible with the supply free of its history
+     (`supply_ramp`); otherwise one group of limits relaxed at a time, or "several limits
+     together". The checkpoint is deleted (the run is over); `partial_schedule.csv` keeps the
+     starts made before it.
+   - *Same schedule on resume.* Exact as long as no tick stops at its time limit; a solve cut
+     off by time can differ between any two runs, resumed or not.
+   - *Checks.* The sum of each tick's own carbon (by the solver) must equal the evaluator's
+     carbon, as for the whole-day objective; "no worse than a valid baseline" does not apply
+     per tick (no foresight) and is reported as n/a.
+   - *A stopped run* (exit 3) leaves `checkpoint/` and `ticks.csv` but no `summary.json`; a
+     fresh run deletes an old `summary.json` of the same name so it cannot look finished.
+   - `per_tick` and `tick_time_limit_s` do not decide which Chapter 6 test a run is
+     (`experiments.IGNORED`), so per-tick runs show on the site as the same tests.
+
+   **First timing** (this machine, with other threads' jobs running at the same time; the
+   real timing run is item 3). Default settings, 60 s tick cap, gap 0.1 % per tick:
+
+   | Run | Ticks | Wall time of the ticks | Ticks/s | Slowest tick | Ticks at the cap | Largest gap |
+   |---|---|---|---|---|---|---|
+   | `small`, base | 96 | 31 s | 3.1 | 4.2 s (tick 66) | 0 | 0.10 % |
+   | `consolidated6`, base (6.1 Base) | 288 | 3,668 s (61 min) | 0.08 | 63.0 s (tick 70) | 47 | 0.43 % |
+   | `consolidated6`, cold plates (6.2 Base) | 288 | 1,310 s (22 min) | 0.22 | 54.8 s (tick 1) | 0 | 0.10 % |
+
+   Both `consolidated6` runs were cut off part-way and resumed from their checkpoint (at
+   ticks 166 and 146), passed every check and are valid under the evaluator. On the base run
+   the cap binds in a block of midday ticks (about ticks 149–190) with 25–30 workloads
+   waiting; HiGHS overruns the cap by up to 3 s. A tick that stops at the cap still has a
+   valid schedule; it only makes the run timing-dependent (see *Same schedule on resume*).
 3. **Time one heavy-day run** on this machine (6.1 Base, `servers6_heavy`) and set the
    per-tick cap from it with margin; the first Actions job confirms it on the 4-core runner.
 4. **Add the GitHub Actions workflow** for the 18 jobs: a matrix of 18, resume from the
