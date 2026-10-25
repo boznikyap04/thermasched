@@ -1,0 +1,278 @@
+# The first per-tick batch (docs/PLAN.md §3 and §4): 18 runs, one job each, on GitHub-hosted
+# runners. The run list comes from tools/runlist.py. How to start, resume and collect:
+# docs/PLAN.md §4.
+#
+# Starts on a push to the branch per-tick-runs, or by hand (workflow_dispatch). Never on main
+# or release. The repository is public, so its logs and artifacts are public: the jobs check
+# out only the code and scenarios they need, and upload only run folders.
+
+name: per-tick batch
+
+on:
+  push:
+    branches: [per-tick-runs]
+  workflow_dispatch:
+    inputs:
+      batch:
+        description: "all: the 18 runs; timing: only servers6_heavy__base (6.1 Base, heavy day)"
+        type: choice
+        options: [all, timing]
+        default: all
+      runs:
+        description: "Run ids to run, comma- or space-separated, e.g. servers6__base (overrides batch)"
+        type: string
+        default: ""
+      resume_from_run_id:
+        description: "Resume from this earlier workflow run's checkpoints (its run id, from the URL)"
+        type: string
+        default: ""
+      tick_time_limit:
+        description: "Per-tick solve-time cap, seconds (empty: tools/runlist.py's TICK_TIME_LIMIT_S)"
+        type: string
+        default: ""
+
+permissions:
+  contents: read
+  actions: read           # to list and download an earlier run's artifacts when resuming
+
+concurrency:
+  group: per-tick-batch
+  cancel-in-progress: false
+
+defaults:
+  run:
+    shell: bash
+
+env:
+  RESULTS_DIR: _ci/results          # run folders: _ci/results/<scenario>/<run-name>/
+  RESUME_FROM: ${{ inputs.resume_from_run_id }}
+
+jobs:
+  setup:
+    name: run list
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      matrix: ${{ steps.list.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            /pyproject.toml
+            /uv.lock
+            /scheduler/
+            /tools/
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+      - name: Runs left to resume
+        id: resume
+        if: inputs.resume_from_run_id != '' && inputs.runs == ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # A job that stopped before its run finished uploads a marker artifact resume-<id>.
+          ids=$(gh api --paginate "repos/$GITHUB_REPOSITORY/actions/runs/$RESUME_FROM/artifacts" \
+                  --jq '.artifacts[] | select(.expired | not) | .name
+                        | select(startswith("resume-")) | ltrimstr("resume-")' | sort -u | xargs)
+          if [ -z "$ids" ]; then
+            echo "::error::workflow run $RESUME_FROM left no run to resume"
+            exit 1
+          fi
+          echo "ids=$ids" >> "$GITHUB_OUTPUT"
+      - name: Run list
+        id: list
+        env:
+          BATCH: ${{ inputs.batch }}
+          RUNS: ${{ inputs.runs }}
+          RESUME_IDS: ${{ steps.resume.outputs.ids }}
+          TICK_TIME_LIMIT: ${{ inputs.tick_time_limit }}
+        run: |
+          opts=(--format matrix --results-dir "$RESULTS_DIR")
+          if [ -n "$RUNS" ]; then opts+=(--only "$RUNS")
+          elif [ -n "$RESUME_IDS" ]; then opts+=(--only "$RESUME_IDS")
+          elif [ "$BATCH" = timing ]; then opts+=(--timing)
+          fi
+          if [ -n "$TICK_TIME_LIMIT" ]; then opts+=(--tick-time-limit "$TICK_TIME_LIMIT"); fi
+          matrix=$(uv run --no-default-groups python tools/runlist.py "${opts[@]}")
+          if [ "$(jq '.include | length' <<<"$matrix")" -eq 0 ]; then
+            echo "::error::no run selected"
+            exit 1
+          fi
+          echo "matrix=$matrix" >> "$GITHUB_OUTPUT"
+          {
+            echo "### Runs"
+            [ -z "$RESUME_FROM" ] || echo "Resuming from workflow run $RESUME_FROM."
+            echo
+            jq -r '.include[] | "- `\(.id)`: `python -m scheduler.run \(.argv | fromjson | join(" "))`"' <<<"$matrix"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  run:
+    name: ${{ matrix.id }}
+    needs: setup
+    runs-on: ubuntu-latest
+    # GitHub stops a job at 6 h. The run saves its checkpoint and exits at its wall-time limit
+    # (5 h 30 min, tools/runlist.py); the step limit below catches a run that overshoots it,
+    # and leaves time to upload the run folder.
+    timeout-minutes: 355
+    strategy:
+      fail-fast: false
+      max-parallel: 18
+      matrix: ${{ fromJSON(needs.setup.outputs.matrix) }}
+    env:
+      RUN_ID: ${{ matrix.id }}
+      RUN_DIR: _ci/results/${{ matrix.scenario }}/${{ matrix.run_name }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            /pyproject.toml
+            /uv.lock
+            /scheduler/
+            /tools/
+            /scenarios/
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+      - name: Install
+        run: uv sync --locked --no-default-groups
+      - name: Run folder of the earlier run
+        if: inputs.resume_from_run_id != ''
+        uses: actions/download-artifact@v4
+        with:
+          name: run-${{ matrix.id }}
+          path: _ci
+          run-id: ${{ inputs.resume_from_run_id }}
+          github-token: ${{ github.token }}
+      - name: Check the checkpoint
+        if: inputs.resume_from_run_id != ''
+        run: |
+          if [ ! -d "$RUN_DIR/checkpoint" ]; then
+            echo "::error::workflow run $RESUME_FROM left no checkpoint for $RUN_ID (it finished, or stopped before its first tick)"
+            exit 1
+          fi
+          echo "Resuming $RUN_ID from the checkpoint of workflow run $RESUME_FROM"
+      - name: Solve
+        id: solve
+        timeout-minutes: 345
+        env:
+          ARGV: ${{ matrix.argv }}
+        run: |
+          mapfile -t argv < <(jq -r '.[]' <<<"$ARGV")
+          echo "python -m scheduler.run ${argv[*]}"
+          set +e
+          uv run --no-sync python -m scheduler.run "${argv[@]}"
+          code=$?
+          set -e
+          echo "code=$code" >> "$GITHUB_OUTPUT"
+      - name: Outcome
+        id: outcome
+        if: always()
+        env:
+          CODE: ${{ steps.solve.outputs.code }}
+          SOLVE: ${{ steps.solve.outcome }}
+        run: |
+          state=error
+          case "$CODE" in
+            0) state=finished; echo "::notice::$RUN_ID: done" ;;
+            1) state=finished; echo "::warning::$RUN_ID: done, with failed checks (see summary.json)" ;;
+            2) echo "::error::$RUN_ID: exit 2, a switch not defined yet or the arguments did not parse" ;;
+            3) state=resume
+               echo "::warning::$RUN_ID: stopped at the wall-time limit; checkpoint saved, resume it" ;;
+            4) state=stuck
+               echo "::error::$RUN_ID: stuck tick, no valid schedule; summary.json names the limit" ;;
+            "")
+              if [ "$SOLVE" != skipped ] && [ -d "$RUN_DIR/checkpoint" ]; then
+                state=resume
+                echo "::warning::$RUN_ID: stopped ($SOLVE) before the run finished; resume from the last checkpoint"
+              else
+                echo "::error::$RUN_ID: the run did not start or left no checkpoint ($SOLVE)"
+              fi ;;
+            *) echo "::error::$RUN_ID: exit code $CODE" ;;
+          esac
+          echo "state=$state" >> "$GITHUB_OUTPUT"
+          echo "- \`$RUN_ID\`: $state (exit code ${CODE:-none})" >> "$GITHUB_STEP_SUMMARY"
+          if [ "$state" = resume ]; then
+            mkdir -p _resume && echo "$RUN_ID" > _resume/id.txt
+          fi
+      - name: Upload the run folder
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: run-${{ matrix.id }}
+          path: _ci/
+          if-no-files-found: warn
+          overwrite: true
+      - name: Mark for resume
+        if: always() && steps.outcome.outputs.state == 'resume'
+        uses: actions/upload-artifact@v4
+        with:
+          name: resume-${{ matrix.id }}
+          path: _resume/id.txt
+          overwrite: true
+      - name: Result
+        if: always()
+        env:
+          STATE: ${{ steps.outcome.outputs.state }}
+        run: |
+          case "$STATE" in
+            finished) exit 0 ;;
+            resume) echo "::error::$RUN_ID needs a resume: start the workflow with resume_from_run_id=$GITHUB_RUN_ID"; exit 1 ;;
+            *) exit 1 ;;
+          esac
+
+  collect:
+    name: collect results
+    needs: [setup, run]
+    if: always() && needs.setup.result == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Results of the earlier run
+        if: inputs.resume_from_run_id != ''
+        continue-on-error: true       # an earlier run cancelled before collecting has none
+        uses: actions/download-artifact@v4
+        with:
+          name: per-tick-results
+          path: collected
+          run-id: ${{ inputs.resume_from_run_id }}
+          github-token: ${{ github.token }}
+      - name: Run folders of this run
+        uses: actions/download-artifact@v4
+        with:
+          pattern: run-*
+          path: incoming
+      - name: Merge
+        run: |
+          # incoming/run-<id>/results/<scenario>/<run-name>/ replaces the same folder of the
+          # earlier run, so no stale checkpoint is left next to a finished run.
+          mkdir -p collected/results
+          shopt -s nullglob
+          for src in incoming/run-*/results/*/*/; do
+            rel=${src#incoming/*/}
+            rm -rf "collected/$rel"
+            mkdir -p "collected/$rel"
+            cp -R "$src". "collected/$rel"
+          done
+          {
+            echo "### Collected run folders"
+            echo
+            echo "| run folder | state |"
+            echo "|---|---|"
+            for d in collected/results/*/*/; do
+              rel=${d#collected/}
+              if [ -d "$d/checkpoint" ]; then s="not finished (checkpoint)"
+              elif [ -f "$d/summary.json" ]; then s="finished"
+              else s="no summary.json"; fi
+              echo "| \`${rel%/}\` | $s |"
+            done
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload per-tick-results
+        uses: actions/upload-artifact@v4
+        with:
+          name: per-tick-results
+          path: collected/
+          if-no-files-found: error
+          overwrite: true
