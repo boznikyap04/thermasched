@@ -484,6 +484,8 @@ def run_per_tick(scenario: Scenario, original: dict[int, int], settings: RunSett
     resumed = None
     if state is None:
         state = _initial_state(scenario)
+        # a summary left by an earlier run of this name would make a stopped run look done
+        (run_dir / "summary.json").unlink(missing_ok=True)
     else:
         resumed = state.next_tick
         if not quiet:

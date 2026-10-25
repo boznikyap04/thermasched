@@ -126,7 +126,10 @@ def test_stopped_and_resumed_run_matches_the_unbroken_run(unbroken, tmp_path):
     folder = tmp_path / "small" / st.run_name
     assert st.run_name.endswith("_pertick")
 
-    # stopped by the wall-time limit after its first tick
+    # stopped by the wall-time limit after its first tick; a summary left by an earlier run
+    # of this name goes, so the stopped run does not look finished
+    folder.mkdir(parents=True)
+    (folder / "summary.json").write_text("{}")
     assert main(argv + ["--wall-time-limit", "0"]) == 3
     assert (folder / CHECKPOINT_DIR / "state.json").is_file()
     assert not (folder / "summary.json").exists()
