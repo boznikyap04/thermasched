@@ -1,0 +1,33 @@
+--scenario thesis10 --h-min 19 --time-limit 600 --run-name s3_t1_hmin_high --results-dir runs_staging/servers10
+--scenario consolidated6 --zone-map 1,1,2,2,2,2 --time-limit 600 --run-name s1_t1_zones --results-dir runs_staging/servers6
+--scenario consolidated6 --reassignment same_zone --time-limit 600 --run-name s1_t2_same_zone --results-dir runs_staging/servers6
+--scenario consolidated6 --cold-plates --time-limit 600 --run-name s2_base --results-dir runs_staging/servers6
+--scenario consolidated6 --cold-plates --cp-mode fixed --time-limit 600 --run-name s2_t1_crac --results-dir runs_staging/servers6
+--scenario consolidated6 --cold-plates --supply-temp-mode fixed --time-limit 600 --run-name s2_t2_cold_plate --results-dir runs_staging/servers6
+--scenario consolidated6 --h-min 19 --time-limit 600 --run-name s3_t1_hmin_high --results-dir runs_staging/servers6
+--scenario consolidated6 --h-min 15 --time-limit 600 --run-name s3_t2_hmin_med --results-dir runs_staging/servers6
+--scenario consolidated6 --h-min 5 --time-limit 600 --run-name s3_t3_hmin_low --results-dir runs_staging/servers6
+--scenario consolidated6 --thermal-blind --time-limit 600 --run-name s4_t2_blind --results-dir runs_staging/servers6
+--scenario consolidated6 --ci-flat --time-limit 600 --run-name s4_t3a_ci_flat --results-dir runs_staging/servers6
+--scenario consolidated6_swing --time-limit 600 --run-name s4_t3b_ci_swing --results-dir runs_staging/servers6
+--scenario servers2 --time-limit 600 --run-name base --results-dir runs_staging/servers2
+--scenario servers2 --zone-map 1,1 --time-limit 600 --run-name s1_t1_zones --results-dir runs_staging/servers2
+--scenario servers2 --reassignment same_zone --time-limit 600 --run-name s1_t2_same_zone --results-dir runs_staging/servers2
+--scenario servers2 --h-min 19 --time-limit 600 --run-name s3_t1_hmin_high --results-dir runs_staging/servers2
+--scenario servers2 --h-min 15 --time-limit 600 --run-name s3_t2_hmin_med --results-dir runs_staging/servers2
+--scenario servers2 --h-min 5 --time-limit 600 --run-name s3_t3_hmin_low --results-dir runs_staging/servers2
+--scenario servers2 --reassignment none --time-limit 600 --run-name s4_t1_no_moves --results-dir runs_staging/servers2
+--scenario servers2 --thermal-blind --time-limit 600 --run-name s4_t2_blind --results-dir runs_staging/servers2
+--scenario servers2 --ci-flat --time-limit 600 --run-name s4_t3a_ci_flat --results-dir runs_staging/servers2
+--scenario servers2_swing --time-limit 600 --run-name s4_t3b_ci_swing --results-dir runs_staging/servers2
+--scenario thesis10 --time-limit 600 --run-name base --results-dir runs_staging/servers10
+--scenario thesis10 --zone-map 1,1,1,1,2,2,2,2,2,2 --time-limit 600 --run-name s1_t1_zones --results-dir runs_staging/servers10
+--scenario thesis10 --reassignment same_zone --time-limit 600 --run-name s1_t2_same_zone --results-dir runs_staging/servers10
+--scenario thesis10 --cold-plates --time-limit 600 --run-name s2_base --results-dir runs_staging/servers10
+--scenario thesis10 --cold-plates --cp-mode fixed --time-limit 600 --run-name s2_t1_crac --results-dir runs_staging/servers10
+--scenario thesis10 --cold-plates --supply-temp-mode fixed --time-limit 600 --run-name s2_t2_cold_plate --results-dir runs_staging/servers10
+--scenario thesis10 --h-min 15 --time-limit 600 --run-name s3_t2_hmin_med --results-dir runs_staging/servers10
+--scenario thesis10 --h-min 5 --time-limit 600 --run-name s3_t3_hmin_low --results-dir runs_staging/servers10
+--scenario thesis10 --reassignment none --time-limit 600 --run-name s4_t1_no_moves --results-dir runs_staging/servers10
+--scenario thesis10 --thermal-blind --time-limit 600 --run-name s4_t2_blind --results-dir runs_staging/servers10
+--scenario thesis10 --ci-flat --time-limit 600 --run-name s4_t3a_ci_flat --results-dir runs_staging/servers10

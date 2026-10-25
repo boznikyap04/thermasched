@@ -78,7 +78,12 @@ def is_time_sensitive(vm_id, seed, share):
     return int(int.from_bytes(h[:8], "big") / 2 ** 64 < share)
 
 
-def pick_workloads(sc, fleet_cores, clean_dir):
+def pick_workloads(sc, fleet_cores, fleet_mem_mb, clean_dir):
+    # Draw in seeded random order until peak requested vCPUs reach target_peak_load of the
+    # fleet's cores, or peak requested memory that share of its memory, whichever comes first.
+    # With top_up_by_repeats, a catalogue that runs out first is drawn again in the same
+    # order: each copy keeps the workload's arrival time, work and flags, and its ID gets
+    # "-r1", "-r2", ... (column `repeat`).
     T, rng = sc["periods"], random.Random(sc["seed"])
     per_day = 86400 // sc["dt_seconds"]
     start = sc["start_hour_local"] * 3600 // sc["dt_seconds"]
@@ -86,32 +91,45 @@ def pick_workloads(sc, fleet_cores, clean_dir):
            if sc["min_et_periods"] <= int(w["ET_base_periods"]) <= sc["max_et_periods"]]
     rng.shuffle(cat)
 
-    demand, picked = [0] * (T + 2), []
-    for w in cat:
-        et, vcpu = int(w["ET_base_periods"]), int(w["C_req_vcpu"])
-        a = (int(w["arrival_slot_of_day"]) - start) % per_day + 1
-        rt = is_time_sensitive(w["ufcg_server_id"], sc["seed"], sc["rt_share"])
-        slack = max(1, math.ceil(sc["rt_slack_frac"] * et)) if rt else \
-            min(sc["dt_slack_max"], max(sc["dt_slack_min"], math.ceil(sc["dt_slack_mult"] * et)))
-        d = min(a + et + slack, T + 1)          # D_i: first period by which it must be done
-        if d - a - et < 1:
-            continue                            # cannot finish inside the horizon
-        for t in range(a, a + et):
-            demand[t] += vcpu
-        picked.append({
-            "workload_id": w["workload_id"], "flavor": w["flavor_name"],
-            "A_i": a, "D_i": d, "AD_i": d - a - et, "ET_base_i": et, "RT_i": rt, "B_i": 0,
-            "C_req_i": vcpu, "M_req_i_MB": int(w["M_req_MB"]), "W_i_MHz_s": float(w["W_MHz_s"]),
-            "usage_imputed": int(w["usage_imputed"]),
-        })
-        if max(demand) >= sc["target_peak_load"] * fleet_cores:
+    demand, mem, picked = [0] * (T + 2), [0] * (T + 2), []
+
+    def full():
+        return (max(demand) >= sc["target_peak_load"] * fleet_cores
+                or max(mem) >= sc["target_peak_load"] * fleet_mem_mb)
+
+    repeat = 0
+    while True:
+        n_before = len(picked)
+        for w in cat:
+            et, vcpu, mb = int(w["ET_base_periods"]), int(w["C_req_vcpu"]), int(w["M_req_MB"])
+            a = (int(w["arrival_slot_of_day"]) - start) % per_day + 1
+            rt = is_time_sensitive(w["ufcg_server_id"], sc["seed"], sc["rt_share"])
+            slack = max(1, math.ceil(sc["rt_slack_frac"] * et)) if rt else \
+                min(sc["dt_slack_max"], max(sc["dt_slack_min"], math.ceil(sc["dt_slack_mult"] * et)))
+            d = min(a + et + slack, T + 1)          # D_i: first period by which it must be done
+            if d - a - et < 1:
+                continue                            # cannot finish inside the horizon
+            for t in range(a, a + et):
+                demand[t] += vcpu
+                mem[t] += mb
+            picked.append({
+                "workload_id": w["workload_id"] + (f"-r{repeat}" if repeat else ""),
+                "flavor": w["flavor_name"],
+                "A_i": a, "D_i": d, "AD_i": d - a - et, "ET_base_i": et, "RT_i": rt, "B_i": 0,
+                "C_req_i": vcpu, "M_req_i_MB": mb, "W_i_MHz_s": float(w["W_MHz_s"]),
+                "usage_imputed": int(w["usage_imputed"]), "repeat": repeat,
+            })
+            if full():
+                break
+        if full() or len(picked) == n_before or not sc.get("top_up_by_repeats", False):
             break
+        repeat += 1
     if not picked:
         raise ValueError("no workload fits: none can finish inside the horizon with these settings")
     picked.sort(key=lambda w: (w["A_i"], w["workload_id"]))
     for i, w in enumerate(picked, 1):
         w["i"] = i
-    return picked, max(demand), len(cat)
+    return picked, max(demand), max(mem), len(cat)
 
 
 def carbon_profile(sc):
@@ -129,9 +147,11 @@ def carbon_profile(sc):
 
 def baseline_schedule(servers, workloads, sc, unavailable=frozenset()):
     # Thermally unaware reference: each workload starts at arrival on the least-loaded
-    # server that has room. `unavailable` holds (server, period) pairs with AV = 0, Eq. (11).
+    # server that has room for its cores and memory, Eq. (12)-(13). `unavailable` holds
+    # (server, period) pairs with AV = 0, Eq. (11).
     T, dt = sc["periods"], sc["dt_seconds"]
     used = {s["s"]: [0] * (T + 2) for s in servers}
+    mem = {s["s"]: [0] * (T + 2) for s in servers}
     sched = []
     for w in workloads:
         placed = None
@@ -140,6 +160,7 @@ def baseline_schedule(servers, workloads, sc, unavailable=frozenset()):
                 et = math.ceil(w["W_i_MHz_s"] / (w["C_req_i"] * s["f_s_MHz"] * dt))
                 span = range(start, start + max(1, et))
                 if span[-1] <= T and all(used[s["s"]][t] + w["C_req_i"] <= s["C_s_cores"]
+                                         and mem[s["s"]][t] + w["M_req_i_MB"] <= s["M_s_MB"]
                                          and (s["s"], t) not in unavailable for t in span):
                     placed = (s, span)
                     break
@@ -151,6 +172,7 @@ def baseline_schedule(servers, workloads, sc, unavailable=frozenset()):
         s, span = placed
         for t in span:
             used[s["s"]][t] += w["C_req_i"]
+            mem[s["s"]][t] += w["M_req_i_MB"]
         w["X0_s"] = s["s"]
         sched.append({"i": w["i"], "s": s["s"], "start": span[0], "end": span[-1] + 1,
                       "late": int(span[-1] + 1 > w["D_i"])})
@@ -181,7 +203,8 @@ def build_scenario(name, sc, const, cold_plate, *, clean_dir, scenarios_dir, f_r
 
     servers = pick_servers(sc, clean_dir)
     fleet = sum(s["C_s_cores"] for s in servers)
-    workloads, peak, n_cat = pick_workloads(sc, fleet, clean_dir)
+    fleet_mem = sum(s["M_s_MB"] for s in servers)
+    workloads, peak, peak_mem, n_cat = pick_workloads(sc, fleet, fleet_mem, clean_dir)
     carbon = carbon_profile(sc)
     sched, used = baseline_schedule(servers, workloads, sc)
 
@@ -203,7 +226,7 @@ def build_scenario(name, sc, const, cold_plate, *, clean_dir, scenarios_dir, f_r
     write_csv(out / "servers.csv", servers)
     write_csv(out / "workloads.csv", workloads, ["i", "workload_id", "flavor", "A_i", "D_i", "AD_i", "ET_base_i",
                                                  "RT_i", "B_i", "X0_s", "C_req_i", "M_req_i_MB", "W_i_MHz_s",
-                                                 "usage_imputed"])
+                                                 "usage_imputed", "repeat"])
     write_csv(out / "carbon.csv", carbon)
     write_csv(out / "baseline_schedule.csv", sched)
 
@@ -218,8 +241,12 @@ def build_scenario(name, sc, const, cold_plate, *, clean_dir, scenarios_dir, f_r
         "peak_requested_vcpus": peak,
         "peak_load_share_of_fleet": round(peak / fleet, 3),
         "peak_load_share_of_fastest_tier": round(peak / top_cores, 3) if top_cores else None,
+        "fleet_memory_MB": fleet_mem,
+        "peak_requested_memory_MB": peak_mem,
+        "peak_memory_share_of_fleet": round(peak_mem / fleet_mem, 3),
         "time_sensitive_workloads": sum(w["RT_i"] for w in workloads),
         "workloads_with_imputed_usage": sum(w["usage_imputed"] for w in workloads),
+        "repeated_workloads": sum(w["repeat"] > 0 for w in workloads),
         "median_slack_periods_delay_tolerant": sorted(w["AD_i"] for w in workloads if not w["RT_i"])[
             sum(1 for w in workloads if not w["RT_i"]) // 2] if any(not w["RT_i"] for w in workloads) else None,
         "W_per_MHz_spread_best_to_worst": round(max(s["W_per_MHz"] for s in servers) / min(s["W_per_MHz"] for s in servers), 2),
@@ -267,10 +294,11 @@ def build_running_variant(name, start_from, running_arrivals, outage, *, scenari
     T, dt = params["time"]["T"], params["time"]["dt_seconds"]
     server_rows = read_csv_rows(src / "servers.csv")
     rows = read_csv_rows(src / "workloads.csv")
-    servers = [{"s": int(r["s"]), "f_s_MHz": float(r["f_s_MHz"]), "C_s_cores": int(r["C_s_cores"])}
-               for r in server_rows]
+    servers = [{"s": int(r["s"]), "f_s_MHz": float(r["f_s_MHz"]), "C_s_cores": int(r["C_s_cores"]),
+                "M_s_MB": int(r["M_s_MB"])} for r in server_rows]
     workloads = [{"i": int(r["i"]), "A_i": int(r["A_i"]), "D_i": int(r["D_i"]),
-                  "C_req_i": int(r["C_req_i"]), "W_i_MHz_s": float(r["W_i_MHz_s"])} for r in rows]
+                  "C_req_i": int(r["C_req_i"]), "M_req_i_MB": int(r["M_req_i_MB"]),
+                  "W_i_MHz_s": float(r["W_i_MHz_s"])} for r in rows]
 
     first, last = running_arrivals
     running = [r for r in rows if first <= int(r["A_i"]) <= last]

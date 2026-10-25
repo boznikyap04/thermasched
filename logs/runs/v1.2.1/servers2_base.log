@@ -1,0 +1,60 @@
+Scenario servers2: I=123 workloads, S=2 servers, Z=2 zones, T=288 periods of 300 s
+Run 'base': baseline=least_loaded at 18.0 C, reassignment=free, placement=thermal_aware, supply_temp_mode=optimize, priority=on, thermal cap 80.0 C
+Made with ThermaSched 1.2.1 (command line, commit 68304fa+dirty), scenario fingerprint 508dc0d2d5e3
+
+Metric                                       Baseline         Optimized    Diff  Diff %
+-----------------------------------  ----------------  ----------------  ------  ------
+Total carbon (kg)                                8.27              7.08   -1.19  -14.4%
+Energy, IT (kWh)                                 9.67              9.67   +0.00   +0.0%
+Energy, CRAC (kWh)                               3.62              1.78   -1.84  -50.8%
+Energy, cold plate (kWh)                         0.00              0.00   +0.00       -
+Heat removed by cold plates (kWh)                0.00              0.00   +0.00       -
+Energy, fan (kWh)                                0.00              0.00   +0.00       -
+Energy, total (kWh)                             13.29             11.45   -1.84  -13.8%
+Workloads late                                      0                 0      +0       -
+Non-compliant workloads                             0                 0      +0       -
+Mean wait, time-sensitive (periods)              0.00              0.66   +0.66       -
+Max wait, time-sensitive (periods)               0.00              8.00   +8.00       -
+Mean wait, delay-tolerant (periods)              0.00             17.45  +17.45       -
+Max wait, delay-tolerant (periods)               0.00             96.00  +96.00       -
+Priority inversions                                 0                 0      +0       -
+Hottest server temperature (C)       63.42 (server 1)  72.66 (server 2)   +9.24  +14.6%
+Mean server temperature (C)                     55.38             63.86   +8.49  +15.3%
+Minimum headroom (C)                            26.58             17.34   -9.24  -34.8%
+Mean headroom (C)                               34.62             26.14   -8.49  -24.5%
+Server-periods above 75 C                           0                 0      +0       -
+Server-periods above thermal cap                    0                 0      +0       -
+Servers throttled (DPF < 1)                         0                 0      +0       -
+Workloads reassigned                                0                 0      +0       -
+Reassigned to another zone                          0                 0      +0       -
+Schedule valid (no limit broken)                 True              True                
+
+Solver: status=time_limit (Time limit reached), time=600.2 s, gap=1.0932%, objective=7,080.31 g, bound=7,002.91 g
+        36283 variables, 19176 binaries, 50853 constraints
+        note: Y[i,s,t] is eliminated: a workload occupies n_min core periods after its start, U[t] - U[t-n_min], plus optional tail binaries E[i,s,t] only where n_max > n_min, because the Y-based model made the root LP of 'consolidated6' unsolvable (500k rows).
+        note: Start indicators S are replaced by cumulative 'started by t' steps U[i,s,t] (S = U[t] - U[t-1], X[i,s] is the last step), so one unbroken block needs no window sums.
+        note: The tail E[t] <= U[t-n_min] - U[t-n_max] and E[t] <= E[t-1] + U[t-n_min] - U[t-n_min-1] keep the run unbroken and within n_min..n_max periods; Y <= X (10) is then implied and Eq. (9) is kept.
+        note: n_min = ceil(W/(C_req*f_s*dt)) is the shortest run since DPF <= 1, and starts with t + n_min > D are dropped.
+        note: n_max = ceil(W/(C_req*f_s*dt*DPF_cap)) caps the run: valid for the optimum because trimming the tail of a run never raises power, heat or temperature, so every other limit stays met.
+        note: DPF enters only through the loss L = 1 - DPF >= slope*(T - T_dvfs), L >= 0 (the linear piece of Eq. 37, valid below T_throttle, so a cap above T_throttle is rejected), and only on servers where some pair has n_max > n_min; higher DPF never hurts, so no binaries are needed.
+        note: Work (39) uses core credit n_min*X - coreLoss, where coreLoss >= CL[tau+n_min-1] - CL[tau-1] - M(1 - sigma_tau) over the running sum CL of L, plus tail credits wt <= E, wt <= 1 - L; for a pair with n_max == n_min any core block delivers at least W, so its term is exactly X.
+        note: The work row is divided by W_i (right side 1), and with the cap at or below T_dvfs there are no loss, tail or work-credit columns at all.
+        note: Server utilisation and heat are substituted into P_IT[s,t] = P_idle + (P_max-P_idle)*sum C_req*occupancy/C_s (Eq. 16, 20, 21); P_IT is bounded by P_max (or by the cores of the workloads that can ever run there) as a column bound.
+        note: Eq. (54) Q_crac <= 116 kW and the big-M of the supply-level split are one column bound Qmax = min(116, sum of the zone's maximum IT power in kW); the heat balance sets Q_crac >= heat and the cost increases in Q_crac, so it sits at equality in any optimum.
+        note: CRAC power is Q_crac / COP (divide), COP looked up per whole-degree level; the printed Eq. (46) multiplies.
+        note: Fan power P_fan is a named column fixed at zero (_add_fan_terms) that already appears in the objective.
+        note: Idle energy is in the objective through the P_IT columns (lower bound P_idle), so objective_g equals total carbon with no separate offset.
+        note: The wait limit (28) is applied to all workloads, which includes (25). Workloads with B_i = 1 keep their original server (29).
+        note: Priority (56)-(57): O_ij = 1 for a time-sensitive i and a delay-tolerant j, and for the earlier arrival of two same-type, same-deadline workloads. It is linked to the start times as: on a shared server, j may not start while i waits (A_i <= ST_j implies ST_i <= ST_j), through ST_i = sum_s (b X - sum U) and big-M rows (1860 pair-server rows after dropping those that cannot bind). EDF within a type is not in the equations and is not modelled.
+        note: Availability (11): every server is available in every period (AV = 1).
+        note: Cold plates are off: Q_cp and P_cp are columns fixed at zero.
+        note: Starting schedule: the same model with reassignment=none, solved first (optimal, 7,080.31 g, 12.7 s); its time is included in the solve time.
+
+Note: Airflow and fan power are not modelled (fan power and airflow are zero). Cold plates are off (cold-plate heat removal and pump power are zero; run with --cold-plates to model them).
+
+Checks:
+  [PASS] least_loaded_reproduces_baseline_schedule_csv
+  [PASS] optimizer_objective_equals_evaluator_carbon  {'optimizer_objective_g': 7080.310541809521, 'evaluator_carbon_g': 7080.310541809521, 'relative_difference': 0.0}
+  [PASS] optimized_schedule_valid_under_evaluator  {'violations': []}
+
+Results written to runs_staging/servers2/servers2/base/
