@@ -1,4 +1,4 @@
-"""Relationship checks of the Validation page (dashboard/relations.py) on real thesis10 runs."""
+"""Relationship checks of the Validation page (dashboard/relations.py) on real servers10 runs."""
 
 from __future__ import annotations
 
@@ -46,6 +46,9 @@ def test_utilization_drives_power_and_idle_is_not_zero(runs):
     sp = runs["base"].server_period
     sp = sp[sp["variant"] == "optimized"]
     for _, g in sp.groupby("s"):
+        if g["utilization"].nunique() == 1:     # idle all day: power stays at P_idle
+            assert g["P_IT_W"].nunique() == 1 and g["P_IT_W"].iloc[0] > 0
+            continue
         assert relations.pearson(g["utilization"], g["P_IT_W"]) > 0.99
     assert "not 0 W" in relations.reading("util_power", runs["base"], "optimized")
 

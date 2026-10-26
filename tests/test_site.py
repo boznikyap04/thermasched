@@ -68,7 +68,7 @@ def test_across_both_is_never_offered():
 
 def test_picking_a_configuration_carries_to_the_next_page():
     at = _section("6.1").run()
-    assert at.segmented_control(key="config-6.1").value == "servers6"    # first fleet with runs
+    assert at.segmented_control(key="config-6.1").value == "servers10"   # first fleet with runs
     assert at.segmented_control(key="level-6.1").value == "normal"
     at.segmented_control(key="config-6.1").set_value("servers2").run()
     _ok(at)
