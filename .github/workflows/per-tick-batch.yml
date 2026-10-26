@@ -40,8 +40,10 @@ permissions:
   contents: read
   actions: read           # to list and download an earlier run's artifacts when resuming
 
+# One batch per set of inputs at a time: a push, or a start with the same inputs, waits for the
+# one running; a start with other runs (e.g. a re-run at another cap) goes alongside it.
 concurrency:
-  group: per-tick-batch
+  group: per-tick-batch-${{ inputs.fleet }}-${{ inputs.batch }}-${{ inputs.runs }}-${{ inputs.resume_from_run_id }}-${{ inputs.tick_time_limit }}
   cancel-in-progress: false
 
 defaults:
