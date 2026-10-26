@@ -6,7 +6,8 @@ left to do. Where it differs from `PRD.md` or `PRD_CH6_RESULTS.md`, this file wi
 **Status (2026-10-26):** work items 1–6 done. All 39 per-tick runs on six servers (6.1–6.4,
 light / normal / heavy) are solved on GitHub Actions and in `results/` on `refactor-10_25`,
 pushed only to the branch `per-tick-runs`. The deployed site stays at release 1.2.1 until the
-release (item 7), which needs the project owner's go.
+release (item 7), which needs the project owner's go. The 39 runs on ten servers (third batch,
+§3) are in `results/` on `pertick-servers10`: 37 solved, 2 stuck at a tick (item 8).
 
 ---
 
@@ -105,7 +106,15 @@ T3b runs on each day's `_swing` twin (`servers6_light_swing`, `servers6_swing`,
 folder is `<day>_swing/s4_t3b_ci_swing/`, filed under the day's folder when installed.
 `tools/runlist.py` now lists all 39 runs; `--sections 6.1,6.2` gives the first batch.
 
-**Not in either batch:** the 10- and 2-server fleets and the validation runs.
+### Third batch: ten servers, 39 runs (2026-10-26)
+
+The same 13 tests × 3 days on ten servers (4 slow / 3 mid / 3 fast, regroup map
+1,1,1,1,2,2,2,2,2,2, cold plates on the fast tier): `servers10_light`, `servers10`,
+`servers10_heavy` (91 / 257 / 370 workloads, peak memory 30.7 / 62.0 / 85.6 %; the heavy day
+repeats 33 workloads) and their `_swing` twins. `tools/runlist.py --fleet servers10` lists
+them. Cap 60 s per tick, except four runs re-run at 120 s after they got stuck at 60 s (item 8).
+
+**Not in any batch:** the 2-server fleet and the validation runs.
 
 ## 4. Where it runs: GitHub Actions
 
@@ -144,6 +153,10 @@ names, is `<scenario>__<test id>`, e.g. `servers6_heavy__base`.
   checkpoint made by another command) fails with an error. 3 (wall-time stop) or a job stopped by its step limit fails with "needs a resume"
   and leaves a marker artifact `resume-<id>`, 4 (stuck tick) fails with an error; summary.json
   names the limit.
+- **Fleet:** `fleet` (servers6 or servers10; a push runs servers6) picks the run list, for a
+  start and for a resume, so a resume needs the earlier run's fleet. One batch per set of
+  inputs runs at a time: a push or a start with the same inputs waits, a start with other
+  inputs (e.g. other `runs` or another cap) runs alongside.
 - **Resume:** Run workflow with `resume_from_run_id` = the earlier run's id (the number in its
   URL, `.../actions/runs/<id>`). With `runs` empty it resumes every job that left a
   `resume-<id>` marker; with `runs` it resumes those. Each job downloads `run-<id>` of the
@@ -276,6 +289,30 @@ names, is `<scenario>__<test id>`, e.g. `servers6_heavy__base`.
    runs relabelled 1.3.0 (`relabelled_from: 1.2.1` in their provenance), and the site reads
    per-tick runs (status per tick, per-tick chart, opens on 6 servers). Pushing `main` and
    `release` needs the owner's go.
+8. **Ten servers: scenarios and 39 runs** (third batch, §3). **Done (2026-10-26) on
+   `pertick-servers10`, not merged.** The six `servers10*` scenarios are built by data_prep
+   (baselines: 0 late, 0 unplaced, within cores and 66,036 MB) and shipped; the workflow has a
+   `fleet` input. Actions runs: 40238528912 (all 39, 60 s), 40254014552 (four stuck runs again
+   at 120 s, owner's choice) and 40254057648 (resume of one crashed run).
+   - *Crash fixed.* `servers10_heavy` 6.2 T2 crashed at tick 58: the tick stopped at the cap
+     with a schedule but before HiGHS had a bound (gap inf), which the checkpoint could not
+     store. Such a tick now has no gap in `ticks.csv`, is counted in
+     `per_tick.n_ticks_no_bound` and left out of `max_mip_gap`; the site shows its gap as
+     unknown. The run resumed from tick 58 and finished (1 tick with no bound).
+   - *Stuck at 60 s:* 6.4 T3a normal day (tick 55), and on the heavy day 6.3 T3 (tick 111),
+     6.4 T2 (tick 110), 6.4 T3b (tick 106): HiGHS found no schedule within the cap. Re-run
+     from the start at 120 s: 6.4 T2 and T3b heavy finished; 6.4 T3a normal (tick 55) and
+     6.3 T3 heavy (tick 111) got stuck again at the same tick. These two are **reported as
+     stuck** (owner, 2026-10-26): no result, the site shows the tick and the limit. Tick 55
+     of 6.4 T3a solved on a laptop (warm start accepted in 1 s, optimal in 123 s), so the
+     tick can be solved; on the runner it was not, within either cap.
+   - *Results:* the 37 finished runs have 0 evaluator violations, 0 late and every check
+     passed. Ticks at the cap: light day 0–1 (flat carbon 34), normal day 0–77, heavy day
+     0–129, worst gaps up to 34 %; per run in `ticks.csv` and the summary's `per_tick`.
+     Carbon against the baseline: −12.8 to −15.9 % for most tests, −1.6 to −2.8 % for 6.2 T2
+     (cold plates changed, CRAC fixed).
+   - *Site:* it now opens on ten servers (the first fleet with runs). Tests that read the
+     whole-day 10-server runs were moved to the per-tick ones.
 
 ### Who does what
 
@@ -295,7 +332,8 @@ separate go.
 
 ## 6. Open items
 
-- When to add the 10- and 2-server fleets, 6.3 and 6.4, and the validation runs.
+- When to add the 2-server fleet and the validation runs.
+- Merge `pertick-servers10` (item 8) and release it; the version is not bumped there.
 - The tests that read whole-day runs (`tests/test_validate.py`) now skip; they need per-tick
   runs or a rewrite.
 
@@ -332,3 +370,6 @@ All on 2026-10-25.
 | How the work is split | one thread per phase (A, B, D); this planning thread coordinates |
 | Where to time the cap | this machine first, confirmed by the first Actions job |
 | Start | A, B, D went ahead 2026-10-25; push and all 18 runs at once: go on 2026-10-26 |
+| Ten servers | all 39 runs on Actions (2026-10-26) |
+| 10-server runs stuck at 60 s | re-run at a 120 s cap (2026-10-26) |
+| Still stuck at 120 s (6.4 T3a normal, 6.3 T3 heavy) | reported as stuck, no result (2026-10-26) |
