@@ -10,7 +10,9 @@ FILES = ("servers.csv", "workloads.csv", "carbon.csv", "baseline_schedule.csv", 
 
 
 # The scenarios data_prep.ipynb builds from data/clean/ (small_running is made from small).
-BUILT = ("servers6_light", "servers6", "servers6_heavy", "servers6_light_swing", "servers6_swing",
+BUILT = ("servers10_light", "servers10", "servers10_heavy", "servers10_light_swing",
+         "servers10_swing", "servers10_heavy_swing",
+         "servers6_light", "servers6", "servers6_heavy", "servers6_light_swing", "servers6_swing",
          "servers6_heavy_swing", "small")
 
 
@@ -28,15 +30,24 @@ def test_build_reproduces_shipped_scenario(name, tmp_path):
 
 def test_scenarios_record_what_they_change_from_the_reference_settings():
     """Every shipped scenario is the reference settings (servers10) with only the values under
-    variant_of changed: two scenarios differ only in values one of them lists as changed."""
+    variant_of changed: two scenarios differ only in values one of them lists as changed.
+    servers10 is the reference settings as they are, so it has no variant_of."""
     params = {name: json.loads(open(f"scenarios/{name}/params.json").read()) for name in BUILT}
+    assert "variant_of" not in params["servers10"]
+
+    def changed_settings(p):
+        return p["variant_of"]["changed"]["settings"] if "variant_of" in p else {}
+
     for name, p in params.items():
+        if name == "servers10":
+            continue
         assert p["variant_of"]["scenario"] == "servers10", name
-        changed = p["variant_of"]["changed"]
-        assert changed["settings"], name
-        assert all(p["settings"][k] == v for k, v in changed["settings"].items()), name
+        changed = changed_settings(p)
+        assert changed, name
+        assert all(p["settings"][k] == v for k, v in changed.items()), name
+    for name, p in params.items():
         for other, q in params.items():
-            listed = set(changed["settings"]) | set(q["variant_of"]["changed"]["settings"])
+            listed = set(changed_settings(p)) | set(changed_settings(q))
             assert {k: v for k, v in p["settings"].items() if k not in listed} == \
                 {k: v for k, v in q["settings"].items() if k not in listed}, (name, other)
             assert p["constants_as_printed"] == q["constants_as_printed"], (name, other)

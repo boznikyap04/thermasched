@@ -1,0 +1,4 @@
+s,name,n_cold_plates,coolant_min_C,coolant_max_C,coolant_allowed_min_C,coolant_allowed_max_C,flow_min_Lmin,flow_max_Lmin,flow_allowed_min_Lmin,flow_allowed_max_Lmin,Q_cp_peak_W,Q_cp_capacity_W
+8,qh2-rcc133,1,20.0,20.0,20.0,39.95,0.3,0.3,0.05,0.35,237.09550289254878,300.0
+9,qh2-rcc183,1,20.0,20.0,20.0,39.95,0.3,0.3,0.05,0.35,240.18801527214714,300.0
+10,qh2-rcc174,1,20.0,20.0,20.0,39.95,0.3,0.3,0.05,0.35,159.38750000000002,300.0

@@ -1,4 +1,4 @@
-"""tools/runlist.py: the 39 per-tick runs of the six-server fleet (docs/PLAN.md §3)."""
+"""tools/runlist.py: the 39 per-tick runs of the six- and the ten-server fleet (docs/PLAN.md §3)."""
 
 from __future__ import annotations
 
@@ -12,6 +12,7 @@ from scheduler.types import RunSettings
 from tools import runlist
 
 RUNS = runlist.runs()
+RUNS10 = runlist.runs("servers10")
 # Settings that name or limit a run but never change which test it is.
 NOT_A_SWITCH = {"run_name", "time_limit_s", "mip_rel_gap"}
 
@@ -40,6 +41,20 @@ def test_thirty_nine_runs_with_unique_ids():
     assert runlist.TIMING_RUN in {r["id"] for r in RUNS}
 
 
+def test_ten_server_fleet_has_the_same_thirty_nine_tests():
+    assert len(RUNS10) == 39 and len({r["id"] for r in RUNS10}) == 39
+    assert {r["configuration"] for r in RUNS10} == {"servers10_light", "servers10",
+                                                     "servers10_heavy"}
+    assert [(r["run_name"], r["level"]) for r in RUNS10] == \
+        [(r["run_name"], r["level"]) for r in RUNS]
+    swing = [r for r in RUNS10 if r["run_name"] == "s4_t3b_ci_swing"]
+    assert [r["scenario"] for r in swing] == ["servers10_light_swing", "servers10_swing",
+                                              "servers10_heavy_swing"]
+    zones = next(r for r in RUNS10 if r["id"] == "servers10__s1_t1_zones")["args"]
+    assert zones[zones.index("--zone-map") + 1] == "1,1,1,1,2,2,2,2,2,2"
+    assert runlist.timing_run("servers10") in {r["id"] for r in RUNS10}
+
+
 def test_first_batch_is_sections_6_1_and_6_2():
     first = runlist.runs(sections=("6.1", "6.2"))
     assert len(first) == 18 and {r["run_name"] for r in first} == FIRST_BATCH
@@ -56,7 +71,7 @@ def test_carbon_tests_run_flat_or_on_the_swing_twin():
                if r["run_name"] != "s4_t3b_ci_swing")
 
 
-@pytest.mark.parametrize("r", RUNS, ids=[r["id"] for r in RUNS])
+@pytest.mark.parametrize("r", RUNS + RUNS10, ids=[r["id"] for r in RUNS + RUNS10])
 def test_args_reproduce_the_batch_notebook(r):
     """The usual flags parse, and give the settings the batch notebook builds for the same
     test (RunSettings with the test's switches); the run is recognized as that test."""
@@ -78,7 +93,7 @@ def test_args_reproduce_the_batch_notebook(r):
 
 
 @pytest.mark.skipif(not _per_tick_supported(), reason="scheduler.run has no --per-tick yet")
-@pytest.mark.parametrize("r", RUNS, ids=[r["id"] for r in RUNS])
+@pytest.mark.parametrize("r", RUNS + RUNS10, ids=[r["id"] for r in RUNS + RUNS10])
 def test_full_argv_parses_with_per_tick(r):
     settings, _ = parse_args(r["args"] + r["per_tick_args"])
     assert (settings.scenario, settings.run_name) == (r["scenario"], r["run_name"])
@@ -97,6 +112,11 @@ def test_matrix_and_selection(capsys):
     assert runlist.main(["--format", "matrix", "--timing"]) == 0
     timing = json.loads(capsys.readouterr().out)["include"]
     assert [e["id"] for e in timing] == [runlist.TIMING_RUN]
+    assert runlist.main(["--format", "matrix", "--fleet", "servers10", "--timing"]) == 0
+    timing = json.loads(capsys.readouterr().out)["include"]
+    assert [e["id"] for e in timing] == ["servers10_heavy__base"]
+    assert runlist.main(["--format", "matrix", "--fleet", "servers10"]) == 0
+    assert len(json.loads(capsys.readouterr().out)["include"]) == 39
     with pytest.raises(SystemExit):
         runlist.main(["--only", "servers6__nope"])
 

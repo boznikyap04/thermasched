@@ -51,11 +51,12 @@ def tick_solve_times(ticks: pd.DataFrame, clock: pd.DataFrame, pal: Palette,
         part = d[at_cap == stopped]
         if part.empty:
             continue
+        # a tick at the cap with no bound has no gap (NaN): "unknown"
+        gap = [("unknown" if pd.isna(g) else f"{g * 100:.2f} %") for g in part["mip_gap"]]
         fig.add_bar(x=part["time"], y=part["solve_s"], name=name, marker_color=color,
-                    customdata=np.stack([part["tick"], part["mip_gap"] * 100,
-                                         part["n_waiting"]], axis=-1),
-                    hovertemplate="tick %{customdata[0]}: %{y:.1f} s, gap %{customdata[1]:.2f} "
-                                  "%, %{customdata[2]} waiting<extra></extra>")
+                    customdata=np.stack([part["tick"], gap, part["n_waiting"]], axis=-1),
+                    hovertemplate="tick %{customdata[0]}: %{y:.1f} s, gap %{customdata[1]}, "
+                                  "%{customdata[2]} waiting<extra></extra>")
     if cap_s:
         threshold(fig, pal, cap_s, f"cap {cap_s:g} s")
     style(fig, pal, height=320)

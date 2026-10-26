@@ -316,7 +316,7 @@ def test_provenance_warnings():
 # -- Chapter 6: configurations, tests and the results table -------------------------------
 
 BASE = "servers10/base"
-# The runs kept on the site on 2026-10-25, renamed by their test.
+# Per-tick runs on the site (1.3.0 and the 10-server batch of 2026-10-26), by their test.
 SERVERS10_TESTS = {
     "servers10/base": "base", "servers10/s1_t1_zones": "s1_t1_zones",
     "servers10/s1_t2_same_zone": "s1_t2_same_zone", "servers10/s2_base": "s2_base",
@@ -324,6 +324,7 @@ SERVERS10_TESTS = {
     "servers10/s3_t2_hmin_med": "s3_t2_hmin_med", "servers10/s3_t3_hmin_low": "s3_t3_hmin_low",
     "servers10/s4_t1_no_moves": "s4_t1_no_moves", "servers10/s4_t2_blind": "s4_t2_blind",
     "servers10/s4_t3a_ci_flat": "s4_t3a_ci_flat", "servers10/s4_t3b_ci_swing": "s4_t3b_ci_swing",
+    "servers10/s3_t1_hmin_high": "s3_t1_hmin_high",
     "servers6/base": "base", "servers6/s4_t1_no_moves": "s4_t1_no_moves",
 }
 needs_site_runs = pytest.mark.skipif(not set(SERVERS10_TESTS) <= set(BY_KEY),
@@ -362,8 +363,6 @@ def test_run_titles():
     assert data.run_long_title(infos[ref.key], ref).startswith("10 servers · normal day · 6.1 · Test 1")
     base = BY_KEY[BASE]
     assert data.run_title(infos[base.key], base) == "Base"
-    v = BY_KEY["servers10/v_crac27_moves"]
-    assert data.run_title(infos[v.key], v) == "v_crac27_moves"
     row = data.compare_runs([BY_KEY[BASE]]).iloc[0]
     assert (row["configuration"], row["test"]) == ("10 servers · normal day", "Base")
 
@@ -390,10 +389,12 @@ def test_chapter6_table_rows_and_columns():
         else:
             assert row["status"] not in (data.NOT_RUN_YET, data.NOT_APPLICABLE)
     status = table.set_index(["configuration", "section", "tag"])["status"]
-    assert status["10 servers · normal day", "6.3", "Test 1"] == data.NOT_RUN_YET
+    assert status["10 servers · normal day", "6.3", "Test 1"] == "time_limit"
+    # stuck at tick 55 (no schedule within the 120 s cap): a run with no optimized schedule
+    assert status["10 servers · normal day", "6.4", "Test 3a"] == "no_solution"
     assert status["2 servers · normal day", "6.1", "Test 1"] == data.NOT_RUN_YET
     assert status["2 servers · normal day", "6.2", "Base"] == data.NOT_APPLICABLE
-    assert status["10 servers · heavy day", "6.1", "Base"] == data.NOT_RUN_YET
+    assert status["10 servers · heavy day", "6.1", "Base"] == "time_limit"
 
 
 @needs_site_runs
@@ -407,9 +408,9 @@ def test_chapter6_base_row_matches_summary_and_schedule():
     assert row["E_crac_kWh"] == tot["E_crac_kWh"]
     assert row["E_IT_kWh"] == tot["E_IT_kWh"] and row["E_total_kWh"] == tot["E_total_kWh"]
     assert row["E_cp_Wh"] == pytest.approx(tot["E_cp_kWh"] * 1000)
-    assert row["carbon_kg"] == pytest.approx(31.017, abs=1e-3) == tot["carbon_kg"]
+    assert row["carbon_kg"] == pytest.approx(30.985, abs=1e-3) == tot["carbon_kg"]
     assert row["T_mean_C"] == met["mean_T_C"]
-    assert row["T_max_C"] == pytest.approx(73.3, abs=0.05) == met["hottest_T_C"]
+    assert row["T_max_C"] == pytest.approx(75.96, abs=0.05) == met["hottest_T_C"]
     assert row["n_moved_server"] == met["n_reassigned"]
     assert row["n_moved_zone"] == met["n_cross_zone"]
     assert row["n_late"] == met["n_late"] and row["n_throttled_servers"] == \
@@ -417,7 +418,8 @@ def test_chapter6_base_row_matches_summary_and_schedule():
     assert row["pct_late"] == pytest.approx(met["n_late"] / summary["scenario"]["I"] * 100)
     assert (row["status"], row["mip_gap"]) == (summary["solver"]["status"],
                                                summary["solver"]["mip_gap"])
-    assert row["time_limit_s"] == summary["settings"]["time_limit_s"] == 1800
+    # a per-tick run: the whole-day limit plays no part, the per-tick cap does
+    assert row["time_limit_s"] is None and row["tick_time_limit_s"] == 60.0
 
     # By hand from schedule.csv and server_period.csv.
     sch = pd.read_csv(ref.path / "optimized" / "schedule.csv")
@@ -433,7 +435,8 @@ def test_chapter6_base_row_matches_summary_and_schedule():
     assert row["exec_mean_min"] == pytest.approx(sch["periods_run"].mean() * 5)
     assert row["util_mean_pct"] == pytest.approx(sp["utilization"].mean() * 100)
     assert row["H_mean_C"] == pytest.approx(sp["headroom_C"].mean())
-    assert row["DPF_min"] == sp["DPF"].min() == 1.0
+    # the hottest server passes T_dvfs (75 C) at 75.96 C, so it slows a little
+    assert row["DPF_min"] == sp["DPF"].min() == pytest.approx(0.9854, abs=1e-4)
     assert row["E_cooling_kWh"] == pytest.approx(row["E_crac_kWh"] + row["E_cp_Wh"] / 1000)
 
 
@@ -483,12 +486,12 @@ def test_chapter6_uses_the_newest_matching_run(tmp_path):
 @needs_site_runs
 def test_config_runs():
     groups = data.config_runs(RUNS)
-    assert list(groups) == ["servers10", "servers6"]
+    assert list(groups) == ["servers10_light", "servers10", "servers10_heavy",
+                            "servers6_light", "servers6", "servers6_heavy"]
     every = [r.key for refs in groups.values() for r in refs]
     assert sorted(every) == sorted(r.key for r in RUNS)            # each run once
-    ten = [r.name for r in groups["servers10"]]
-    assert ten[:12] == [k.split("/")[1] for k in SERVERS10_TESTS if k.startswith("servers10")]
-    assert all(n.startswith("v_") for n in ten[12:])
+    from scheduler import experiments as ex
+    assert [r.name for r in groups["servers10"]] == [t.id for t in ex.TESTS]   # in test order
     mixed = data.config_runs(RUNS + [r for r in ARCHIVED if r.scenario == "archive-small"])
     assert data.OTHER in mixed
 
@@ -504,7 +507,7 @@ def test_chapter6_row_of_a_run_without_optimized_schedule(loaded):
 def test_reassignment_table(loaded):
     run = loaded(BASE)
     df = data.reassignment_table(run)
-    assert len(df) == 238
+    assert len(df) == 257
     assert set(df["Moved"]) <= {"yes", "no"}
     assert (df["Moved"] == "yes").sum() == run.summary["optimized"]["metrics"]["n_reassigned"]
     assert df["Original server"].notna().all() and df["Final server"].notna().all()
@@ -518,9 +521,11 @@ def test_reassignment_table(loaded):
 def test_same_schedule(loaded):
     base = loaded(BASE)
     assert data.same_schedule(base, base)
-    # 6.1 Test 2 keeps the Base's schedule; 6.4 Test 3a (flat carbon intensity) changes it.
-    assert data.same_schedule(loaded("servers10/s1_t2_same_zone"), base)
-    assert not data.same_schedule(loaded("servers10/s4_t3a_ci_flat"), base)
+    # On the light day (no tick at the cap) 6.1 Test 1 keeps the Base's schedule; 6.4 Test 3a
+    # (flat carbon intensity) changes it.
+    light = loaded("servers10_light/base")
+    assert data.same_schedule(loaded("servers10_light/s1_t1_zones"), light)
+    assert not data.same_schedule(loaded("servers10_light/s4_t3a_ci_flat"), light)
     if INFEASIBLE in BY_KEY:
         assert not data.same_schedule(loaded(INFEASIBLE), base)
 
@@ -560,6 +565,23 @@ def test_per_tick_solver_wording():
     assert "not proven best" in text and "best possible" not in text
     # a whole-day run keeps its wording
     assert data.solver_short(PER_TICK_SOLVER) == "Stopped at time limit, gap 24.62 %"
+
+
+def test_per_tick_ticks_without_a_bound(tmp_path):
+    """Ticks at the cap that stopped before the solver had a bound: their gap is unknown, so
+    the wording counts them apart and ticks.csv keeps their gap empty."""
+    some = TICKS | {"n_ticks_no_bound": 2}
+    assert data.solver_short(PER_TICK_SOLVER, some) == \
+        "48 of 288 ticks at the cap, worst gap 24.62 %, 2 with no bound"
+    assert "except 2 that stopped before the solver had a bound" in \
+        data.solver_sentence(PER_TICK_SOLVER, some)
+    assert "how close their plans are to the best is unknown" in \
+        data.solver_sentence(PER_TICK_SOLVER, TICKS | {"n_ticks_no_bound": 48})
+    (tmp_path / "ticks.csv").write_text("tick,status,solve_s,mip_gap,n_waiting\n"
+                                        "1,optimal,0.5,,0\n2,time_limit,61.0,,3\n"
+                                        "3,time_limit,60.5,0.1,4\n")
+    gap = data.load_ticks(tmp_path)["mip_gap"]
+    assert gap[0] == 0.0 and pd.isna(gap[1]) and gap[2] == 0.1
 
 
 def test_per_tick_run_in_the_chapter6_table(loaded):
