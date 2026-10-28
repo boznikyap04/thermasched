@@ -21,8 +21,8 @@ ICONS = {"6.1": ":material/grid_on:", "6.2": ":material/ac_unit:",
          "6.3": ":material/thermostat:", "6.4": ":material/swap_horiz:"}
 # Why a test does not apply to a configuration, by Test.needs.
 NOT_APPLICABLE = {"regroup": "it needs two servers of the same tier to regroup",
-                  "cold_plates": "it needs a server with a cold plate (a fast, 3000 MHz "
-                                 "server)"}
+                  "cold_plates": "it needs a server with a cold plate "
+                                 f"({data.cold_plate_server_text()})"}
 # Rows under the measures in the comparison table: key -> label.
 RUN_ROWS = {"run": "Run folder", "status": "Solver status",
             "time_limit_s": "Time limit (s; per tick: the cap of each tick)", "release": "Release"}
@@ -141,6 +141,8 @@ def _servers(loaded: list[tuple[str, data.Run]], section: str) -> None:
              .reindex(columns=[tag for tag, _ in loaded]))
     names = first.servers.set_index("s")
     pivot.insert(0, "Zone", names["zone"])
+    if "model" in names:
+        pivot.insert(0, "Model", names["model"])
     pivot.insert(0, "Server", names["name"])
     pivot = pivot.loc[first.servers["s"]].reset_index(drop=True)
     fmt = "%d" if stat == "periods_throttled" else \
@@ -152,7 +154,8 @@ def _servers(loaded: list[tuple[str, data.Run]], section: str) -> None:
     if zone_runs:
         st.caption(f"Zones are those of the Base; {', '.join(zone_runs)} regroups them.")
     st.download_button("Download per-server figures (CSV)",
-                       long.rename(columns={"name": "Server", "zone": "Zone", "run": "Test",
+                       long.rename(columns={"name": "Server", "zone": "Zone", "model": "Model",
+                                            "run": "Test",
                                             **data.SERVER_STATS}).drop(columns="s")
                        .to_csv(index=False).encode("utf-8-sig"),
                        file_name=f"chapter6_{section}_servers.csv", mime="text/csv",
@@ -233,9 +236,9 @@ def _across(table: pd.DataFrame, section: ex.Section, scope: state.Scope) -> Non
         fleet = ex.FLEETS[scope.fleet]
         rows = table[(table["section"] == section.key) & (table["servers"] == fleet.size_label)]
         by, header, what = "level", "Load level", f"levels_{fleet.fleet_key}"
-        st.caption(f"{fleet.size_label}: {fleet.fleet}. Each day's workloads are drawn until "
-                   "peak demand reaches its share of the fleet's cores or memory, whichever "
-                   "fills first: " + ", ".join(f"{lv.label.lower()} {lv.target:.0%}"
+        st.caption(f"{fleet.size_label}: {data.fleet_text(fleet)}. Each day's workloads are "
+                   "drawn until peak demand reaches its share of the fleet's cores or memory, "
+                   "whichever fills first: " + ", ".join(f"{lv.label.lower()} {lv.target:.0%}"
                                                for lv in ex.LEVELS) + ".")
     measures = data.SECTION_MEASURES[section.key]
     measure = st.selectbox("Measure", measures, format_func=data.CHAPTER6_COLUMNS.get,
@@ -279,7 +282,8 @@ def page(key: str) -> Callable[[], None]:
             _across(table, section, scope)
         else:
             level = ex.LEVEL_BY_KEY[config.level]
-            st.caption(f"Servers: {config.fleet}. {level.label}: {level.description}.")
+            st.caption(f"Servers: {data.fleet_text(config)}. {level.label}: "
+                       f"{level.description}.")
             _this_configuration(table, cat, config, section)
         st.caption(NOTES)
 

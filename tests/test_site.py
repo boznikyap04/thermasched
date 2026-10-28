@@ -34,6 +34,8 @@ def test_overview():
     at = _page("from dashboard.views import chapter6\nchapter6.render()").run()
     _ok(at)
     assert at.dataframe
+    assert any(data.cold_plate_server_text() in c.value for c in at.caption)
+    assert not any("MHz" in c.value for c in at.caption)
 
 
 @pytest.mark.parametrize("config,level", [(c, lv) for c in CONFIGS + ["across"]
@@ -50,6 +52,10 @@ def test_section_pages(key, config, level):
     assert at.segmented_control(key=f"level-{key}").value == level
     if config == "servers2" and key == "6.2" and level != "across":
         assert "does not apply" in at.info[0].value
+        assert data.cold_plate_server_text() in at.info[0].value
+    if config != "across" and level != "across":
+        fleet = data.fleet_text(ex.configuration(config, level))
+        assert any(fleet in c.value for c in at.caption)
     elif (config, level) == ("servers6", "normal"):
         assert at.dataframe                 # every 6-server section has runs (at least its base)
 
