@@ -1,4 +1,4 @@
-s,server,zone,f_s_MHz,N_cores,C_s_cores,M_s_MB,PC_s_MHz,P_idle_W,P_max_W,P_fit_full_load_W,T0_C,CT_s_cold_plate,n_cold_plates,th_a_C,th_R_C_per_W,th_alpha_5min,W_per_MHz,U_ceiling_inlet_min,U_ceiling_inlet_max
-1,qh2-rcc160,1,2100.0,64,64,66036,134400.0,159.53,346.93,543.58,62.1,0,0,-7.438,0.1841,0.97727,0.001394,1.0,0.901
-2,qh2-rcc135,2,2400.0,64,64,66036,153600.0,154.83,360.0,543.74,62.45,0,0,6.107,0.14794,0.9669,0.001336,1.0,0.79
-3,qh2-rcc137,1,3000.0,64,64,66036,192000.0,155.31,373.6,604.17,76.62,1,1,16.009,0.14313,0.91711,0.001137,0.761,0.472
+s,server,model,cpu,zone,f_s_MHz,N_cores,C_s_cores,M_s_MB,PC_s_MHz,P_idle_W,P_max_W,P_fit_full_load_W,T0_C,CT_s_cold_plate,n_cold_plates,th_a_C,th_R_C_per_W,th_alpha_5min,W_per_MHz,U_ceiling_inlet_min,U_ceiling_inlet_max
+1,qh2-rcc145,R840,Xeon Gold 6130,1,2100.0,64,64,66036,134400.0,154.15,350.53,598.59,62.65,0,0,7.239,0.15927,0.90185,0.001461,0.966,0.678
+2,qh2-rcc157,R840,Xeon Gold 6148,2,2400.0,64,64,66036,153600.0,92.8,357.33,517.63,69.35,0,0,12.385,0.13668,0.86456,0.001722,1.0,0.773
+3,qh2-rcc211,C6320,Xeon E5-2690 v4,1,2600.0,80,80,197972,208000.0,390.82,796.03,1110.93,57.27,1,1,-12.894,0.09876,0.98393,0.001948,0.907,0.682

@@ -5,18 +5,68 @@
     "dt_seconds": 300,
     "periods": 288,
     "start_hour_local": 6,
-    "n_servers": 10,
-    "freq_mhz": [
-      2100.0,
-      2400.0,
-      3000.0
+    "fleet": [
+      {
+        "model": "R840",
+        "f_MHz": 2100,
+        "zone": 1,
+        "cold_plate": 0
+      },
+      {
+        "model": "R840",
+        "f_MHz": 2100,
+        "zone": 2,
+        "cold_plate": 0
+      },
+      {
+        "model": "R840",
+        "f_MHz": 2100,
+        "zone": 1,
+        "cold_plate": 0
+      },
+      {
+        "model": "R840",
+        "f_MHz": 2400,
+        "zone": 2,
+        "cold_plate": 0
+      },
+      {
+        "model": "R840",
+        "f_MHz": 2400,
+        "zone": 1,
+        "cold_plate": 0
+      },
+      {
+        "model": "R840",
+        "f_MHz": 2400,
+        "zone": 2,
+        "cold_plate": 0
+      },
+      {
+        "model": "R840",
+        "f_MHz": 2400,
+        "zone": 1,
+        "cold_plate": 0
+      },
+      {
+        "model": "C6320",
+        "f_MHz": 2600,
+        "zone": 2,
+        "cold_plate": 1
+      },
+      {
+        "model": "C6320",
+        "f_MHz": 2600,
+        "zone": 1,
+        "cold_plate": 1
+      },
+      {
+        "model": "C6320",
+        "f_MHz": 2600,
+        "zone": 2,
+        "cold_plate": 1
+      }
     ],
-    "freq_split": [
-      4,
-      3,
-      3
-    ],
-    "n_zones": 2,
     "target_peak_load": 0.85,
     "top_up_by_repeats": true,
     "min_et_periods": 3,
@@ -90,39 +140,41 @@
     "zone",
     "CT_s_cold_plate",
     "n_cold_plates",
-    "f_s_MHz assignment",
+    "f_s_MHz: the frequency of a SPEC CPU result for the server model (R840 2100 MHz, Xeon Gold 6130; R840 2400 MHz, Xeon Gold 6148; C6320 2600 MHz, Xeon E5-2690 v4)",
+    "N_cores, C_s_cores of C6320: the hardware threads UniMelb reports before the cloud doubled its vCPU slots in March 2019",
+    "inlet of C6320 (thermal fit): UniMelb has none; the R840 room's mean measured inlet at the same timestamp",
     "daily shape of CI_t",
     "AV_st = 1 for all s, t",
     "B_i = 0"
   ],
   "diagnostics": {
-    "I_workloads": 370,
+    "I_workloads": 604,
     "S_servers": 10,
     "Z_zones": 2,
     "T_periods": 288,
-    "Y_ist_binaries_inside_windows": 247140,
+    "Y_ist_binaries_inside_windows": 395790,
     "catalogue_size_within_ET_limits": 339,
-    "fleet_cores": 640,
-    "peak_requested_vcpus": 276,
-    "peak_load_share_of_fleet": 0.431,
-    "peak_load_share_of_fastest_tier": 1.438,
-    "fleet_memory_MB": 660360,
-    "peak_requested_memory_MB": 565248,
-    "peak_memory_share_of_fleet": 0.856,
-    "time_sensitive_workloads": 113,
-    "workloads_with_imputed_usage": 111,
-    "repeated_workloads": 33,
-    "median_slack_periods_delay_tolerant": 26,
-    "W_per_MHz_spread_best_to_worst": 1.37,
-    "servers_thermally_capped_at_coldest_inlet": 5,
+    "fleet_cores": 688,
+    "peak_requested_vcpus": 440,
+    "peak_load_share_of_fleet": 0.64,
+    "peak_load_share_of_fastest_tier": 1.833,
+    "fleet_memory_MB": 1056168,
+    "peak_requested_memory_MB": 901120,
+    "peak_memory_share_of_fleet": 0.853,
+    "time_sensitive_workloads": 183,
+    "workloads_with_imputed_usage": 170,
+    "repeated_workloads": 267,
+    "median_slack_periods_delay_tolerant": 24,
+    "W_per_MHz_spread_best_to_worst": 1.61,
+    "servers_thermally_capped_at_coldest_inlet": 6,
     "servers_thermally_capped_at_warmest_inlet": 10,
     "CI_min_max_g_per_kWh": [
       355.52,
       932.58
     ],
-    "baseline_IT_energy_kWh": 45.29,
-    "baseline_idle_share_of_IT_energy": 0.825,
-    "baseline_IT_carbon_kg": 28.21,
+    "baseline_IT_energy_kWh": 68.12,
+    "baseline_idle_share_of_IT_energy": 0.775,
+    "baseline_IT_carbon_kg": 42.48,
     "baseline_unplaced_or_late": 0
   },
   "variant_of": {
