@@ -1,7 +1,7 @@
 {
   "scenario": {
     "name": "servers6_heavy",
-    "I": 210,
+    "I": 370,
     "S": 6,
     "Z": 2,
     "T": 288,
@@ -21,13 +21,11 @@
   "provenance": {
     "schema_version": 1,
     "thermasched_version": "1.3.0",
-    "relabelled_from": "1.2.1",
-    "relabel_note": "solved with the code of release 1.3.0 (commit below) before its version number was set",
     "made_with": "command line",
-    "created_utc": "2026-10-25T19:18:45Z",
-    "git_commit": "2c6686e",
-    "scenario_fingerprint": "9f9a249a2d1e",
-    "scenario_built_with": "1.2.1",
+    "created_utc": "2026-10-28T13:20:53Z",
+    "git_commit": "5812f4b",
+    "scenario_fingerprint": "ba05b028088e",
+    "scenario_built_with": "1.3.0",
     "highspy": "1.15.1",
     "python": "3.12.3"
   },
@@ -61,17 +59,37 @@
   },
   "mode": "per_tick",
   "per_tick": {
-    "outcome": "done",
-    "n_ticks": 288,
+    "outcome": "stuck",
+    "n_ticks": 68,
     "tick_time_limit_s": 60.0,
-    "n_ticks_optimal": 288,
+    "n_ticks_optimal": 67,
     "n_ticks_time_limit": 0,
-    "total_solve_s": 192.46084200200016,
-    "slowest_tick": 110,
-    "slowest_tick_solve_s": 2.3138518169999998,
-    "max_mip_gap": 0.0003208578689683169,
+    "n_ticks_no_bound": 0,
+    "total_solve_s": 76.11313663299997,
+    "slowest_tick": 52,
+    "slowest_tick_solve_s": 2.8203757940000003,
+    "max_mip_gap": 0.0008179419795042512,
     "resumed_from_tick": null,
-    "stuck": null,
+    "stuck": {
+      "tick": 68,
+      "status": "infeasible",
+      "solver_status_text": "Infeasible",
+      "n_waiting": 27,
+      "n_running": 62,
+      "relaxed_one_at_a_time": {
+        "deadlines_and_waiting": "feasible",
+        "thermal_cap": "infeasible",
+        "capacity": "feasible",
+        "cooling_capacity": "infeasible",
+        "priority": "infeasible"
+      },
+      "limits": [
+        "deadlines_and_waiting",
+        "capacity"
+      ],
+      "limit_text": "deadlines and allowed waiting (Eq. 27-28); server CPU and memory capacity (Eq. 12-13)",
+      "detail": "relaxing deadlines and allowed waiting (Eq. 27-28) or server CPU and memory capacity (Eq. 12-13) alone gives a schedule"
+    },
     "ticks_file": "ticks.csv"
   },
   "model_note": "Airflow and fan power are not modelled (fan power and airflow are zero). Cold plates are off (cold-plate heat removal and pump power are zero; run with --cold-plates to model them).",
@@ -137,13 +155,13 @@
     "valid": true,
     "violations": [],
     "metrics": {
-      "carbon_kg": 22.04383080301526,
-      "E_IT_kWh": 25.8214342578125,
-      "E_crac_kWh": 9.650707974963558,
+      "carbon_kg": 36.352019522362156,
+      "E_IT_kWh": 42.462552658854165,
+      "E_crac_kWh": 15.87029176964201,
       "E_cp_kWh": 0.0,
       "Q_cp_kWh": 0.0,
       "E_fan_kWh": 0.0,
-      "E_total_kWh": 35.47214223277605,
+      "E_total_kWh": 58.33284442849618,
       "n_late": 0,
       "n_noncompliant": 0,
       "mean_wait_RT": 0.0,
@@ -151,30 +169,30 @@
       "mean_wait_DT": 0.0,
       "max_wait_DT": 0.0,
       "n_priority_violations": 0,
-      "hottest_T_C": 68.08405324786,
-      "mean_T_C": 55.11843803137294,
-      "min_headroom_C": 21.91594675214,
-      "mean_headroom_C": 34.88156196862706,
+      "hottest_T_C": 71.60705310570081,
+      "mean_T_C": 55.87678469151423,
+      "min_headroom_C": 18.392946894299186,
+      "mean_headroom_C": 34.123215308485776,
       "periods_above_dvfs": 0,
       "periods_above_cap": 0,
       "n_throttled_servers": 0,
       "n_reassigned": 0,
       "n_cross_zone": 0,
-      "hottest_server": 3,
-      "hottest_period": 1,
+      "hottest_server": 6,
+      "hottest_period": 143,
       "n_unplaced": 0,
       "min_DPF": 1.0
     },
     "totals": {
-      "E_IT_kWh": 25.8214342578125,
-      "E_crac_kWh": 9.650707974963558,
+      "E_IT_kWh": 42.462552658854165,
+      "E_crac_kWh": 15.87029176964201,
       "E_cp_kWh": 0.0,
       "E_fan_kWh": 0.0,
       "Q_cp_kWh": 0.0,
-      "E_total_kWh": 35.47214223277605,
-      "carbon_g": 22043.830803015262,
-      "carbon_kg": 22.04383080301526,
-      "n_workloads": 210,
+      "E_total_kWh": 58.33284442849618,
+      "carbon_g": 36352.019522362156,
+      "carbon_kg": 36.352019522362156,
+      "n_workloads": 370,
       "n_unplaced": 0,
       "n_late": 0,
       "n_wait_exceeded": 0,
@@ -184,20 +202,20 @@
       "max_wait_RT": 0.0,
       "mean_wait_DT": 0.0,
       "max_wait_DT": 0.0,
-      "hottest_T_C": 68.08405324786,
-      "hottest_server": 3,
-      "hottest_period": 1,
-      "min_headroom_C": 21.91594675214,
+      "hottest_T_C": 71.60705310570081,
+      "hottest_server": 6,
+      "hottest_period": 143,
+      "min_headroom_C": 18.392946894299186,
       "periods_above_dvfs": 0,
       "periods_above_cap": 0,
       "min_DPF": 1.0,
       "n_throttled_servers": 0,
-      "mean_T_C": 55.11843803137294,
-      "mean_headroom_C": 34.88156196862706,
+      "mean_T_C": 55.87678469151423,
+      "mean_headroom_C": 34.123215308485776,
       "n_priority_violations": 0,
       "E_crac_by_zone_kWh": [
-        4.861161223183585,
-        4.789546751779975
+        8.231037308220586,
+        7.639254461421426
       ]
     },
     "compliance_flags": {
@@ -216,278 +234,174 @@
       "priority_ok": true
     }
   },
-  "optimized": {
-    "valid": true,
-    "violations": [],
-    "metrics": {
-      "carbon_kg": 18.893077296655537,
-      "E_IT_kWh": 25.8214342578125,
-      "E_crac_kWh": 4.7493809332350825,
-      "E_cp_kWh": 0.0,
-      "Q_cp_kWh": 0.0,
-      "E_fan_kWh": 0.0,
-      "E_total_kWh": 30.570815191047583,
-      "n_late": 0,
-      "n_noncompliant": 0,
-      "mean_wait_RT": 1.271186440677966,
-      "max_wait_RT": 24.0,
-      "mean_wait_DT": 20.456953642384107,
-      "max_wait_DT": 96.0,
-      "n_priority_violations": 0,
-      "hottest_T_C": 72.61168156533297,
-      "mean_T_C": 63.70898748663076,
-      "min_headroom_C": 17.388318434667028,
-      "mean_headroom_C": 26.29101251336924,
-      "periods_above_dvfs": 0,
-      "periods_above_cap": 0,
-      "n_throttled_servers": 0,
-      "n_reassigned": 0,
-      "n_cross_zone": 0,
-      "hottest_server": 4,
-      "hottest_period": 77,
-      "n_unplaced": 0,
-      "min_DPF": 1.0
-    },
-    "totals": {
-      "E_IT_kWh": 25.8214342578125,
-      "E_crac_kWh": 4.7493809332350825,
-      "E_cp_kWh": 0.0,
-      "E_fan_kWh": 0.0,
-      "Q_cp_kWh": 0.0,
-      "E_total_kWh": 30.570815191047583,
-      "carbon_g": 18893.077296655538,
-      "carbon_kg": 18.893077296655537,
-      "n_workloads": 210,
-      "n_unplaced": 0,
-      "n_late": 0,
-      "n_wait_exceeded": 0,
-      "n_work_short": 0,
-      "n_noncompliant": 0,
-      "mean_wait_RT": 1.271186440677966,
-      "max_wait_RT": 24.0,
-      "mean_wait_DT": 20.456953642384107,
-      "max_wait_DT": 96.0,
-      "hottest_T_C": 72.61168156533297,
-      "hottest_server": 4,
-      "hottest_period": 77,
-      "min_headroom_C": 17.388318434667028,
-      "periods_above_dvfs": 0,
-      "periods_above_cap": 0,
-      "min_DPF": 1.0,
-      "n_throttled_servers": 0,
-      "mean_T_C": 63.70898748663076,
-      "mean_headroom_C": 26.29101251336924,
-      "n_priority_violations": 0,
-      "E_crac_by_zone_kWh": [
-        2.3923121999613746,
-        2.357068733273709
-      ]
-    },
-    "compliance_flags": {
-      "all_ok": true,
-      "cpu_ok": true,
-      "mem_ok": true,
-      "thermal_cap_ok": true,
-      "workloads_ok": true,
-      "supply_range_ok": true,
-      "zone_temp_ok": true,
-      "ramp_ok": true,
-      "crac_capacity_ok": true,
-      "cold_plate_coolant_ok": true,
-      "cold_plate_flow_ok": true,
-      "availability_ok": true,
-      "priority_ok": true
-    }
-  },
-  "has_optimized_schedule": true,
+  "optimized": null,
+  "has_optimized_schedule": false,
   "comparison": {
     "carbon_kg": {
-      "baseline": 22.04383080301526,
-      "optimized": 18.893077296655537,
-      "diff": -3.150753506359724,
-      "pct": -14.29313051127551
+      "baseline": 36.352019522362156,
+      "optimized": null,
+      "diff": null,
+      "pct": null
     },
     "E_IT_kWh": {
-      "baseline": 25.8214342578125,
-      "optimized": 25.8214342578125,
-      "diff": 0.0,
-      "pct": 0.0
+      "baseline": 42.462552658854165,
+      "optimized": null,
+      "diff": null,
+      "pct": null
     },
     "E_crac_kWh": {
-      "baseline": 9.650707974963558,
-      "optimized": 4.7493809332350825,
-      "diff": -4.901327041728475,
-      "pct": -50.787227781047676
+      "baseline": 15.87029176964201,
+      "optimized": null,
+      "diff": null,
+      "pct": null
     },
     "E_cp_kWh": {
       "baseline": 0.0,
-      "optimized": 0.0,
-      "diff": 0.0,
+      "optimized": null,
+      "diff": null,
       "pct": null
     },
     "Q_cp_kWh": {
       "baseline": 0.0,
-      "optimized": 0.0,
-      "diff": 0.0,
+      "optimized": null,
+      "diff": null,
       "pct": null
     },
     "E_fan_kWh": {
       "baseline": 0.0,
-      "optimized": 0.0,
-      "diff": 0.0,
+      "optimized": null,
+      "diff": null,
       "pct": null
     },
     "E_total_kWh": {
-      "baseline": 35.47214223277605,
-      "optimized": 30.570815191047583,
-      "diff": -4.901327041728468,
-      "pct": -13.81739791627152
+      "baseline": 58.33284442849618,
+      "optimized": null,
+      "diff": null,
+      "pct": null
     },
     "n_late": {
       "baseline": 0,
-      "optimized": 0,
-      "diff": 0,
+      "optimized": null,
+      "diff": null,
       "pct": null
     },
     "n_noncompliant": {
       "baseline": 0,
-      "optimized": 0,
-      "diff": 0,
+      "optimized": null,
+      "diff": null,
       "pct": null
     },
     "mean_wait_RT": {
       "baseline": 0.0,
-      "optimized": 1.271186440677966,
-      "diff": 1.271186440677966,
+      "optimized": null,
+      "diff": null,
       "pct": null
     },
     "max_wait_RT": {
       "baseline": 0.0,
-      "optimized": 24.0,
-      "diff": 24.0,
+      "optimized": null,
+      "diff": null,
       "pct": null
     },
     "mean_wait_DT": {
       "baseline": 0.0,
-      "optimized": 20.456953642384107,
-      "diff": 20.456953642384107,
+      "optimized": null,
+      "diff": null,
       "pct": null
     },
     "max_wait_DT": {
       "baseline": 0.0,
-      "optimized": 96.0,
-      "diff": 96.0,
+      "optimized": null,
+      "diff": null,
       "pct": null
     },
     "n_priority_violations": {
       "baseline": 0,
-      "optimized": 0,
-      "diff": 0,
+      "optimized": null,
+      "diff": null,
       "pct": null
     },
     "hottest_T_C": {
-      "baseline": 68.08405324786,
-      "optimized": 72.61168156533297,
-      "diff": 4.527628317472974,
-      "pct": 6.650056953851062
+      "baseline": 71.60705310570081,
+      "optimized": null,
+      "diff": null,
+      "pct": null
     },
     "mean_T_C": {
-      "baseline": 55.11843803137294,
-      "optimized": 63.70898748663076,
-      "diff": 8.590549455257822,
-      "pct": 15.58561846467448
+      "baseline": 55.87678469151423,
+      "optimized": null,
+      "diff": null,
+      "pct": null
     },
     "min_headroom_C": {
-      "baseline": 21.91594675214,
-      "optimized": 17.388318434667028,
-      "diff": -4.527628317472974,
-      "pct": -20.65905876062995
+      "baseline": 18.392946894299186,
+      "optimized": null,
+      "diff": null,
+      "pct": null
     },
     "mean_headroom_C": {
-      "baseline": 34.88156196862706,
-      "optimized": 26.29101251336924,
-      "diff": -8.590549455257822,
-      "pct": -24.627765989906862
+      "baseline": 34.123215308485776,
+      "optimized": null,
+      "diff": null,
+      "pct": null
     },
     "periods_above_dvfs": {
       "baseline": 0,
-      "optimized": 0,
-      "diff": 0,
+      "optimized": null,
+      "diff": null,
       "pct": null
     },
     "periods_above_cap": {
       "baseline": 0,
-      "optimized": 0,
-      "diff": 0,
+      "optimized": null,
+      "diff": null,
       "pct": null
     },
     "n_throttled_servers": {
       "baseline": 0,
-      "optimized": 0,
-      "diff": 0,
+      "optimized": null,
+      "diff": null,
       "pct": null
     },
     "n_reassigned": {
       "baseline": 0,
-      "optimized": 0,
-      "diff": 0,
+      "optimized": null,
+      "diff": null,
       "pct": null
     },
     "n_cross_zone": {
       "baseline": 0,
-      "optimized": 0,
-      "diff": 0,
+      "optimized": null,
+      "diff": null,
       "pct": null
     }
   },
   "solver": {
-    "status": "optimal",
-    "solver_status_text": "per tick: 288 of 288 optimal, 0 at the tick time limit",
-    "solve_time_s": 192.46084200200016,
-    "mip_gap": 0.0003208578689683169,
-    "objective_g": 18893.077296655538,
+    "status": "infeasible",
+    "solver_status_text": "stuck at tick 68: deadlines and allowed waiting (Eq. 27-28); server CPU and memory capacity (Eq. 12-13)",
+    "solve_time_s": 76.11313663299997,
+    "mip_gap": null,
+    "objective_g": null,
     "best_bound_g": null,
-    "n_variables": 21475,
-    "n_binaries": 6073,
-    "n_constraints": 17776,
+    "n_variables": 0,
+    "n_binaries": 0,
+    "n_constraints": 0,
     "relaxed": [],
-    "has_schedule": true,
+    "has_schedule": false,
     "notes": [
-      "Y[i,s,t] is eliminated: a workload occupies n_min core periods after its start, U[t] - U[t-n_min], plus optional tail binaries E[i,s,t] only where n_max > n_min, because the Y-based model made the root LP of 'consolidated6' unsolvable (500k rows).",
-      "Start indicators S are replaced by cumulative 'started by t' steps U[i,s,t] (S = U[t] - U[t-1], X[i,s] is the last step), so one unbroken block needs no window sums.",
-      "The tail E[t] <= U[t-n_min] - U[t-n_max] and E[t] <= E[t-1] + U[t-n_min] - U[t-n_min-1] keep the run unbroken and within n_min..n_max periods; Y <= X (10) is then implied and Eq. (9) is kept.",
-      "n_min = ceil(W/(C_req*f_s*dt)) is the shortest run since DPF <= 1, and starts with t + n_min > D are dropped.",
-      "n_max = ceil(W/(C_req*f_s*dt*DPF_cap)) caps the run: valid for the optimum because trimming the tail of a run never raises power, heat or temperature, so every other limit stays met.",
-      "DPF enters only through the loss L = 1 - DPF >= slope*(T - T_dvfs), L >= 0 (the linear piece of Eq. 37, valid below T_throttle, so a cap above T_throttle is rejected), and only on servers where some pair has n_max > n_min; higher DPF never hurts, so no binaries are needed.",
-      "Work (39) uses core credit n_min*X - coreLoss, where coreLoss >= CL[tau+n_min-1] - CL[tau-1] - M(1 - sigma_tau) over the running sum CL of L, plus tail credits wt <= E, wt <= 1 - L; for a pair with n_max == n_min any core block delivers at least W, so its term is exactly X.",
-      "The work row is divided by W_i (right side 1), and with the cap at or below T_dvfs there are no loss, tail or work-credit columns at all.",
-      "Server utilisation and heat are substituted into P_IT[s,t] = P_idle + (P_max-P_idle)*sum C_req*occupancy/C_s (Eq. 16, 20, 21); P_IT is bounded by P_max (or by the cores of the workloads that can ever run there) as a column bound.",
-      "Eq. (54) Q_crac <= 116 kW and the big-M of the supply-level split are one column bound Qmax = min(116, sum of the zone's maximum IT power in kW); the heat balance sets Q_crac >= heat and the cost increases in Q_crac, so it sits at equality in any optimum.",
-      "CRAC power is Q_crac / COP (divide), COP looked up per whole-degree level; the printed Eq. (46) multiplies.",
-      "Fan power P_fan is a named column fixed at zero (_add_fan_terms) that already appears in the objective.",
-      "Idle energy is in the objective through the P_IT columns (lower bound P_idle), so objective_g equals total carbon with no separate offset.",
-      "The wait limit (28) is applied to all workloads, which includes (25). Workloads with B_i = 1 keep their original server (29).",
-      "Priority (56)-(57): O_ij = 1 for a time-sensitive i and a delay-tolerant j, and for the earlier arrival of two same-type, same-deadline workloads. It is linked to the start times as: on a shared server, j may not start while i waits (A_i <= ST_j implies ST_i <= ST_j), through ST_i = sum_s (b X - sum U) and big-M rows (0 pair-server rows after dropping those that cannot bind). EDF within a type is not in the equations and is not modelled.",
-      "Availability (11): every server is available in every period (AV = 1).",
-      "Cold plates are off: Q_cp and P_cp are columns fixed at zero.",
-      "Per-tick re-planning: the model above is solved once per tick over a window from the tick to the end of the horizon, holding only the workloads that have arrived; running workloads keep their server and start and count only the work they have left; T0 is each server's temperature at the end of the previous tick (Eq. 30), and the supply temperatures of the previous ticks bound the ramps (35)-(36). Only the tick's own decisions are kept.",
-      "288 ticks: 288 solved to the gap, 0 stopped at the tick time limit (slowest 2.3 s, tick 110). The objective is the sum of each tick's own carbon for its period; the gap shown is the largest of any tick."
+      "Per-tick re-planning stopped at tick 68 of 288: no valid schedule. Limit: deadlines and allowed waiting (Eq. 27-28); server CPU and memory capacity (Eq. 12-13). relaxing deadlines and allowed waiting (Eq. 27-28) or server CPU and memory capacity (Eq. 12-13) alone gives a schedule."
     ]
   },
-  "infeasibility": null,
+  "infeasibility": {
+    "deadlines_and_waiting": "feasible",
+    "thermal_cap": "infeasible",
+    "capacity": "feasible",
+    "cooling_capacity": "infeasible",
+    "priority": "infeasible"
+  },
   "checks": {
     "least_loaded_reproduces_baseline_schedule_csv": {
       "passed": true
-    },
-    "optimizer_objective_equals_evaluator_carbon": {
-      "passed": true,
-      "optimizer_objective_g": 18893.077296655538,
-      "evaluator_carbon_g": 18893.077296655538,
-      "relative_difference": 0.0
-    },
-    "optimized_schedule_valid_under_evaluator": {
-      "passed": true,
-      "violations": []
     }
   }
 }
