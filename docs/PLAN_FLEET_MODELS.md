@@ -1,6 +1,6 @@
 # Plan: two server models (R840 + C6320)
 
-**Status (2026-10-28):** final. All decisions made; threads not started yet. Implements
+**Status (2026-10-28, evening):** items 1–8 done and merged into `fleet-models` (merge 9a6abfa; local, not pushed). 770 tests pass; 4 site tests wait for the 1.4.0 runs. **Blocked before item 9:** the timing run (servers6_heavy base, 60 s cap) got stuck at tick 110 of 288 with no schedule, see §8. No Actions run has been started. Implements
 [ADR 0001](adr/0001-server-fleet-from-processor-specs.md); the ADR holds the why, this file
 holds the work. Where they differ, this file wins for the work and the ADR for the reasons.
 
@@ -188,3 +188,7 @@ Each thread gets this file plus its brief.
 | 2026-10-28 | Plan proposed; threads A, B, C in parallel, D after the merge; 6 servers first |
 | 2026-10-28 | Group answered A to all three questions: cores 64 / 80, C6320 memory 193 GB, C6320 inlet from the R840 room at the same timestamp. Plan final |
 | 2026-10-28 | Inlet figures corrected: excluding the 4.0 °C failed-sensor value, the R840 room inlet over Feb–Jun 2019 is 18.8 °C mean, SD 0.6 (earlier 17.7 / 4.2 included those readings) |
+| 2026-10-28 | `qh2-rcc248` excluded (rcc263's power and thermal profile with the C6320's memory); C6320 records above 160 slots dropped, like the R840's doubled records. 43 C6320s and 45 R840s eligible |
+| 2026-10-28 | Owner: everything is per-tick; the whole-day solver is no longer needed (`small_running` test moved to per-tick) |
+| 2026-10-28 | Rebuild: 6-server days now draw 91 / 257 / 370 workloads (the old 10-server counts; fleet memory is almost the same), 10-server days 199 / 414 / 604 with 0 / 77 / 267 repeats. Memory still fills first |
+| 2026-10-28 | Timing run (local M4): servers6_heavy base **stuck at tick 110** (no schedule in 60 s; 61 waiting, 42 running); 93 ticks optimal, 16 at the cap with gaps up to 26 %. 1.3.0: done, 283 / 5, gap 0.2 %. The batch needs a decision first: higher cap, smaller heavy day, or solver work |
