@@ -5,6 +5,8 @@ from __future__ import annotations
 import pytest
 
 from scheduler import experiments as ex
+from scheduler.build import pick_servers
+from tests.fleets import FIXTURE_CLEAN, FLEET6, FLEET10, SMALL_SETTINGS
 
 
 def _ids(settings: dict, scenario: str) -> list[str]:
@@ -20,9 +22,35 @@ def test_configurations():
     assert [lv.target for lv in ex.LEVELS] == [0.30, 0.60, 0.85]
     assert ex.FLEETS["servers2"].fleet == "2 mid"
     ten = ex.FLEETS["servers10"]
-    assert ten.tiers.count("slow") == 4 and ten.tiers.count("fast") == 3
+    assert ten.fleet == "3 slow · 4 mid · 3 fast"
+    assert ex.FLEETS["servers6"].fleet == "2 slow · 2 mid · 2 fast"
     assert len(ten.regroup_zone_map) == ten.n_servers
     assert all(len(c.regroup_zone_map or c.tiers) == c.n_servers for c in ex.CONFIGURATIONS)
+
+
+def test_tiers():
+    assert ex.TIERS == {"slow": 2100.0, "mid": 2400.0, "fast": 2600.0}
+    assert list(ex.TIERS) == sorted(ex.TIERS, key=ex.TIERS.get)     # slowest first
+    assert ex.COLD_PLATE_TIER == "fast"
+
+
+@pytest.mark.parametrize("key", ["servers10", "servers6"])
+def test_regrouping_puts_the_slow_tier_in_zone_1(key):
+    config = ex.FLEETS[key]
+    assert config.regroup_zone_map == tuple(1 if t == "slow" else 2 for t in config.tiers)
+
+
+@pytest.mark.parametrize("key, fleet", [("servers10", FLEET10), ("servers6", FLEET6)])
+def test_built_fleet_matches_the_configuration(key, fleet):
+    """A fleet built from the contract's table (on the fixture's cleaned data) has the
+    configuration's tiers in server order, and cold plates on the cold-plate tier only."""
+    config = ex.FLEETS[key]
+    tier_of = {f: t for t, f in ex.TIERS.items()}
+    servers = pick_servers(SMALL_SETTINGS | {"fleet": fleet}, FIXTURE_CLEAN)
+    assert tuple(tier_of[s["f_s_MHz"]] for s in servers) == config.tiers
+    assert [s["CT_s_cold_plate"] for s in servers] == [int(t == ex.COLD_PLATE_TIER) for t in config.tiers]
+    assert {s["model"] for s in servers if s["CT_s_cold_plate"]} == {"C6320"}
+    assert [s["zone"] for s in servers] == [i % 2 + 1 for i in range(len(servers))]
 
 
 def test_a_scenario_name_gives_the_load_level():
@@ -57,7 +85,8 @@ def test_matching_by_settings():
     assert _ids({}, "servers10") == ["base"]
     assert _ids({}, "consolidated6") == ["base"]
     assert _ids({"reassignment": "none"}, "thesis10") == ["s4_t1_no_moves"]
-    assert _ids({"zone_map": [1, 1, 1, 1, 2, 2, 2, 2, 2, 2]}, "thesis10") == ["s1_t1_zones"]
+    assert _ids({"zone_map": [1, 1, 1, 2, 2, 2, 2, 2, 2, 2]}, "thesis10") == ["s1_t1_zones"]
+    assert _ids({"zone_map": [1, 1, 1, 1, 2, 2, 2, 2, 2, 2]}, "thesis10") == []    # the 1.3.0 map
     assert _ids({"zone_map": [1, 1, 2, 2, 2, 2]}, "consolidated6") == ["s1_t1_zones"]
     assert _ids({"cold_plates": True, "cp_mode": "fixed"}, "thesis10") == ["s2_t1_crac"]
     assert _ids({"H_min_C": 19}, "thesis10") == ["s3_t1_hmin_high"]

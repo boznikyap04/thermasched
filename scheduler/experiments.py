@@ -4,10 +4,12 @@ One list for the solver, the batch notebook and the site. A run belongs to a tes
 configuration and its switches match the test's, so a folder name never decides it: a run
 made in the batch notebook or uploaded on the site is recognized too.
 
-A configuration is a fleet on a load level. Fleets: 10 servers (4 slow / 3 mid / 3 fast),
-6 servers (2 / 2 / 2) and 2 servers (2 mid). Load levels: a light, normal and heavy day, whose
-workloads are drawn until peak demand reaches 30, 60 or 85 % of the fleet's cores or memory,
-whichever fills first. The normal day of a fleet is scenario ``servers10`` (``servers6``,
+A configuration is a fleet on a load level. Fleets: 10 servers (3 slow / 4 mid / 3 fast),
+6 servers (2 / 2 / 2) and 2 servers (2 mid). The slow (2.1 GHz) and mid (2.4 GHz) servers are
+Dell R840s cooled by CRAC air; the fast (2.6 GHz) ones are Dell C6320s cooled by CRAC air and a
+cold plate. The frequencies are those of SPEC CPU results for these models. Load levels: a
+light, normal and heavy day, whose workloads are drawn until peak demand reaches 30, 60 or
+85 % of the fleet's cores or memory, whichever fills first. The normal day of a fleet is scenario ``servers10`` (``servers6``,
 ``servers2``), the others ``servers10_light`` and ``servers10_heavy``; each has a ``_swing``
 twin with a deeper daily carbon swing (6.4 Test 3b). ``thesis10`` and ``consolidated6`` (and
 their ``_swing``) are the earlier names of the 10- and 6-server normal days.
@@ -20,7 +22,7 @@ from dataclasses import dataclass
 from scheduler.types import RunSettings
 
 # Server tiers, slowest first: name -> clock frequency (MHz).
-TIERS = {"slow": 2100.0, "mid": 2400.0, "fast": 3000.0}
+TIERS = {"slow": 2100.0, "mid": 2400.0, "fast": 2600.0}
 COLD_PLATE_TIER = "fast"        # servers of this tier carry a cold plate (CT_s = 1)
 
 Switches = tuple[tuple[str, object], ...]
@@ -103,8 +105,9 @@ def _fleet(fleet_key: str, tiers: tuple[str, ...], regroup: tuple[int, ...] | No
 
 
 CONFIGURATIONS: tuple[Configuration, ...] = (
-    *_fleet("servers10", ("slow",) * 4 + ("mid",) * 3 + ("fast",) * 3,
-            (1, 1, 1, 1, 2, 2, 2, 2, 2, 2), earlier=("thesis10",)),
+    # 6.1 Test 1 regroups by tier: the slow tier in zone 1, the others in zone 2.
+    *_fleet("servers10", ("slow",) * 3 + ("mid",) * 4 + ("fast",) * 3,
+            (1, 1, 1, 2, 2, 2, 2, 2, 2, 2), earlier=("thesis10",)),
     *_fleet("servers6", ("slow",) * 2 + ("mid",) * 2 + ("fast",) * 2,
             (1, 1, 2, 2, 2, 2), earlier=("consolidated6",)),
     # Base zones alternate (server 1 in zone 1, server 2 in zone 2); regrouping puts both in
