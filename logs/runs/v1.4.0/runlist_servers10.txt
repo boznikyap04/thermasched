@@ -1,0 +1,39 @@
+servers10_light__base                python -m scheduler.run --scenario servers10_light --run-name base --results-dir results --per-tick --wall-time-limit 19800
+servers10__base                      python -m scheduler.run --scenario servers10 --run-name base --results-dir results --per-tick --wall-time-limit 19800
+servers10_heavy__base                python -m scheduler.run --scenario servers10_heavy --run-name base --results-dir results --per-tick --wall-time-limit 19800
+servers10_light__s1_t1_zones         python -m scheduler.run --scenario servers10_light --run-name s1_t1_zones --zone-map 1,1,1,2,2,2,2,2,2,2 --results-dir results --per-tick --wall-time-limit 19800
+servers10__s1_t1_zones               python -m scheduler.run --scenario servers10 --run-name s1_t1_zones --zone-map 1,1,1,2,2,2,2,2,2,2 --results-dir results --per-tick --wall-time-limit 19800
+servers10_heavy__s1_t1_zones         python -m scheduler.run --scenario servers10_heavy --run-name s1_t1_zones --zone-map 1,1,1,2,2,2,2,2,2,2 --results-dir results --per-tick --wall-time-limit 19800
+servers10_light__s1_t2_same_zone     python -m scheduler.run --scenario servers10_light --run-name s1_t2_same_zone --reassignment same_zone --results-dir results --per-tick --wall-time-limit 19800
+servers10__s1_t2_same_zone           python -m scheduler.run --scenario servers10 --run-name s1_t2_same_zone --reassignment same_zone --results-dir results --per-tick --wall-time-limit 19800
+servers10_heavy__s1_t2_same_zone     python -m scheduler.run --scenario servers10_heavy --run-name s1_t2_same_zone --reassignment same_zone --results-dir results --per-tick --wall-time-limit 19800
+servers10_light__s2_base             python -m scheduler.run --scenario servers10_light --run-name s2_base --cold-plates --results-dir results --per-tick --wall-time-limit 19800
+servers10__s2_base                   python -m scheduler.run --scenario servers10 --run-name s2_base --cold-plates --results-dir results --per-tick --wall-time-limit 19800
+servers10_heavy__s2_base             python -m scheduler.run --scenario servers10_heavy --run-name s2_base --cold-plates --results-dir results --per-tick --wall-time-limit 19800
+servers10_light__s2_t1_crac          python -m scheduler.run --scenario servers10_light --run-name s2_t1_crac --cold-plates --cp-mode fixed --results-dir results --per-tick --wall-time-limit 19800
+servers10__s2_t1_crac                python -m scheduler.run --scenario servers10 --run-name s2_t1_crac --cold-plates --cp-mode fixed --results-dir results --per-tick --wall-time-limit 19800
+servers10_heavy__s2_t1_crac          python -m scheduler.run --scenario servers10_heavy --run-name s2_t1_crac --cold-plates --cp-mode fixed --results-dir results --per-tick --wall-time-limit 19800
+servers10_light__s2_t2_cold_plate    python -m scheduler.run --scenario servers10_light --run-name s2_t2_cold_plate --cold-plates --supply-temp-mode fixed --results-dir results --per-tick --wall-time-limit 19800
+servers10__s2_t2_cold_plate          python -m scheduler.run --scenario servers10 --run-name s2_t2_cold_plate --cold-plates --supply-temp-mode fixed --results-dir results --per-tick --wall-time-limit 19800
+servers10_heavy__s2_t2_cold_plate    python -m scheduler.run --scenario servers10_heavy --run-name s2_t2_cold_plate --cold-plates --supply-temp-mode fixed --results-dir results --per-tick --wall-time-limit 19800
+servers10_light__s3_t1_hmin_high     python -m scheduler.run --scenario servers10_light --run-name s3_t1_hmin_high --h-min 19 --results-dir results --per-tick --wall-time-limit 19800
+servers10__s3_t1_hmin_high           python -m scheduler.run --scenario servers10 --run-name s3_t1_hmin_high --h-min 19 --results-dir results --per-tick --wall-time-limit 19800
+servers10_heavy__s3_t1_hmin_high     python -m scheduler.run --scenario servers10_heavy --run-name s3_t1_hmin_high --h-min 19 --results-dir results --per-tick --wall-time-limit 19800
+servers10_light__s3_t2_hmin_med      python -m scheduler.run --scenario servers10_light --run-name s3_t2_hmin_med --h-min 15 --results-dir results --per-tick --wall-time-limit 19800
+servers10__s3_t2_hmin_med            python -m scheduler.run --scenario servers10 --run-name s3_t2_hmin_med --h-min 15 --results-dir results --per-tick --wall-time-limit 19800
+servers10_heavy__s3_t2_hmin_med      python -m scheduler.run --scenario servers10_heavy --run-name s3_t2_hmin_med --h-min 15 --results-dir results --per-tick --wall-time-limit 19800
+servers10_light__s3_t3_hmin_low      python -m scheduler.run --scenario servers10_light --run-name s3_t3_hmin_low --h-min 5 --results-dir results --per-tick --wall-time-limit 19800
+servers10__s3_t3_hmin_low            python -m scheduler.run --scenario servers10 --run-name s3_t3_hmin_low --h-min 5 --results-dir results --per-tick --wall-time-limit 19800
+servers10_heavy__s3_t3_hmin_low      python -m scheduler.run --scenario servers10_heavy --run-name s3_t3_hmin_low --h-min 5 --results-dir results --per-tick --wall-time-limit 19800
+servers10_light__s4_t1_no_moves      python -m scheduler.run --scenario servers10_light --run-name s4_t1_no_moves --reassignment none --results-dir results --per-tick --wall-time-limit 19800
+servers10__s4_t1_no_moves            python -m scheduler.run --scenario servers10 --run-name s4_t1_no_moves --reassignment none --results-dir results --per-tick --wall-time-limit 19800
+servers10_heavy__s4_t1_no_moves      python -m scheduler.run --scenario servers10_heavy --run-name s4_t1_no_moves --reassignment none --results-dir results --per-tick --wall-time-limit 19800
+servers10_light__s4_t2_blind         python -m scheduler.run --scenario servers10_light --run-name s4_t2_blind --thermal-blind --results-dir results --per-tick --wall-time-limit 19800
+servers10__s4_t2_blind               python -m scheduler.run --scenario servers10 --run-name s4_t2_blind --thermal-blind --results-dir results --per-tick --wall-time-limit 19800
+servers10_heavy__s4_t2_blind         python -m scheduler.run --scenario servers10_heavy --run-name s4_t2_blind --thermal-blind --results-dir results --per-tick --wall-time-limit 19800
+servers10_light__s4_t3a_ci_flat      python -m scheduler.run --scenario servers10_light --run-name s4_t3a_ci_flat --ci-flat --results-dir results --per-tick --wall-time-limit 19800
+servers10__s4_t3a_ci_flat            python -m scheduler.run --scenario servers10 --run-name s4_t3a_ci_flat --ci-flat --results-dir results --per-tick --wall-time-limit 19800
+servers10_heavy__s4_t3a_ci_flat      python -m scheduler.run --scenario servers10_heavy --run-name s4_t3a_ci_flat --ci-flat --results-dir results --per-tick --wall-time-limit 19800
+servers10_light_swing__s4_t3b_ci_swing python -m scheduler.run --scenario servers10_light_swing --run-name s4_t3b_ci_swing --results-dir results --per-tick --wall-time-limit 19800
+servers10_swing__s4_t3b_ci_swing     python -m scheduler.run --scenario servers10_swing --run-name s4_t3b_ci_swing --results-dir results --per-tick --wall-time-limit 19800
+servers10_heavy_swing__s4_t3b_ci_swing python -m scheduler.run --scenario servers10_heavy_swing --run-name s4_t3b_ci_swing --results-dir results --per-tick --wall-time-limit 19800
