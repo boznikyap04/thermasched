@@ -151,7 +151,7 @@ def test_small_running_exercises_availability_and_running_workloads(tmp_path):
     assert [w.i for w in sc.workloads if w.B == 1] == [1, 2, 3, 4, 5, 6, 7]
     AV = sc.availability()
     assert int((AV == 0).sum()) == 12 and not AV[2, 36:48].any()
-    st = RunSettings(scenario="small_running", run_name="t", time_limit_s=60.0)
+    st = RunSettings(scenario="small_running", run_name="t", per_tick=True, tick_time_limit_s=60.0)
     summary = run(st, results_dir=tmp_path, quiet=True)
     checks = summary["checks"]
     assert checks["running_workloads_not_reassigned"]["passed"] is True
