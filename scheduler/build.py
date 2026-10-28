@@ -2,8 +2,14 @@
 
 ``build_scenario`` writes servers.csv, workloads.csv, carbon.csv, baseline_schedule.csv and
 params.json from a dict of scenario settings, the thesis constants and the cold-plate table.
-``notebooks/data_prep.ipynb`` calls it for the scenarios of its Settings cell: the 6-server
-fleet on a light, normal and heavy day, and ``small``.
+``notebooks/data_prep.ipynb`` calls it for the scenarios of its Settings cell: the 6- and
+10-server fleets on a light, normal and heavy day, and ``small``.
+
+The settings' ``fleet`` table has one row ``{model, f_MHz, zone, cold_plate}`` per server, in
+server order; the number of servers and zones follow from it. Each row gets a host of its
+model (R840 or C6320), drawn by the settings' ``seed`` from the eligible hosts of the cleaned
+table without regard to power (``draw_hosts``).
+
 ``derive_scenario`` builds a new scenario from an existing one's params.json with some values
 changed, for ``notebooks/solver.ipynb``. It reads only data/clean/, not the raw datasets.
 
@@ -38,30 +44,57 @@ def write_csv(path, records, fields=None):
         w.writerows(records)
 
 
-def pick_servers(sc, clean_dir):
-    pool = [s for s in read_csv_rows(Path(clean_dir) / "servers.csv") if s["eligible"] == "1"]
-    for s in pool:
-        for k, v in s.items():
-            if k != "server":
-                s[k] = float(v)
-    pool.sort(key=lambda s: s["P_max_W"] - s["P_idle_W"])
-    n = sc["n_servers"]
-    if n > len(pool):
-        raise ValueError(f"n_servers = {n}, but only {len(pool)} servers in the cleaned table are eligible")
-    chosen = [pool[int((i + 0.5) * len(pool) / n)] for i in range(n)]   # bin midpoints, no extremes
+# Server models of the cleaned table (column `model`) and the processor of each frequency
+# tier, from the SPEC CPU results for those models: the frequencies are assumptions.
+MODELS = ("R840", "C6320")
+CPU_BY_MHZ = {2100: "Xeon Gold 6130", 2400: "Xeon Gold 6148", 2600: "Xeon E5-2690 v4"}
+FLEET_ROW_KEYS = ("model", "f_MHz", "zone", "cold_plate")
+# Columns of the cleaned servers.csv that a scenario's servers.csv takes over (as numbers).
+HOST_VALUES = ("N_cores", "C_s_cores", "M_s_MB", "P_idle_W", "P_max_W", "P_fit_full_load_W", "T0_C",
+               "th_a_C", "th_R_C_per_W", "th_alpha_5min")
 
-    freqs = [f for f, k in zip(sc["freq_mhz"], sc["freq_split"]) for _ in range(k)]
-    top_f = max(sc["freq_mhz"])
+
+def fleet_size(sc):
+    """(n_servers, n_zones) of the settings' fleet table."""
+    return len(sc["fleet"]), max(int(r["zone"]) for r in sc["fleet"])
+
+
+def eligible_hosts(clean_dir):
+    rows = read_csv_rows(Path(clean_dir) / "servers.csv")
+    if rows and "model" not in rows[0]:
+        raise ValueError("the cleaned servers.csv has no `model` column: clean it again to build a fleet")
+    return [s for s in rows if s["eligible"] == "1"]
+
+
+def host_draw_key(seed, host):
+    # Seeded hash of the host name: a host's place in the draw depends only on the seed and
+    # its own name, not on power, on the table's row order or on which other hosts are in it.
+    return hashlib.sha256(f"{seed}:host:{host}".encode()).hexdigest()
+
+
+def draw_hosts(sc, pool):
+    """One host per fleet row, in server order. The eligible hosts of each model are put in
+    seeded order (host_draw_key) and handed out in that order to the model's rows, in fleet
+    order, so no host is drawn twice."""
+    queue = {m: sorted((s for s in pool if s["model"] == m), key=lambda s: host_draw_key(sc["seed"], s["server"]))
+             for m in MODELS}
+    return [queue[r["model"]].pop(0) for r in sc["fleet"]]
+
+
+def pick_servers(sc, clean_dir):
     out = []
-    for rank, (s, f) in enumerate(zip(sorted(chosen, key=lambda s: s["P_max_W"]), freqs)):
+    for i, (row, host) in enumerate(zip(sc["fleet"], draw_hosts(sc, eligible_hosts(clean_dir)))):
+        s = {k: float(host[k]) for k in HOST_VALUES}
+        f, cp = float(row["f_MHz"]), int(row["cold_plate"])
         out.append({
-            "s": rank + 1, "server": s["server"], "zone": rank % sc["n_zones"] + 1,
+            "s": i + 1, "server": host["server"], "model": host["model"], "cpu": CPU_BY_MHZ.get(round(f), ""),
+            "zone": int(row["zone"]),
             "f_s_MHz": f, "N_cores": int(s["N_cores"]), "C_s_cores": int(s["C_s_cores"]),
             "M_s_MB": round(s["M_s_MB"]), "PC_s_MHz": s["N_cores"] * f,
             "P_idle_W": round(s["P_idle_W"], 2), "P_max_W": round(s["P_max_W"], 2),
             "P_fit_full_load_W": round(s["P_fit_full_load_W"], 2),
-            "T0_C": round(s["T0_C"], 2), "CT_s_cold_plate": int(f == top_f),
-            "n_cold_plates": int(f == top_f),   # editable: plates on the server (0 = none)
+            "T0_C": round(s["T0_C"], 2), "CT_s_cold_plate": cp,
+            "n_cold_plates": cp,   # editable: plates on the server (0 = none)
             "th_a_C": round(s["th_a_C"], 3), "th_R_C_per_W": round(s["th_R_C_per_W"], 5),
             "th_alpha_5min": round(s["th_alpha_5min"], 5),
             # dynamic watts drawn per MHz of work delivered: lower is more efficient
@@ -179,17 +212,51 @@ def baseline_schedule(servers, workloads, sc, unavailable=frozenset()):
     return sched, used
 
 
-def check_settings(sc):
-    """The scenario settings must describe a fleet the builder can make."""
-    if len(sc["freq_mhz"]) != len(sc["freq_split"]):
-        raise ValueError(f"freq_mhz has {len(sc['freq_mhz'])} entries but freq_split has {len(sc['freq_split'])}")
-    if sum(sc["freq_split"]) != sc["n_servers"]:
-        raise ValueError(f"freq_split {sc['freq_split']} adds up to {sum(sc['freq_split'])}, "
-                         f"not n_servers = {sc['n_servers']}")
-    if not 1 <= sc["n_zones"] <= sc["n_servers"]:
-        raise ValueError(f"n_zones = {sc['n_zones']} must be between 1 and n_servers = {sc['n_servers']}")
+def check_settings(sc, hosts=None):
+    """The scenario settings must describe a fleet the builder can make. ``hosts``: the
+    eligible hosts of the cleaned table, to check there are enough of each model."""
+    old = sorted({"freq_mhz", "freq_split", "n_servers", "n_zones"} & set(sc))
+    if old:
+        raise ValueError(f"settings {old} are replaced by the fleet table: one row "
+                         f"{{model, f_MHz, zone, cold_plate}} per server; n_servers and n_zones come from it")
+    fleet = sc.get("fleet")
+    if not isinstance(fleet, list) or not fleet:
+        raise ValueError("fleet must be a non-empty list, one row {model, f_MHz, zone, cold_plate} per server")
+    for i, r in enumerate(fleet, 1):
+        if not isinstance(r, dict) or sorted(r) != sorted(FLEET_ROW_KEYS):
+            raise ValueError(f"fleet row {i} must have exactly the keys {list(FLEET_ROW_KEYS)}, got {r}")
+        if r["model"] not in MODELS:
+            raise ValueError(f"fleet row {i}: model '{r['model']}' is not one of {list(MODELS)}")
+        if not (isinstance(r["f_MHz"], (int, float)) and r["f_MHz"] > 0):
+            raise ValueError(f"fleet row {i}: f_MHz = {r['f_MHz']} must be a positive number")
+        if type(r["zone"]) is not int or r["zone"] < 1:
+            raise ValueError(f"fleet row {i}: zone = {r['zone']} must be a whole number of at least 1")
+        if type(r["cold_plate"]) is not int or r["cold_plate"] not in (0, 1):
+            raise ValueError(f"fleet row {i}: cold_plate = {r['cold_plate']} must be 0 or 1")
+    zones = sorted({r["zone"] for r in fleet})
+    if zones != list(range(1, len(zones) + 1)):
+        raise ValueError(f"fleet zones {zones}: every zone from 1 to {zones[-1]} must have a server")
+    if hosts is not None:
+        for m in MODELS:
+            want, have = sum(r["model"] == m for r in fleet), sum(s["model"] == m for s in hosts)
+            if want > have:
+                raise ValueError(f"the fleet has {want} {m} servers, but only {have} {m} hosts "
+                                 f"in the cleaned table are eligible")
     if sc["periods"] < 1 or sc["min_et_periods"] > sc["max_et_periods"]:
         raise ValueError("periods must be at least 1 and min_et_periods at most max_et_periods")
+
+
+def assumed_server_values(servers):
+    """The server values that are assumptions rather than UniMelb measurements."""
+    tiers = sorted({(s["model"], s["f_s_MHz"], s["cpu"]) for s in servers}, key=lambda t: (t[1], t[0]))
+    out = ["f_s_MHz: the frequency of a SPEC CPU result for the server model (" + "; ".join(
+        f"{m} {f:g} MHz, {cpu or 'no SPEC processor'}" for m, f, cpu in tiers) + ")"]
+    if any(s["model"] == "C6320" for s in servers):
+        out += ["N_cores, C_s_cores of C6320: the hardware threads UniMelb reports before the "
+                "cloud doubled its vCPU slots in March 2019",
+                "inlet of C6320 (thermal fit): UniMelb has none; the R840 room's mean measured "
+                "inlet at the same timestamp"]
+    return out
 
 
 def build_scenario(name, sc, const, cold_plate, *, clean_dir, scenarios_dir, f_ref_mhz,
@@ -197,7 +264,7 @@ def build_scenario(name, sc, const, cold_plate, *, clean_dir, scenarios_dir, f_r
     """Write scenarios_dir/name/ from scenario settings ``sc``, the constants and the
     cold-plate table. ``extra`` is added to params.json. Returns (servers, diagnostics)."""
     assert sc["dt_seconds"] == slot_seconds, "period length must match the UFCG slot"
-    check_settings(sc)
+    check_settings(sc, eligible_hosts(clean_dir))
     out = Path(scenarios_dir) / name
     T, dt = sc["periods"], sc["dt_seconds"]
 
@@ -230,17 +297,17 @@ def build_scenario(name, sc, const, cold_plate, *, clean_dir, scenarios_dir, f_r
     write_csv(out / "carbon.csv", carbon)
     write_csv(out / "baseline_schedule.csv", sched)
 
-    top_f = max(sc["freq_mhz"])
-    top_cores = sum(s["C_s_cores"] for s in servers if s["f_s_MHz"] == top_f)   # 0: no server of that tier
+    top_f = max(float(r["f_MHz"]) for r in sc["fleet"])
+    top_cores = sum(s["C_s_cores"] for s in servers if s["f_s_MHz"] == top_f)
     diag = {
-        "I_workloads": len(workloads), "S_servers": len(servers), "Z_zones": sc["n_zones"], "T_periods": T,
+        "I_workloads": len(workloads), "S_servers": len(servers), "Z_zones": fleet_size(sc)[1], "T_periods": T,
         # Y_ist can only be 1 between arrival and deadline, so this is the real count
         "Y_ist_binaries_inside_windows": sum(w["D_i"] - w["A_i"] for w in workloads) * len(servers),
         "catalogue_size_within_ET_limits": n_cat,
         "fleet_cores": fleet,
         "peak_requested_vcpus": peak,
         "peak_load_share_of_fleet": round(peak / fleet, 3),
-        "peak_load_share_of_fastest_tier": round(peak / top_cores, 3) if top_cores else None,
+        "peak_load_share_of_fastest_tier": round(peak / top_cores, 3),
         "fleet_memory_MB": fleet_mem,
         "peak_requested_memory_MB": peak_mem,
         "peak_memory_share_of_fleet": round(peak_mem / fleet_mem, 3),
@@ -272,7 +339,7 @@ def build_scenario(name, sc, const, cold_plate, *, clean_dir, scenarios_dir, f_r
                        "per period T[t] = alpha*T[t-1] + (1-alpha)*steady, alpha = th_alpha_5min. "
                        "Fitted from UniMelb; not part of the thesis formulation.",
         "assumed_not_from_data": ["RT_i", "D_i", "zone", "CT_s_cold_plate", "n_cold_plates",
-                                  "f_s_MHz assignment",
+                                  *assumed_server_values(servers),
                                   "daily shape of CI_t", "AV_st = 1 for all s, t", "B_i = 0"],
         "diagnostics": diag,
         **(extra or {}),
