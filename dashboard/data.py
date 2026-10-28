@@ -60,6 +60,32 @@ RELAX_FAMILY_LABELS = {
 CLOCK_ORIGIN = pd.Timestamp("2000-01-03")
 ZERO_TOL = 1e-12
 
+# Server model of each tier: Dell PowerEdge R840 (CRAC) at the slow and mid clock, C6320
+# (CRAC + cold plate) at the fast one. The clock of each tier is in ex.TIERS.
+TIER_MODELS = {"slow": "R840", "mid": "R840", "fast": "C6320"}
+
+
+def tier_ghz(tier: str) -> str:
+    """'2.6 GHz'."""
+    return f"{ex.TIERS[tier] / 1000:.1f} GHz"
+
+
+def tier_text(tier: str) -> str:
+    """'R840, 2.1 GHz'; the cold-plate tier adds ', cold plate'."""
+    text = f"{TIER_MODELS[tier]}, {tier_ghz(tier)}"
+    return text + (", cold plate" if tier == ex.COLD_PLATE_TIER else "")
+
+
+def fleet_text(config: ex.Configuration) -> str:
+    """'3 slow (R840, 2.1 GHz) · 4 mid (R840, 2.4 GHz) · 3 fast (C6320, 2.6 GHz, cold plate)'."""
+    return " · ".join(f"{config.tiers.count(t)} {t} ({tier_text(t)})"
+                      for t in ex.TIERS if t in config.tiers)
+
+
+def cold_plate_server_text() -> str:
+    """'a C6320 at 2.6 GHz': the servers that carry a cold plate."""
+    return f"a {TIER_MODELS[ex.COLD_PLATE_TIER]} at {tier_ghz(ex.COLD_PLATE_TIER)}"
+
 
 # ---------------------------------------------------------------------------
 # Run discovery
@@ -126,14 +152,17 @@ def scenario_file(scenario: str, name: str, scenarios_dir: str | Path = SCENARIO
 
 def load_servers(scenario: str, run_dir: str | Path | None = None,
                  scenarios_dir: str | Path = SCENARIOS_DIR) -> pd.DataFrame:
-    """Columns s, name, zone, label, zone_label; sorted by zone then s (display order).
+    """Columns s, name, zone, label, zone_label, and model when the scenario's servers.csv
+    has one (scenarios built before release 1.4.0 have none); sorted by zone then s (display
+    order).
 
     Names come from the scenario's ``servers.csv`` (see ``scenario_file``), else from the
     run's ``compliance_servers.csv``, else "server <s>".
     """
     path = scenario_file(scenario, "servers.csv", scenarios_dir, run_dir)
     if path is not None:
-        df = pd.read_csv(path, usecols=["s", "server", "zone"]).rename(columns={"server": "name"})
+        df = pd.read_csv(path, usecols=lambda c: c in ("s", "server", "zone", "model")
+                         ).rename(columns={"server": "name"})
     else:
         df = pd.DataFrame(columns=["s", "name", "zone"])
         if run_dir is not None:
@@ -971,8 +1000,14 @@ SECTION_SERVER_STATS = {
 }
 
 
+def server_columns(servers: pd.DataFrame) -> list[str]:
+    """s, name, zone, and model when the scenario's servers.csv names it."""
+    return ["s", "name", "zone", *(["model"] if "model" in servers else [])]
+
+
 def server_stats(run: Run, variant: str = "optimized") -> pd.DataFrame:
-    """One row per server (display order): s, name, zone and the SERVER_STATS columns."""
+    """One row per server (display order): s, name, zone, model (when known) and the
+    SERVER_STATS columns."""
     sp = run.server_period
     sp = sp[sp["variant"] == variant] if not sp.empty else sp
     if sp.empty:
@@ -990,7 +1025,7 @@ def server_stats(run: Run, variant: str = "optimized") -> pd.DataFrame:
         "periods_throttled": g["DPF"].apply(lambda d: int((d < 1 - 1e-9).sum())),
         "E_IT_kWh": g["P_IT_W"].sum() * run.dt_seconds / 3600 / 1000,
     }).reset_index()
-    return run.servers[["s", "name", "zone"]].merge(out, on="s", how="left")
+    return run.servers[server_columns(run.servers)].merge(out, on="s", how="left")
 
 
 def reassignment_table(run: Run) -> pd.DataFrame:

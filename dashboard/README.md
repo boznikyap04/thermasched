@@ -6,6 +6,13 @@ cores or memory, whichever fills first), from the runs saved under `results/`: t
 and key results of each test against its Base, and every CSV those runs wrote. It only reads
 files.
 
+The fleets have three speed tiers of two server models: slow, Dell PowerEdge R840 at 2.1 GHz;
+mid, R840 at 2.4 GHz; fast, C6320 at 2.6 GHz, the only servers with a cold plate (all are
+cooled by the CRAC). 10 servers are 3 slow, 4 mid and 3 fast; 6 servers 2 / 2 / 2; 2 servers
+two mid. The site takes each tier's frequency from `TIERS` in `scheduler/experiments.py`, and
+the model of each server from the `model` column of the scenario's `servers.csv` when it has
+one (scenarios built before release 1.4.0 have none).
+
 ## 1. Start the dashboard
 
 From the repository root (after `uv sync`, see the [main README](../README.md#setup)):
@@ -39,8 +46,8 @@ A run shows on the site when it was solved on one of the configurations' scenari
 day of 10 servers is `servers10` (earlier `thesis10`), its light and heavy days
 `servers10_light` and `servers10_heavy`, and each has a `_swing` twin for 6.4 Test 3b; the
 same for `servers6` (earlier `consolidated6`) and `servers2` (two mid servers). The list is in
-`scheduler/experiments.py`. Only the `servers6` scenarios are in `scenarios/` for now; the
-others are added when they are run. A run
+`scheduler/experiments.py`. The `servers6` and `servers10` scenarios are in `scenarios/`;
+`servers2` is added when it is run. A run
 is matched to its test by its settings, not its folder name, so a run made in the batch
 notebook shows under its test too.
 
@@ -79,12 +86,12 @@ view. *Test charts* keeps its scenario, test and topic the same way
 | Page | What it shows |
 |---|---|
 | **Chapter 6 › Overview** | which test has a run in each configuration (per-tick runs: ✅ every tick solved, ⏱ ticks stopped at the per-tick cap with the worst tick's gap; whole-day runs: ✅ proven best, ⏱ stopped at the time limit with its gap; · not run yet, n/a not applicable), and every result of every configuration in one table, downloadable as CSV |
-| **Chapter 6 › 6.1 to 6.4** | one page per scenario, with its question and goal. For a configuration: the Base next to each test, one row per measure the scenario asks for (with the change against the Base on request), a chart, per-server figures (utilization, temperature, headroom, DPF, periods slowed) and, for 6.1 and 6.4, every workload's original and new server and zone. *Across configurations*: one measure for every configuration and test, as a table and a chart. Everything downloads as CSV |
+| **Chapter 6 › 6.1 to 6.4** | one page per scenario, with its question and goal. For a configuration: its servers (tier, model and frequency), the Base next to each test, one row per measure the scenario asks for (with the change against the Base on request), a chart, per-server figures (server model when the scenario names it; utilization, temperature, headroom, DPF, periods slowed) and, for 6.1 and 6.4, every workload's original and new server and zone. *Across configurations*: one measure for every configuration and test, as a table and a chart. Everything downloads as CSV |
 | **Test charts › Charts and key results** | one test of one configuration: pick the scenario, then the test (Base, Test 1, ...). It shows the run's settings, its key results (carbon, energy, hottest server, lowest headroom, missed deadlines, workloads moved) with their change against the Base of its scenario, the solver's outcome and the run's self-checks. Then one topic at a time: **Servers** (utilization, temperature, headroom, effective capability, IT power and DPF per server, and a temperature heatmap), **Cooling** (CRAC supply temperature and energy per zone; coolant and flow of the cold plates in 6.2), **Energy and carbon** (energy by component, carbon and carbon intensity per period) and **Workloads** (a Gantt chart with filters). The Base's optimized schedule is drawn dashed; switch it off with *Base dashed*. When a test has the same schedule as the Base, the page says so |
 | **Outputs › Output files** | every CSV of a run, as the run wrote it: pick the configuration, the run (named by its test; the validation runs `v_…` and older solves of a test come after) and the file. Each file downloads as it is. A warning shows if the run was solved on a different build of its scenario than the one in `scenarios/` |
 
-6.2 needs a server with a cold plate (a fast, 3000 MHz server), so it does not apply to
-2 servers. When several runs match one test, the newest is used.
+6.2 needs a server with a cold plate (a fast server: a C6320 at 2.6 GHz), so it does not
+apply to 2 servers. When several runs match one test, the newest is used.
 
 Every comparison is with the Base test of the same scenario and configuration: 6.2 compares
 with its own Base (both cooling systems optimized), 6.1, 6.3 and 6.4 with the shared Base. The

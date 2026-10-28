@@ -154,7 +154,8 @@ def render() -> None:
                "per-tick cap (how many, and the worst tick's MIP gap). Runs planned for the "
                "whole day at once: ✅ proven best · ⏱ stopped at the time limit (with its MIP "
                "gap). ❌ no valid schedule · **·** not run yet · **n/a** not applicable: 6.1 Test 1 needs two "
-               "servers of the same tier, 6.2 needs a server with a cold plate (3000 MHz).")
+               "servers of the same tier, 6.2 needs a server with a cold plate "
+               f"({data.cold_plate_server_text()}).")
 
     st.subheader("All results")
     with st.container(horizontal=True, gap="medium", vertical_alignment="bottom"):

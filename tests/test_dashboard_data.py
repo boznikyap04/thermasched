@@ -180,6 +180,49 @@ def test_server_names_and_zones_from_scenario(loaded):
     assert not sch["server_name"].isna().any()
 
 
+def _scenario_servers(root, with_model: bool):
+    df = pd.DataFrame({"s": [1, 2, 3], "server": ["qh2-rcc120", "qh2-rcc121", "qh2-rcc210"],
+                       "zone": [1, 2, 1], "N_cores": [64, 64, 80]})
+    if with_model:
+        df.insert(2, "model", ["R840", "R840", "C6320"])
+    (root / "fleet").mkdir()
+    df.to_csv(root / "fleet" / "servers.csv", index=False)
+
+
+def test_server_model_from_scenario(tmp_path):
+    _scenario_servers(tmp_path, with_model=True)
+    servers = data.load_servers("fleet", scenarios_dir=tmp_path)
+    assert dict(zip(servers["s"], servers["model"])) == {1: "R840", 2: "R840", 3: "C6320"}
+    assert data.server_columns(servers) == ["s", "name", "zone", "model"]
+
+
+def test_scenario_without_model_column_still_loads(tmp_path):
+    # scenarios built before release 1.4.0 have no model column
+    _scenario_servers(tmp_path, with_model=False)
+    servers = data.load_servers("fleet", scenarios_dir=tmp_path)
+    assert "model" not in servers
+    assert data.server_columns(servers) == ["s", "name", "zone"]
+    assert servers["label"].tolist() == ["qh2-rcc120 (Z1)", "qh2-rcc210 (Z1)", "qh2-rcc121 (Z2)"]
+
+
+def test_fleet_captions_follow_the_tiers():
+    # The clocks are read from ex.TIERS: 2.1 / 2.4 / 2.6 GHz once the R840 + C6320 fleet of
+    # release 1.4.0 is in scheduler/experiments.py.
+    from scheduler import experiments as ex
+    fast = f"{ex.TIERS[ex.COLD_PLATE_TIER] / 1000:.1f} GHz"
+    assert data.cold_plate_server_text() == f"a C6320 at {fast}"
+    text = data.fleet_text(ex.configuration("servers10"))
+    parts = text.split(" · ")
+    assert len(parts) == 3
+    for part, tier in zip(parts, ex.TIERS):
+        n = ex.configuration("servers10").tiers.count(tier)
+        assert part.startswith(f"{n} {tier} ({data.TIER_MODELS[tier]}, {data.tier_ghz(tier)}")
+    assert parts[-1].endswith(f"C6320, {fast}, cold plate)")
+    assert data.fleet_text(ex.configuration("servers2")) == \
+        f"2 mid (R840, {ex.TIERS['mid'] / 1000:.1f} GHz)"
+    assert "MHz" not in text
+
+
 def test_kpis_match_summary(loaded):
     kpis = data.kpi_frame(loaded(CONSOLIDATED6_FREE).summary).set_index("key")
     assert kpis.loc["min_headroom_C", "better"] == "higher"
