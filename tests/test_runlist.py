@@ -51,7 +51,7 @@ def test_ten_server_fleet_has_the_same_thirty_nine_tests():
     assert [r["scenario"] for r in swing] == ["servers10_light_swing", "servers10_swing",
                                               "servers10_heavy_swing"]
     zones = next(r for r in RUNS10 if r["id"] == "servers10__s1_t1_zones")["args"]
-    assert zones[zones.index("--zone-map") + 1] == "1,1,1,1,2,2,2,2,2,2"
+    assert zones[zones.index("--zone-map") + 1] == "1,1,1,2,2,2,2,2,2,2"
     assert runlist.timing_run("servers10") in {r["id"] for r in RUNS10}
 
 

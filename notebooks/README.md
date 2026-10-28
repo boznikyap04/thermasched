@@ -134,7 +134,7 @@ and run all cells again. The main groups:
 
 | Part | Reads | Writes |
 |---|---|---|
-| 1. Servers | `data/raw/UniMelb.csv` | `data/clean/servers.csv`, `cleaning_log_servers.csv` |
+| 1. Servers | `data/raw/UniMelb.csv` (R840), `data/raw/UniMelb_C6320.csv` (C6320) | `data/clean/servers.csv`, `cleaning_log_servers.csv` |
 | 2. Workloads | `data/raw/UFCG/servers_usage.csv`, `servers_specs.csv`, `flavors.csv` | `data/clean/workloads.csv`, `workload_usage.parquet`, `cleaning_log_workloads.csv` |
 | 3. Model inputs | the two cleaned tables | `scenarios/servers6_light/`, `servers6/`, `servers6_heavy/` and `small/`, by the rules in `scheduler/build.py` |
 | 4. Checks | all outputs | nothing; every assertion must pass |
