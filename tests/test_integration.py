@@ -26,8 +26,8 @@ def test_least_loaded_reproduces_reference_baseline(name):
     assert build_baseline(sc, RunSettings(scenario=name)) == load_reference_baseline(name)
 
 
-@pytest.mark.parametrize("name,kwh,kg", [("small", 4.45, 2.82), ("servers6_light", 22.73, 14.14),
-                                         ("servers6", 24.59, 15.31), ("servers6_heavy", 25.82, 16.05)])
+@pytest.mark.parametrize("name,kwh,kg", [("small", 6.87, 4.37), ("servers6_light", 35.33, 21.98),
+                                         ("servers6", 39.13, 24.35), ("servers6_heavy", 42.46, 26.46)])
 def test_baseline_it_energy_and_carbon(name, kwh, kg):
     sc = load_scenario(name)
     st = RunSettings(scenario=name)
@@ -36,7 +36,7 @@ def test_baseline_it_energy_and_carbon(name, kwh, kg):
     assert round(float((sc.CI_g_per_kWh * ev.E_IT_kWh).sum()) / 1000, 2) == kg
 
 
-@pytest.mark.parametrize("supply,hottest,cooling", [(18.0, 68.08, 9.19), (27.0, 70.18, 4.52)])
+@pytest.mark.parametrize("supply,hottest,cooling", [(18.0, 66.26, 14.62), (27.0, 75.26, 7.20)])
 def test_servers6_baseline_thermal_and_cooling(supply, hottest, cooling):
     sc = load_scenario("servers6")
     st = RunSettings(scenario="servers6", baseline_supply_temp_C=supply)
@@ -148,19 +148,19 @@ def test_run_name_is_built_from_the_switches():
 
 def test_small_running_exercises_availability_and_running_workloads(tmp_path):
     sc = load_scenario("small_running")
-    assert [w.i for w in sc.workloads if w.B == 1] == [1, 2, 3, 4, 5]
+    assert [w.i for w in sc.workloads if w.B == 1] == [1, 2, 3, 4, 5, 6, 7]
     AV = sc.availability()
     assert int((AV == 0).sum()) == 12 and not AV[2, 36:48].any()
-    st = RunSettings(scenario="small_running", run_name="t", time_limit_s=60.0)
+    st = RunSettings(scenario="small_running", run_name="t", per_tick=True, tick_time_limit_s=60.0)
     summary = run(st, results_dir=tmp_path, quiet=True)
     checks = summary["checks"]
     assert checks["running_workloads_not_reassigned"]["passed"] is True
     assert all(c["passed"] in (True, None) for c in checks.values())
-    assert summary["scenario"]["n_running"] == 5
+    assert summary["scenario"]["n_running"] == 7
     assert summary["scenario"]["n_unavailable_server_periods"] == 12
     rows = list(csv.DictReader(open(tmp_path / "small_running" / "t" / "optimized" /
                                     "reassignment.csv")))
-    assert all(r["reassigned"] == "0" and "Eq. (29)" in r["reason"] for r in rows[:5])
+    assert all(r["reassigned"] == "0" and "Eq. (29)" in r["reason"] for r in rows[:7])
     sp = list(csv.DictReader(open(tmp_path / "small_running" / "t" / "optimized" /
                                   "server_period.csv")))
     assert all(float(r["cpu_used_cores"]) == 0 for r in sp

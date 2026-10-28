@@ -56,18 +56,18 @@ def test_least_loaded_reproduces_reference(name):
 
 def test_loader_small():
     sc = load_scenario("small")
-    assert (sc.I, sc.S, sc.Z, sc.T, sc.dt_seconds) == (79, 3, 2, 96, 300)
+    assert (sc.I, sc.S, sc.Z, sc.T, sc.dt_seconds) == (158, 3, 2, 96, 300)
     assert sc.CI_g_per_kWh.shape == (96,)
     assert sc.CI_g_per_kWh[0] == pytest.approx(488.67)
     assert sc.constants.Q_crac_kW == 116
     assert sc.constants.COP_coeffs == (0.0068, 0.0008, 0.458)
     assert sc.constants.T_max_zone_C == 32.0
     s1 = sc.servers[0]
-    assert (s1.s, s1.name, s1.zone, s1.f_MHz, s1.C_cores) == (1, "qh2-rcc160", 1, 2100.0, 64)
-    assert s1.th_alpha == pytest.approx(0.97727)
+    assert (s1.s, s1.name, s1.zone, s1.f_MHz, s1.C_cores) == (1, "qh2-rcc145", 1, 2100.0, 64)
+    assert s1.th_alpha == pytest.approx(0.90185)
     w1 = sc.workloads[0]
     assert (w1.i, w1.workload_id, w1.A, w1.D, w1.AD, w1.C_req, w1.X0) == (1, "w0088", 3, 43, 8, 2, 1)
-    assert [w.i for w in sc.workloads] == list(range(1, 80))
+    assert [w.i for w in sc.workloads] == list(range(1, 159))
 
 
 def test_loader_validation(tmp_path):

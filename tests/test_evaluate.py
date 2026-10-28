@@ -438,8 +438,8 @@ def test_cold_plate_settings_checked():
 # ---------------------------------------------------------------------------
 
 @pytest.mark.parametrize("name,e_it,carbon_kg", [
-    ("small", 4.45, 2.82), ("servers6_light", 22.73, 14.14), ("servers6", 24.59, 15.31),
-    ("servers6_heavy", 25.82, 16.05)])
+    ("small", 6.87, 4.37), ("servers6_light", 35.33, 21.98), ("servers6", 39.13, 24.35),
+    ("servers6_heavy", 42.46, 26.46)])
 def test_reference_baseline_it_energy_and_carbon(name, e_it, carbon_kg):
     sc = load_scenario(name)
     ev = evaluate(sc, load_reference_baseline(name), constant_supply_temp(sc, 18.0),
@@ -457,12 +457,12 @@ def test_servers6_thermal_and_cooling_numbers():
     st = RunSettings(scenario="servers6")
     ev18 = evaluate(sc, ref, constant_supply_temp(sc, 18.0), st)
     ev27 = evaluate(sc, ref, constant_supply_temp(sc, 27.0), st)
-    assert ev18.totals["hottest_T_C"] == pytest.approx(68.1, abs=0.1)
-    assert ev27.totals["hottest_T_C"] == pytest.approx(70.2, abs=0.1)
+    assert ev18.totals["hottest_T_C"] == pytest.approx(66.3, abs=0.1)
+    assert ev27.totals["hottest_T_C"] == pytest.approx(75.3, abs=0.1)
     assert ev18.T_C.max() < 80 and ev27.T_C.max() < 80
     assert ev18.totals["periods_above_cap"] == 0 and ev27.totals["periods_above_cap"] == 0
-    assert ev18.totals["E_crac_kWh"] == pytest.approx(9.2, abs=0.1)
-    assert ev27.totals["E_crac_kWh"] == pytest.approx(4.5, abs=0.1)
+    assert ev18.totals["E_crac_kWh"] == pytest.approx(14.6, abs=0.1)
+    assert ev27.totals["E_crac_kWh"] == pytest.approx(7.2, abs=0.1)
     # E_total is the sum of its parts
     t = ev18.totals
     assert t["E_total_kWh"] == pytest.approx(t["E_IT_kWh"] + t["E_crac_kWh"])

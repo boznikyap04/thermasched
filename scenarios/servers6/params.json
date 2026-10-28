@@ -5,18 +5,44 @@
     "dt_seconds": 300,
     "periods": 288,
     "start_hour_local": 6,
-    "n_servers": 6,
-    "freq_mhz": [
-      2100.0,
-      2400.0,
-      3000.0
+    "fleet": [
+      {
+        "model": "R840",
+        "f_MHz": 2100,
+        "zone": 1,
+        "cold_plate": 0
+      },
+      {
+        "model": "R840",
+        "f_MHz": 2100,
+        "zone": 2,
+        "cold_plate": 0
+      },
+      {
+        "model": "R840",
+        "f_MHz": 2400,
+        "zone": 1,
+        "cold_plate": 0
+      },
+      {
+        "model": "R840",
+        "f_MHz": 2400,
+        "zone": 2,
+        "cold_plate": 0
+      },
+      {
+        "model": "C6320",
+        "f_MHz": 2600,
+        "zone": 1,
+        "cold_plate": 1
+      },
+      {
+        "model": "C6320",
+        "f_MHz": 2600,
+        "zone": 2,
+        "cold_plate": 1
+      }
     ],
-    "freq_split": [
-      2,
-      2,
-      2
-    ],
-    "n_zones": 2,
     "target_peak_load": 0.6,
     "top_up_by_repeats": true,
     "min_et_periods": 3,
@@ -90,50 +116,84 @@
     "zone",
     "CT_s_cold_plate",
     "n_cold_plates",
-    "f_s_MHz assignment",
+    "f_s_MHz: the frequency of a SPEC CPU result for the server model (R840 2100 MHz, Xeon Gold 6130; R840 2400 MHz, Xeon Gold 6148; C6320 2600 MHz, Xeon E5-2690 v4)",
+    "N_cores, C_s_cores of C6320: the hardware threads UniMelb reports before the cloud doubled its vCPU slots in March 2019",
+    "inlet of C6320 (thermal fit): UniMelb has none; the R840 room's mean measured inlet at the same timestamp",
     "daily shape of CI_t",
     "AV_st = 1 for all s, t",
     "B_i = 0"
   ],
   "diagnostics": {
-    "I_workloads": 132,
+    "I_workloads": 257,
     "S_servers": 6,
     "Z_zones": 2,
     "T_periods": 288,
-    "Y_ist_binaries_inside_windows": 58080,
+    "Y_ist_binaries_inside_windows": 102096,
     "catalogue_size_within_ET_limits": 339,
-    "fleet_cores": 384,
-    "peak_requested_vcpus": 117,
-    "peak_load_share_of_fleet": 0.305,
-    "peak_load_share_of_fastest_tier": 0.914,
-    "fleet_memory_MB": 396216,
-    "peak_requested_memory_MB": 239616,
-    "peak_memory_share_of_fleet": 0.605,
-    "time_sensitive_workloads": 35,
-    "workloads_with_imputed_usage": 32,
+    "fleet_cores": 416,
+    "peak_requested_vcpus": 200,
+    "peak_load_share_of_fleet": 0.481,
+    "peak_load_share_of_fastest_tier": 1.25,
+    "fleet_memory_MB": 660088,
+    "peak_requested_memory_MB": 409600,
+    "peak_memory_share_of_fleet": 0.621,
+    "time_sensitive_workloads": 74,
+    "workloads_with_imputed_usage": 66,
     "repeated_workloads": 0,
-    "median_slack_periods_delay_tolerant": 26,
-    "W_per_MHz_spread_best_to_worst": 1.28,
-    "servers_thermally_capped_at_coldest_inlet": 2,
+    "median_slack_periods_delay_tolerant": 24,
+    "W_per_MHz_spread_best_to_worst": 1.61,
+    "servers_thermally_capped_at_coldest_inlet": 4,
     "servers_thermally_capped_at_warmest_inlet": 6,
     "CI_min_max_g_per_kWh": [
       488.62,
       777.15
     ],
-    "baseline_IT_energy_kWh": 24.59,
-    "baseline_idle_share_of_IT_energy": 0.873,
-    "baseline_IT_carbon_kg": 15.31,
+    "baseline_IT_energy_kWh": 39.13,
+    "baseline_idle_share_of_IT_energy": 0.83,
+    "baseline_IT_carbon_kg": 24.35,
     "baseline_unplaced_or_late": 0
   },
   "variant_of": {
     "scenario": "servers10",
     "changed": {
       "settings": {
-        "n_servers": 6,
-        "freq_split": [
-          2,
-          2,
-          2
+        "fleet": [
+          {
+            "model": "R840",
+            "f_MHz": 2100,
+            "zone": 1,
+            "cold_plate": 0
+          },
+          {
+            "model": "R840",
+            "f_MHz": 2100,
+            "zone": 2,
+            "cold_plate": 0
+          },
+          {
+            "model": "R840",
+            "f_MHz": 2400,
+            "zone": 1,
+            "cold_plate": 0
+          },
+          {
+            "model": "R840",
+            "f_MHz": 2400,
+            "zone": 2,
+            "cold_plate": 0
+          },
+          {
+            "model": "C6320",
+            "f_MHz": 2600,
+            "zone": 1,
+            "cold_plate": 1
+          },
+          {
+            "model": "C6320",
+            "f_MHz": 2600,
+            "zone": 2,
+            "cold_plate": 1
+          }
         ]
       }
     }

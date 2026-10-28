@@ -5,18 +5,26 @@
     "dt_seconds": 300,
     "periods": 96,
     "start_hour_local": 12,
-    "n_servers": 3,
-    "freq_mhz": [
-      2100.0,
-      2400.0,
-      3000.0
+    "fleet": [
+      {
+        "model": "R840",
+        "f_MHz": 2100,
+        "zone": 1,
+        "cold_plate": 0
+      },
+      {
+        "model": "R840",
+        "f_MHz": 2400,
+        "zone": 2,
+        "cold_plate": 0
+      },
+      {
+        "model": "C6320",
+        "f_MHz": 2600,
+        "zone": 1,
+        "cold_plate": 1
+      }
     ],
-    "freq_split": [
-      1,
-      1,
-      1
-    ],
-    "n_zones": 2,
     "target_peak_load": 0.6,
     "top_up_by_repeats": true,
     "min_et_periods": 3,
@@ -90,39 +98,41 @@
     "zone",
     "CT_s_cold_plate",
     "n_cold_plates",
-    "f_s_MHz assignment",
+    "f_s_MHz: the frequency of a SPEC CPU result for the server model (R840 2100 MHz, Xeon Gold 6130; R840 2400 MHz, Xeon Gold 6148; C6320 2600 MHz, Xeon E5-2690 v4)",
+    "N_cores, C_s_cores of C6320: the hardware threads UniMelb reports before the cloud doubled its vCPU slots in March 2019",
+    "inlet of C6320 (thermal fit): UniMelb has none; the R840 room's mean measured inlet at the same timestamp",
     "daily shape of CI_t",
     "AV_st = 1 for all s, t",
     "B_i = 0"
   ],
   "diagnostics": {
-    "I_workloads": 79,
+    "I_workloads": 158,
     "S_servers": 3,
     "Z_zones": 2,
     "T_periods": 96,
-    "Y_ist_binaries_inside_windows": 5871,
+    "Y_ist_binaries_inside_windows": 11184,
     "catalogue_size_within_ET_limits": 233,
-    "fleet_cores": 192,
-    "peak_requested_vcpus": 60,
-    "peak_load_share_of_fleet": 0.312,
-    "peak_load_share_of_fastest_tier": 0.938,
-    "fleet_memory_MB": 198108,
-    "peak_requested_memory_MB": 122880,
-    "peak_memory_share_of_fleet": 0.62,
-    "time_sensitive_workloads": 22,
-    "workloads_with_imputed_usage": 20,
-    "repeated_workloads": 0,
-    "median_slack_periods_delay_tolerant": 12,
-    "W_per_MHz_spread_best_to_worst": 1.23,
-    "servers_thermally_capped_at_coldest_inlet": 1,
+    "fleet_cores": 208,
+    "peak_requested_vcpus": 104,
+    "peak_load_share_of_fleet": 0.5,
+    "peak_load_share_of_fastest_tier": 1.3,
+    "fleet_memory_MB": 330044,
+    "peak_requested_memory_MB": 212992,
+    "peak_memory_share_of_fleet": 0.645,
+    "time_sensitive_workloads": 52,
+    "workloads_with_imputed_usage": 46,
+    "repeated_workloads": 22,
+    "median_slack_periods_delay_tolerant": 14,
+    "W_per_MHz_spread_best_to_worst": 1.33,
+    "servers_thermally_capped_at_coldest_inlet": 2,
     "servers_thermally_capped_at_warmest_inlet": 3,
     "CI_min_max_g_per_kWh": [
       488.67,
       777.15
     ],
-    "baseline_IT_energy_kWh": 4.45,
-    "baseline_idle_share_of_IT_energy": 0.844,
-    "baseline_IT_carbon_kg": 2.82,
+    "baseline_IT_energy_kWh": 6.87,
+    "baseline_idle_share_of_IT_energy": 0.743,
+    "baseline_IT_carbon_kg": 4.37,
     "baseline_unplaced_or_late": 0
   },
   "variant_of": {
@@ -131,11 +141,25 @@
       "settings": {
         "periods": 96,
         "start_hour_local": 12,
-        "n_servers": 3,
-        "freq_split": [
-          1,
-          1,
-          1
+        "fleet": [
+          {
+            "model": "R840",
+            "f_MHz": 2100,
+            "zone": 1,
+            "cold_plate": 0
+          },
+          {
+            "model": "R840",
+            "f_MHz": 2400,
+            "zone": 2,
+            "cold_plate": 0
+          },
+          {
+            "model": "C6320",
+            "f_MHz": 2600,
+            "zone": 1,
+            "cold_plate": 1
+          }
         ],
         "max_et_periods": 36,
         "dt_slack_min": 12,
