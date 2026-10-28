@@ -1,6 +1,10 @@
 dataset,step,unit,before,after,removed,note
-UniMelb,keep 64-core period,rows,2748525,1621427,1127098,before 2019-03-14 11:40:00
-UniMelb,"drop duplicate (server, time)",rows,1621427,1621427,0,
-UniMelb,drop rows missing CPU_Load or Power,rows,1621427,1621427,0,
-UniMelb,null failed-sensor inlet readings,rows,1621427,1621427,0,"53,165 inlet values set to null"
-UniMelb,servers passing power-curve and thermal gates,servers,81,45,36,
+UniMelb R840,keep 64-core period,rows,2748525,1621427,1127098,before 2019-03-14 11:40:00
+UniMelb R840,"drop duplicate (server, time)",rows,1621427,1621427,0,
+UniMelb R840,drop rows missing CPU_Load or Power,rows,1621427,1621427,0,
+UniMelb R840,null failed-sensor inlet readings,rows,1621427,1621427,0,"53,165 inlet values set to null"
+UniMelb R840,servers passing power-curve and thermal gates,servers,81,45,36,
+UniMelb C6320,drop records at a doubled slot count,rows,1281024,1179631,101393,CPU_cores above 160
+UniMelb C6320,"drop duplicate (server, time)",rows,1179631,1179283,348,
+UniMelb C6320,drop rows missing CPU_Load or Power,rows,1179283,1030643,148640,
+UniMelb C6320,servers passing power-curve and thermal gates,servers,64,44,20,
