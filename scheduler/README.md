@@ -104,11 +104,11 @@ folders, and how to start a run from the browser.
 
 | Scenario | Servers | Workloads | Horizon | Use |
 |---|---|---|---|---|
-| `servers6_light` | 6 (2/2/2 by tier) | 45 | 288 periods (24 h from 06:00) | light day: workloads drawn until peak demand is 30% of the fleet's cores or memory (34% of memory, 17% of cores) |
-| `servers6` | 6 (2/2/2) | 132 | 288 periods | normal day: peak demand 60% (61% of memory, 31% of cores) |
-| `servers6_heavy` | 6 (2/2/2) | 210 | 288 periods | heavy day: peak demand 85% (86% of memory, 44% of cores) |
-| `servers10_light`, `servers10`, `servers10_heavy` | 10 (3/4/3) | in `params.json` | 288 periods | the same three days on the ten-server fleet |
-| `small` | 3 (one per tier) | 79 | 96 periods (8 h, 12:00-20:00) | quick tests, debugging |
+| `servers6_light` | 6 (2/2/2 by tier) | 91 | 288 periods (24 h from 06:00) | light day: workloads drawn until peak demand is 30% of the fleet's cores or memory (31% of memory, 24% of cores) |
+| `servers6` | 6 (2/2/2) | 257 | 288 periods | normal day: peak demand 60% (62% of memory, 48% of cores) |
+| `servers6_heavy` | 6 (2/2/2) | 370 | 288 periods | heavy day: peak demand 85% (86% of memory, 66% of cores) |
+| `servers10_light`, `servers10`, `servers10_heavy` | 10 (3/4/3) | 199, 414, 604 | 288 periods | the same three days on the ten-server fleet |
+| `small` | 3 (one per tier) | 158 | 96 periods (8 h, 12:00-20:00) | quick tests, debugging |
 | `small_running` | 3 | same as `small` | 96 periods | `small` with 5 workloads already running (B_i = 1) and server 3 down 15:00-16:00 (`availability.csv`), to exercise Eq. (11) and (29) |
 
 The servers are of two models, each with its data from its own UniMelb dataset (D1 for the

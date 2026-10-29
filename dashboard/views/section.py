@@ -12,7 +12,7 @@ import streamlit as st
 
 from dashboard import charts, data, state
 from dashboard.views.chapter6 import (
-    FORMATS, NOTES, csv_bytes, fmt_value, gap_warning, status_cell)
+    FORMATS, NOTES, csv_bytes, fmt_value, gap_warning, status_cell, stuck_notice)
 from scheduler import experiments as ex
 
 SHORT_TITLES = {"6.1": "Cooling zones", "6.2": "Cooling systems", "6.3": "Thermal headroom",
@@ -92,7 +92,7 @@ def _same_schedules(loaded: list[tuple[str, data.Run]], section: ex.Section) -> 
 
 
 def _chart(rows: pd.DataFrame, section: str) -> None:
-    ran = rows[data.has_result(rows)]
+    ran = rows[data.has_result(rows) & ~data.is_stuck(rows)]     # a stuck run has no bars
     if ran.empty:
         return
     tags = ran["tag"].tolist()
@@ -152,7 +152,7 @@ def _servers(loaded: list[tuple[str, data.Run]], section: str) -> None:
     zone_runs = [tag for tag, run in loaded
                  if not run.servers.set_index("s")["zone"].equals(names["zone"])]
     if zone_runs:
-        st.caption(f"Zones are those of the Base; {', '.join(zone_runs)} regroups them.")
+        st.caption(f"Zones are those of {loaded[0][0]}; {', '.join(zone_runs)} regroups them.")
     st.download_button("Download per-server figures (CSV)",
                        long.rename(columns={"name": "Server", "zone": "Zone", "model": "Model",
                                             "run": "Test",
@@ -199,6 +199,10 @@ def _this_configuration(table, cat, config: ex.Configuration, section: ex.Sectio
         st.info(f"{section.key} does not apply to {config.label}: "
                 f"{NOT_APPLICABLE[tests[0].needs]}.")
         return
+    if config.key not in data.configs_with_runs(cat):
+        st.info(f"{config.label} is not run in this release: no test of it has a run.",
+                icon=":material/do_not_disturb_on:")
+        return
     rows = _rows(table, config, section.key)
     changes = st.toggle("Show change against the Base (%)", key=f"changes-{section.key}")
     st.dataframe(_comparison(rows, section.key, changes), hide_index=True,
@@ -207,6 +211,7 @@ def _this_configuration(table, cat, config: ex.Configuration, section: ex.Sectio
     if not missing.empty:
         st.caption(" · ".join(f"{r.tag}: {r.status}" for r in missing.itertuples()) + ".")
     gap_warning(rows)
+    stuck_notice(rows, each=True)
     st.download_button("Download this comparison (CSV)",
                        csv_bytes(rows, data.CHAPTER6_COLUMNS),
                        file_name=f"chapter6_{section.key}_{config.key}.csv", mime="text/csv",
@@ -218,10 +223,20 @@ def _this_configuration(table, cat, config: ex.Configuration, section: ex.Sectio
         st.info(f"No run of {section.key} for {config.label} yet.")
         return
     _same_schedules(loaded, section)
+    # a stuck run has no full-day schedule: no bars, nothing per server or per workload
+    scheduled = [(tag, run) for tag, run in loaded if run.has_optimized]
+    if not scheduled:
+        st.caption("No run of this section has a full-day schedule, so there is no chart, "
+                   "no per-server figures and no workload moves to show.")
+        return
+    left_out = [tag for tag, run in loaded if not run.has_optimized]
+    if left_out:
+        st.caption(f"Left out of the chart and the tables below, with no full-day schedule: "
+                   f"{', '.join(left_out)}.")
     _chart(rows, section.key)
-    _servers(loaded, section.key)
+    _servers(scheduled, section.key)
     if section.key in MOVES:
-        _moves(loaded, section.key)
+        _moves(scheduled, section.key)
 
 
 def _across(table: pd.DataFrame, section: ex.Section, scope: state.Scope) -> None:

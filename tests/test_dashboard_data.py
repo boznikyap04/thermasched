@@ -18,8 +18,12 @@ INFEASIBLE = "archive-small/infeasible_demo_hmin20"
 CONSOLIDATED6_FREE = "archive-consolidated6/least_loaded_base18_free_optimize"
 SMALL_FREE = "archive-small/least_loaded_base18_free_optimize"
 FASTEST = "archive-small/fastest_first_base27_free_optimize"
-COLD_PLATES = "servers6/s2_base"
+COLD_PLATES = "servers6_light/s2_base"       # 6.2 Base, light day: a full-day schedule
 SERVERS6_BASE = "servers6/base"
+# Runs of release 1.4.0 that stopped at a stuck tick: on the 60 s cap, and with no valid
+# schedule (6.4 Test 1 on the heavy day: deadlines vs. server capacity).
+STUCK_AT_CAP = "servers6_heavy/base"
+STUCK_INVALID = "servers6_heavy/s4_t1_no_moves"
 
 pytestmark = pytest.mark.skipif(not RUNS, reason="no run outputs under results/")
 
@@ -358,8 +362,8 @@ def test_provenance_warnings():
 
 # -- Chapter 6: configurations, tests and the results table -------------------------------
 
-BASE = "servers10/base"
-# Per-tick runs on the site (1.3.0 and the 10-server batch of 2026-10-26), by their test.
+BASE = SERVERS6_BASE        # a full-day per-tick run of this release, 53 of 288 ticks at the cap
+# Per-tick runs on the site, by their test: each folder holds the run of its test.
 SERVERS10_TESTS = {
     "servers10/base": "base", "servers10/s1_t1_zones": "s1_t1_zones",
     "servers10/s1_t2_same_zone": "s1_t2_same_zone", "servers10/s2_base": "s2_base",
@@ -404,9 +408,9 @@ def test_run_titles():
     assert data.run_title(infos[ref.key], ref) == \
         "6.1 · Test 1 · Same-type servers regrouped into one zone"
     assert data.run_long_title(infos[ref.key], ref).startswith("10 servers · normal day · 6.1 · Test 1")
-    base = BY_KEY[BASE]
+    base = BY_KEY["servers10/base"]
     assert data.run_title(infos[base.key], base) == "Base"
-    row = data.compare_runs([BY_KEY[BASE]]).iloc[0]
+    row = data.compare_runs([base]).iloc[0]
     assert (row["configuration"], row["test"]) == ("10 servers · normal day", "Base")
 
 
@@ -427,17 +431,19 @@ def test_chapter6_table_rows_and_columns():
     assert firsts["6.2"] == "s2_base"
     for _, row in table.iterrows():
         if row["run"] is None or pd.isna(row["run"]):
-            assert row["status"] in (data.NOT_RUN_YET, data.NOT_APPLICABLE)
+            assert row["status"] in data.NO_RUN
             assert row[list(data.CHAPTER6_METRICS)].isna().all()
         else:
-            assert row["status"] not in (data.NOT_RUN_YET, data.NOT_APPLICABLE)
+            assert row["status"] not in data.NO_RUN
     status = table.set_index(["configuration", "section", "tag"])["status"]
-    assert status["10 servers · normal day", "6.3", "Test 1"] == "time_limit"
-    # stuck at tick 55 (no schedule within the 120 s cap): a run with no optimized schedule
-    assert status["10 servers · normal day", "6.4", "Test 3a"] == "no_solution"
-    assert status["2 servers · normal day", "6.1", "Test 1"] == data.NOT_RUN_YET
+    assert status["6 servers · normal day", "6.3", "Test 1"] == "time_limit"
+    # stuck at tick 169 (no schedule within the 60 s cap): a run with no optimized schedule
+    assert status["6 servers · normal day", "6.1", "Test 1"] == "no_solution"
+    assert status["6 servers · heavy day", "6.4", "Test 1"] == "infeasible"     # stuck, tick 68
+    # no run of the configuration at all: not run in this release
+    assert status["2 servers · normal day", "6.1", "Test 1"] == data.NOT_IN_RELEASE
     assert status["2 servers · normal day", "6.2", "Base"] == data.NOT_APPLICABLE
-    assert status["10 servers · heavy day", "6.1", "Base"] == "time_limit"
+    assert status["10 servers · heavy day", "6.1", "Base"] == data.NOT_IN_RELEASE
 
 
 @needs_site_runs
@@ -451,9 +457,9 @@ def test_chapter6_base_row_matches_summary_and_schedule():
     assert row["E_crac_kWh"] == tot["E_crac_kWh"]
     assert row["E_IT_kWh"] == tot["E_IT_kWh"] and row["E_total_kWh"] == tot["E_total_kWh"]
     assert row["E_cp_Wh"] == pytest.approx(tot["E_cp_kWh"] * 1000)
-    assert row["carbon_kg"] == pytest.approx(30.985, abs=1e-3) == tot["carbon_kg"]
+    assert row["carbon_kg"] == pytest.approx(27.979, abs=1e-3) == tot["carbon_kg"]
     assert row["T_mean_C"] == met["mean_T_C"]
-    assert row["T_max_C"] == pytest.approx(75.96, abs=0.05) == met["hottest_T_C"]
+    assert row["T_max_C"] == pytest.approx(75.55, abs=0.05) == met["hottest_T_C"]
     assert row["n_moved_server"] == met["n_reassigned"]
     assert row["n_moved_zone"] == met["n_cross_zone"]
     assert row["n_late"] == met["n_late"] and row["n_throttled_servers"] == \
@@ -478,8 +484,8 @@ def test_chapter6_base_row_matches_summary_and_schedule():
     assert row["exec_mean_min"] == pytest.approx(sch["periods_run"].mean() * 5)
     assert row["util_mean_pct"] == pytest.approx(sp["utilization"].mean() * 100)
     assert row["H_mean_C"] == pytest.approx(sp["headroom_C"].mean())
-    # the hottest server passes T_dvfs (75 C) at 75.96 C, so it slows a little
-    assert row["DPF_min"] == sp["DPF"].min() == pytest.approx(0.9854, abs=1e-4)
+    # the hottest server passes T_dvfs (75 C) at 75.55 C, so it slows a little
+    assert row["DPF_min"] == sp["DPF"].min() == pytest.approx(0.9916, abs=1e-4)
     assert row["E_cooling_kWh"] == pytest.approx(row["E_crac_kWh"] + row["E_cp_Wh"] / 1000)
 
 
@@ -490,13 +496,18 @@ def test_chapter6_changes_against_section_reference():
     metrics = list(data.CHAPTER6_METRICS)
     for _, idx in table.groupby(["configuration", "section"], sort=False).groups.items():
         ref = changes.loc[idx[0], metrics]
-        if data.has_result(table.loc[[idx[0]]]).iloc[0]:
-            assert (ref.dropna() == 0).all() and ref.notna().any()
+        assert (ref.dropna() == 0).all()
+        # a Base with a full-day schedule has values; a stuck Base has none
+        if data.has_result(table.loc[[idx[0]]]).iloc[0] and \
+                not data.is_stuck(table.loc[[idx[0]]]).iloc[0]:
+            assert ref.notna().any()
+        else:
+            assert changes.loc[idx, metrics].isna().all().all()
     others = [c for c in table.columns if c not in metrics]
     pd.testing.assert_frame_equal(changes[others], table[others])
-    ten_61 = table.index[(table["configuration"] == "10 servers · normal day")
-                         & (table["section"] == "6.1")]
-    base, zones = ten_61[0], ten_61[1]          # the Base, then Test 1
+    light_61 = table.index[(table["configuration"] == "6 servers · light day")
+                           & (table["section"] == "6.1")]
+    base, zones = light_61[0], light_61[1]      # the Base, then Test 1
     assert changes.at[zones, "E_crac_zone1_kWh"] == pytest.approx(
         (table.at[zones, "E_crac_zone1_kWh"] / table.at[base, "E_crac_zone1_kWh"] - 1) * 100)
 
@@ -507,7 +518,7 @@ def test_chapter6_uses_the_newest_matching_run(tmp_path):
     import json
     import shutil
     if BASE not in BY_KEY:
-        pytest.skip("the servers10 base run is not under results/")
+        pytest.skip("the servers6 base run is not under results/")
     for name, created in (("old", "2026-01-01T00:00:00Z"), ("new", "2026-12-01T00:00:00Z")):
         dst = tmp_path / "anything" / name
         shutil.copytree(BY_KEY[BASE].path, dst)
@@ -516,20 +527,21 @@ def test_chapter6_uses_the_newest_matching_run(tmp_path):
         (dst / "summary.json").write_text(json.dumps(summary))
     runs = data.discover_runs(tmp_path)
     cat = data.catalogue(runs)
-    used, found = cat[("servers10", "base")]
+    used, found = cat[("servers6", "base")]
     assert used.name == "new" and [r.name for r in found] == ["old", "new"]
-    assert cat[("servers10", "s1_t1_zones")] == (None, [])
-    table = data.chapter6_table(runs, configs=["servers10"])
+    assert cat[("servers6", "s1_t1_zones")] == (None, [])
+    table = data.chapter6_table(runs, configs=["servers6"])
     assert table.loc[(table["tag"] == "Base") & (table["section"] != "6.2"), "run"].tolist() \
         == ["new"] * 3
     groups = data.config_runs(runs)
-    assert [r.name for r in groups["servers10"]] == ["new", "old"]   # used first, then older
+    assert [r.name for r in groups["servers6"]] == ["new", "old"]   # used first, then older
 
 
 @needs_site_runs
 def test_config_runs():
     groups = data.config_runs(RUNS)
-    assert list(groups) == ["servers10_light", "servers10", "servers10_heavy",
+    # 10 servers on the heavy day is not run in release 1.4.0
+    assert list(groups) == ["servers10_light", "servers10",
                             "servers6_light", "servers6", "servers6_heavy"]
     every = [r.key for refs in groups.values() for r in refs]
     assert sorted(every) == sorted(r.key for r in RUNS)            # each run once
@@ -550,7 +562,7 @@ def test_chapter6_row_of_a_run_without_optimized_schedule(loaded):
 def test_reassignment_table(loaded):
     run = loaded(BASE)
     df = data.reassignment_table(run)
-    assert len(df) == 257
+    assert len(df) == run.summary["scenario"]["I"] == 257
     assert set(df["Moved"]) <= {"yes", "no"}
     assert (df["Moved"] == "yes").sum() == run.summary["optimized"]["metrics"]["n_reassigned"]
     assert df["Original server"].notna().all() and df["Final server"].notna().all()
@@ -564,18 +576,19 @@ def test_reassignment_table(loaded):
 def test_same_schedule(loaded):
     base = loaded(BASE)
     assert data.same_schedule(base, base)
-    # On the light day (no tick at the cap) 6.1 Test 1 keeps the Base's schedule; 6.4 Test 3a
-    # (flat carbon intensity) changes it.
-    light = loaded("servers10_light/base")
-    assert data.same_schedule(loaded("servers10_light/s1_t1_zones"), light)
-    assert not data.same_schedule(loaded("servers10_light/s4_t3a_ci_flat"), light)
+    # On the light day (no tick at the cap) 6.1 Test 1 keeps the Base's schedule; 6.4 Test 3b
+    # (deeper carbon swing) changes it, and a stuck run (6.4 Test 3a) has none to compare.
+    light = loaded("servers6_light/base")
+    assert data.same_schedule(loaded("servers6_light/s1_t1_zones"), light)
+    assert not data.same_schedule(loaded("servers6_light/s4_t3b_ci_swing"), light)
+    assert not data.same_schedule(loaded("servers6_light/s4_t3a_ci_flat"), light)
     if INFEASIBLE in BY_KEY:
         assert not data.same_schedule(loaded(INFEASIBLE), base)
 
 
 @needs_site_runs
 def test_against_base_stacks_the_two_optimized_schedules(loaded):
-    test, base = loaded("servers10/s1_t1_zones"), loaded(BASE)
+    test, base = loaded("servers6_light/s1_t1_zones"), loaded("servers6_light/base")
     pair = data.against_base(test, "Test 1", base)
     assert pair.variants == ("Test 1", data.BASE_LABEL)
     for frame in (pair.period, pair.server_period, pair.zone_period, pair.schedule):
@@ -641,4 +654,63 @@ def test_per_tick_run_in_the_chapter6_table(loaded):
 def test_relabelled_run_says_so():
     summary = data.load_summary(BY_KEY[SERVERS6_BASE].path)
     text = data.provenance_caption(summary)
-    assert "ThermaSched 1.3.0" in text and "labelled 1.2.1 when solved" in text
+    assert "ThermaSched 1.4.0" in text and "labelled 1.3.0 when solved" in text
+
+
+# -- stuck runs and configurations not run -------------------------------------------------
+
+def test_stuck_run_says_where_and_why():
+    """A per-tick run stuck at a tick is a result: it names the tick and the limit, on the
+    60 s cap (a schedule may exist) or with no valid schedule (none exists)."""
+    if not {STUCK_AT_CAP, STUCK_INVALID, SERVERS6_BASE} <= set(BY_KEY):
+        pytest.skip("the 1.4.0 servers6 runs are not under results/")
+    cap = data.load_summary(BY_KEY[STUCK_AT_CAP].path)
+    stuck = data.stuck_info(cap)
+    assert stuck["tick"] == 55 and stuck["limits"] == [data.TICK_TIME_LIMIT]
+    assert data.stuck_reason(stuck, 60.0) == "no schedule within the 60 s cap"
+    ticks = data.per_tick_info(cap)
+    assert data.solver_short(cap["solver"], ticks) == \
+        "Stuck at tick 55: no schedule within the 60 s cap"
+    text = data.stuck_sentence(cap, "10:32")
+    assert text.startswith("Stuck at tick 55 of 288 (10:32): the solver found no schedule")
+    assert "whether one exists is not known" in text and "54 ticks before it" in text
+    assert "no full-day schedule" in data.solver_sentence(cap["solver"], ticks)
+
+    invalid = data.load_summary(BY_KEY[STUCK_INVALID].path)
+    stuck = data.stuck_info(invalid)
+    assert stuck["tick"] == 68
+    assert data.stuck_reason(stuck, 60.0) == "no valid schedule (deadlines vs. server capacity)"
+    assert "no valid schedule exists for it: relaxing deadlines" in data.stuck_sentence(invalid)
+    assert set(data.infeasibility_frame(invalid)["family"]) >= {"deadlines_and_waiting",
+                                                                 "capacity"}
+
+    assert data.stuck_info(data.load_summary(BY_KEY[SERVERS6_BASE].path)) is None
+
+
+def test_stuck_run_in_the_chapter6_table():
+    if STUCK_AT_CAP not in BY_KEY:
+        pytest.skip("the 1.4.0 servers6 runs are not under results/")
+    ref = BY_KEY[STUCK_AT_CAP]
+    row = data.chapter6_row(ref, data.load_summary(ref.path))
+    assert (row["status"], row["stuck_tick"], row["n_ticks"]) == ("no_solution", 55, 55)
+    assert row["stuck_reason"] == "no schedule within the 60 s cap"
+    assert not set(data.CHAPTER6_METRICS) & set(row)       # no full-day figures
+    table = data.chapter6_table(RUNS)
+    stuck = table[data.is_stuck(table)]
+    assert data.has_result(stuck).all()                     # a stuck run is a result
+    heavy = stuck[stuck["configuration"] == "6 servers · heavy day"]
+    assert heavy["run"].nunique() == 13                     # every heavy-day run of 6 servers
+
+
+def test_a_configuration_without_runs_is_not_run_in_this_release():
+    from scheduler import experiments as ex
+    cat = data.catalogue(RUNS)
+    in_release = data.configs_with_runs(cat)
+    assert "servers10_heavy" not in in_release and "servers6_heavy" in in_release
+    base = ex.TEST_BY_ID["base"]
+    heavy10 = ex.configuration("servers10", "heavy")
+    assert data.cell_status(heavy10, base, None, in_release=False) == data.NOT_IN_RELEASE
+    assert data.cell_status(heavy10, base, None) == data.NOT_RUN_YET
+    table = data.chapter6_table(RUNS, configs=["servers10_heavy"])
+    assert not data.has_result(table).any()
+    assert set(table["status"]) <= {data.NOT_IN_RELEASE, data.NOT_APPLICABLE}

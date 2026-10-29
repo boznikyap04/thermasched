@@ -36,6 +36,18 @@ def test_overview():
     assert at.dataframe
     assert any(data.cold_plate_server_text() in c.value for c in at.caption)
     assert not any("MHz" in c.value for c in at.caption)
+    # 10 servers on the heavy day has no run in this release, and says so
+    assert any("Not run in this release: 10 servers · heavy day" in c.value for c in at.caption)
+    grid = at.dataframe[0].value.set_index("Test")
+    assert (grid["10 · heavy"] == "–").all()
+    # stuck runs say at which tick, and why, in the grid and in a note
+    assert grid.loc["Base (6.1, 6.3, 6.4)", "6 · heavy"] == \
+        "⛔ stuck at tick 55, no schedule in cap"
+    assert grid.loc["6.4 · Test 1 · No reassignment (r_is = 0)", "6 · heavy"] == \
+        "⛔ stuck at tick 68, no valid schedule"
+    note = next(i.value for i in at.info if "Stuck runs" in i.value)
+    assert "13 on 6 servers · heavy day" in note
+    assert "6 servers · heavy day 6.4 Test 1 (tick 68) has no valid schedule" in note
 
 
 @pytest.mark.parametrize("config,level", [(c, lv) for c in CONFIGS + ["across"]
@@ -120,12 +132,23 @@ def test_output_files_keeps_the_file_across_runs():
     at.session_state["level"] = "normal"
     at.run()
     first = at.session_state["run-files-servers6"]
-    at.selectbox(key=f"file-{first}").set_value("optimized/server_period.csv").run()
-    at.selectbox(key="run-files-servers6").select_index(1).run()
+    at.selectbox(key=f"file-{first}").set_value("baseline/server_period.csv").run()
+    at.selectbox(key="run-files-servers6").select_index(1).run()      # 6.1 Test 1, stuck
     _ok(at)
     second = at.session_state["run-files-servers6"]
     assert second != first
-    assert at.selectbox(key=f"file-{second}").value == "optimized/server_period.csv"
+    assert at.selectbox(key=f"file-{second}").value == "baseline/server_period.csv"
+
+
+def test_output_files_of_a_stuck_run_open_on_its_partial_schedule():
+    at = _page("from dashboard.views import files\nfiles.render()")
+    at.session_state["config"] = "servers6"
+    at.session_state["level"] = "heavy"
+    at.run()
+    _ok(at)
+    run = at.session_state["run-files-servers6_heavy"]
+    assert at.selectbox(key=f"file-{run}").value == "partial_schedule.csv"
+    assert any("stuck run's schedule" in c.value for c in at.caption)
 
 
 def _charts(config: str, section: str, test: str, topic: str = "Servers",
@@ -148,10 +171,14 @@ def test_test_charts_6_servers(section, test, topic):
     assert at.segmented_control(key="test-detail").value == test
     if any("No run" in i.value for i in at.info):
         return
-    assert at.metric                                        # the key results
+    assert at.metric                                        # the key results, or the ticks
     assert at.get("plotly_chart")
+    if any("No full-day result" in w.value for w in at.warning):     # stuck: no topics
+        assert any(m.label == "Stuck at tick" for m in at.metric)
+        return
     toggle = at.toggle(key="detail_base")
-    assert toggle.disabled == (test == "Base")
+    base_stuck = any("has no full-day schedule" in c.value for c in at.caption)
+    assert toggle.disabled == (test == "Base" or base_stuck)
 
 
 @pytest.mark.parametrize("config", ["servers6", "servers2"])
@@ -194,7 +221,7 @@ def test_scenario_page_says_which_tests_keep_the_base_schedule():
 def test_per_tick_run_shows_its_ticks():
     """A per-tick run's solver block counts the ticks at the cap and charts every tick, and
     says nothing of a whole-day time limit or best bound."""
-    at = _charts("servers6", "6.1", "Test 1", level="heavy")
+    at = _charts("servers6", "6.1", "Test 2")       # 9 of 288 ticks at the cap
     _ok(at)
     labels = {m.label for m in at.metric}
     assert {"Ticks at the cap", "Worst tick's MIP gap"} <= labels
@@ -202,3 +229,51 @@ def test_per_tick_run_shows_its_ticks():
     assert next(m.value for m in at.metric if m.label == "Ticks at the cap").endswith("of 288")
     assert any("Re-planned at each of 288 ticks" in c.value for c in at.caption)
     assert not any("Time limit:" in md.value for md in at.markdown)
+
+
+def test_stuck_run_says_where_and_why():
+    """A run stuck at a tick is a result: its page says at which tick (and when), why, and
+    what it keeps, and charts the ticks up to it, as a warning, not an error."""
+    at = _charts("servers6", "6.1", "Base", level="heavy")
+    _ok(at)
+    text = next(w.value for w in at.warning if "No full-day result" in w.value)
+    assert "Stuck at tick 55 of 288" in text and "within the 60 s per-tick cap" in text
+    metrics = {m.label: m.value for m in at.metric}
+    assert metrics["Stuck at tick"] == "55 of 288"
+    assert metrics["Ticks at the cap"] == "3 of 54 solved"
+    assert any("Partial schedule" in c.value for c in at.caption)
+    assert at.get("plotly_chart")                           # solve time of every tick
+    assert not at.toggle                                    # no topics without a full day
+
+    at = _charts("servers6", "6.4", "Test 1", level="heavy")
+    _ok(at)
+    text = next(w.value for w in at.warning if "No full-day result" in w.value)
+    assert "Stuck at tick 68 of 288" in text and "no valid schedule exists" in text
+    assert at.dataframe                                     # which limits cause it
+
+
+def test_section_page_with_stuck_runs():
+    at = _section("6.1")
+    at.session_state["config"] = "servers6"
+    at.session_state["level"] = "heavy"
+    at.run()
+    _ok(at)
+    note = next(i.value for i in at.info if "Stuck runs" in i.value)
+    assert "**Base** at tick 55 (no schedule within the 60 s cap)" in note
+    table = at.dataframe[0].value.set_index("Measure")
+    assert table.loc["Solver status", "Base"] == \
+        "Stuck at tick 55: no schedule within the 60 s cap"
+    assert any("No run of this section has a full-day schedule" in c.value for c in at.caption)
+
+
+@pytest.mark.parametrize("key", [s.key for s in ex.SECTIONS])
+def test_a_configuration_not_run_in_this_release(key):
+    at = _section(key)
+    at.session_state["config"] = "servers10"
+    at.session_state["level"] = "heavy"
+    at.run()
+    _ok(at)
+    assert "10 servers · heavy day is not run in this release" in at.info[0].value
+    at = _charts("servers10", key, "Base", level="heavy")
+    _ok(at)
+    assert "not run in this release" in at.info[0].value

@@ -14,6 +14,69 @@ run.
   section 4 shows which scenarios differ from before), then solve again. The site warns when
   a run was solved on a different scenario build than the one it holds.
 
+## 1.4.0 (2026-10-29)
+
+**Re-run:** cleaning, then solver. The fleet is new (two server models, new hosts, new tiers),
+so the cleaned data, every scenario and every result change. Run the cleaning notebook again
+(it needs the second UniMelb file, `UniMelb_C6320.csv`), then solve again; runs of 1.3.0 do not
+compare with runs of 1.4.0.
+
+- **New fleet: two server models.** Slow servers are Dell PowerEdge R840 at 2.1 GHz, mid
+  servers R840 at 2.4 GHz, both cooled by the CRAC; fast servers are Dell PowerEdge C6320 at
+  2.6 GHz (was an R840 at 3.0 GHz), which carry the cold plates and are also cooled by the
+  CRAC. The frequencies are assumptions taken from SPEC CPU results for these models (Xeon
+  Gold 6130 and Gold 6148 for the R840, Xeon E5-2690 v4 for the C6320); the UniMelb data does
+  not name the processors. `servers.csv` gains `model` and `cpu` columns, and each scenario's
+  `params.json` lists the assumptions under `assumed_not_from_data`.
+- **C6320 data from UniMelb's second dataset** (D2, same Zenodo record, 64 C6320 hosts,
+  February to June 2019), cleaned like the R840 data. A C6320 has 80 cores (its hardware
+  threads before the cloud doubled its vCPU slots in March 2019, the rule that gives the R840
+  its 64) and 193 GB of memory (measured). D2 has no inlet sensor, so each C6320 uses the R840
+  room's measured inlet at the same time (mean over the R840 hosts with a valid reading:
+  18.8 °C, SD 0.6), an assumption. `qh2-rcc263` and `qh2-rcc264` (another configuration:
+  258 GB, 48 / 96 slots) and `qh2-rcc248` (rcc263's power and thermal profile) are left out,
+  and C6320 records with more than 160 slots (the doubled slots) are dropped, as for the R840.
+  45 R840 and 43 C6320 hosts pass the gates.
+- **Hosts drawn by seed.** The servers of each model are drawn from that model's eligible hosts
+  with a fixed seed, without regard to power, no host twice in a fleet (the power ranking is
+  gone).
+- **10 servers are 3 slow / 4 mid / 3 fast** (was 4 / 3 / 3); 6 servers stay 2 / 2 / 2. The
+  6.1 Test 1 zone map of 10 servers is (1, 1, 1, 2, …): the slow tier in zone 1.
+- **Bigger days.** The light / normal / heavy rule is unchanged (30 / 60 / 85 % of the fleet's
+  cores or memory, whichever fills first; memory still fills first), but the fleet has more
+  memory, so the days draw more workloads: 6 servers 91 / 257 / 370, 10 servers 199 / 414 / 604
+  (with 0 / 77 / 267 repeats of catalogue workloads). The 12 scenarios and `small` /
+  `small_running` are rebuilt.
+- **Per-tick only.** Every result is re-planned per tick (60 s per tick); the whole-day solver
+  is no longer used for results, and `small_running` is tested per tick.
+- **Results.** The 6-server fleet: 39 runs, every test of 6.1 to 6.4 on the light, normal and
+  heavy day. 20 finished: 12 on the light day, 8 on the normal day. 19 got stuck at a tick and
+  are kept as they are, not re-run: a stuck run stops at the first tick it cannot plan, keeps
+  its summary, `ticks.csv` and `partial_schedule.csv` (the workloads started before that tick),
+  and has no full-day schedule. On the light day 6.4 Test 3a got stuck (tick 128); on the
+  normal day 6.1 Test 1 (tick 169), 6.2 Base (138), 6.3 Test 3 (111), 6.4 Test 3a (112) and
+  6.4 Test 3b (111); on the heavy day all 13, at ticks 52 to 152. Eighteen of them found no
+  schedule for the tick within the 60 s cap, so a schedule may exist (a checked heavy-day tick
+  does have one, which takes longer than 60 s to find); 6.4 Test 1 (no moves) on the heavy day
+  has no valid schedule at tick 68: with no moves allowed, the deadlines and the servers'
+  capacity cannot both be met (relaxing either alone gives a schedule).
+  **[ORCHESTRATOR: 10-server counts. The 10-server fleet, light and normal day: 26 runs, N
+  finished, M stuck (…which, at which tick, and why).]** The 10-server heavy day is not run in
+  this release. The runs were solved with the code of this release before its version number
+  was set, so their `summary.json` was relabelled 1.4.0 and keeps `relabelled_from: 1.3.0`.
+  The 1.3.0 results (old fleet) are no longer on the site.
+- **Stuck runs on the site.** The overview grid shows a stuck run as *stuck at tick N*, with no
+  schedule within the cap or no valid schedule, and a note lists the stuck runs and why; the
+  results table and its CSV gain *Stuck at tick* and *Why it got stuck*. The scenario pages
+  name each stuck test with its tick and leave it out of the chart and the per-server and
+  workload tables. *Test charts* says at which tick (and local time) the run stopped, why, how
+  many workloads were waiting and running, what it keeps, and charts the solve time of every
+  tick up to the stuck one (in its own colour), with the limits that cause it when no valid
+  schedule exists. *Output files* opens a stuck run on its `partial_schedule.csv`. A
+  configuration with no run at all says *not run in this release*.
+- The site names the server model in its captions and per-server tables, and reads each
+  tier's clock from the release instead of a fixed 3000 MHz.
+
 ## 1.3.0 (2026-10-26)
 
 **Re-run:** cleaning, then solver. The cleaned data and the scenarios are rebuilt with 64 GB

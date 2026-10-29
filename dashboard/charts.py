@@ -41,18 +41,22 @@ def _variant_line(pal: Palette, variants, v: str, width: float = 2.0) -> dict:
 def tick_solve_times(ticks: pd.DataFrame, clock: pd.DataFrame, pal: Palette,
                      cap_s: float | None) -> go.Figure:
     """Solve time of every tick of a per-tick run, at the local time of its period. Ticks that
-    stopped at the cap are in the warning colour; the hover gives each tick's MIP gap and how
-    many workloads were waiting."""
+    stopped at the cap are in the warning colour, the tick a stuck run stopped at (no
+    schedule) in the critical one; the hover gives each tick's MIP gap and how many workloads
+    were waiting."""
     d = ticks.merge(clock[["t", "time"]], left_on="tick", right_on="t", how="left")
-    at_cap = d["status"] == "time_limit"
+    kind = np.where(d["status"] == "time_limit", "cap",
+                    np.where(d["status"] == "optimal", "solved", "stuck"))
     fig = go.Figure()
-    for stopped, name, color in ((False, "solved to the gap", pal.optimized),
-                                 (True, "stopped at the cap", pal.status["serious"])):
-        part = d[at_cap == stopped]
+    for key, name, color in (("solved", "solved to the gap", pal.optimized),
+                             ("cap", "stopped at the cap", pal.status["serious"]),
+                             ("stuck", "stuck: no schedule", pal.status["critical"])):
+        part = d[kind == key]
         if part.empty:
             continue
         # a tick at the cap with no bound has no gap (NaN): "unknown"
-        gap = [("unknown" if pd.isna(g) else f"{g * 100:.2f} %") for g in part["mip_gap"]]
+        gap = [("no schedule" if key == "stuck" else "unknown" if pd.isna(g) else
+                f"{g * 100:.2f} %") for g in part["mip_gap"]]
         fig.add_bar(x=part["time"], y=part["solve_s"], name=name, marker_color=color,
                     customdata=np.stack([part["tick"], gap, part["n_waiting"]], axis=-1),
                     hovertemplate="tick %{customdata[0]}: %{y:.1f} s, gap %{customdata[1]}, "

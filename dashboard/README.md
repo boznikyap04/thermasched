@@ -61,7 +61,7 @@ notebooks write this structure for you.
    scenario's `servers.csv` and `carbon.csv` next to the run folders.
 2. Restart the dashboard, or reload the page.
 3. Optionally move the run to `results/<configuration>/<test id>/` to match the others, for
-   example `results/servers10_heavy/s3_t1_hmin_high/`. The test ids are in
+   example `results/servers10_light/s3_t1_hmin_high/`. The test ids are in
    `scheduler/experiments.py`.
 
 **Common mistakes**
@@ -85,10 +85,10 @@ view. *Test charts* keeps its scenario, test and topic the same way
 
 | Page | What it shows |
 |---|---|
-| **Chapter 6 › Overview** | which test has a run in each configuration (per-tick runs: ✅ every tick solved, ⏱ ticks stopped at the per-tick cap with the worst tick's gap; whole-day runs: ✅ proven best, ⏱ stopped at the time limit with its gap; · not run yet, n/a not applicable), and every result of every configuration in one table, downloadable as CSV |
+| **Chapter 6 › Overview** | which test has a run in each configuration (per-tick runs: ✅ every tick solved, ⏱ ticks stopped at the per-tick cap with the worst tick's gap, ⛔ stuck at a tick with no schedule; whole-day runs: ✅ proven best, ⏱ stopped at the time limit with its gap; · not run yet, – not run in this release, n/a not applicable), a note listing the stuck runs and why they stopped, and every result of every configuration in one table, downloadable as CSV |
 | **Chapter 6 › 6.1 to 6.4** | one page per scenario, with its question and goal. For a configuration: its servers (tier, model and frequency), the Base next to each test, one row per measure the scenario asks for (with the change against the Base on request), a chart, per-server figures (server model when the scenario names it; utilization, temperature, headroom, DPF, periods slowed) and, for 6.1 and 6.4, every workload's original and new server and zone. *Across configurations*: one measure for every configuration and test, as a table and a chart. Everything downloads as CSV |
 | **Test charts › Charts and key results** | one test of one configuration: pick the scenario, then the test (Base, Test 1, ...). It shows the run's settings, its key results (carbon, energy, hottest server, lowest headroom, missed deadlines, workloads moved) with their change against the Base of its scenario, the solver's outcome and the run's self-checks. Then one topic at a time: **Servers** (utilization, temperature, headroom, effective capability, IT power and DPF per server, and a temperature heatmap), **Cooling** (CRAC supply temperature and energy per zone; coolant and flow of the cold plates in 6.2), **Energy and carbon** (energy by component, carbon and carbon intensity per period) and **Workloads** (a Gantt chart with filters). The Base's optimized schedule is drawn dashed; switch it off with *Base dashed*. When a test has the same schedule as the Base, the page says so |
-| **Outputs › Output files** | every CSV of a run, as the run wrote it: pick the configuration, the run (named by its test; the validation runs `v_…` and older solves of a test come after) and the file. Each file downloads as it is. A warning shows if the run was solved on a different build of its scenario than the one in `scenarios/` |
+| **Outputs › Output files** | every CSV of a run, as the run wrote it: pick the configuration, the run (named by its test; the validation runs `v_…` and older solves of a test come after) and the file; a stuck run opens on its `partial_schedule.csv`. Each file downloads as it is. A warning shows if the run was solved on a different build of its scenario than the one in `scenarios/` |
 
 6.2 needs a server with a cold plate (a fast server: a C6320 at 2.6 GHz), so it does not
 apply to 2 servers. When several runs match one test, the newest is used.
@@ -100,6 +100,16 @@ A test can end with the same optimized schedule as the Base (in the per-tick run
 Test 1 on the light day), so their charts look the same; the scenario page and *Test charts*
 say when that happens. For a per-tick run, *Test charts* also shows the solve time of every
 tick and how many stopped at the per-tick cap.
+
+**Stuck runs.** A per-tick run stops at the first tick it cannot plan: either the solver found
+no schedule for that tick within the per-tick cap (a schedule may exist), or no valid schedule
+exists for it (the run names the limits that cause it). Such a run is a result, not a missing
+one: it keeps `summary.json`, `ticks.csv` and `partial_schedule.csv` (the workloads started
+before the stuck tick), but has no full-day schedule. The overview and the scenario pages show
+it as stuck at its tick, with blank measures and no bars or per-server figures; *Test charts*
+says at which tick (and local time) and why it stopped, what it keeps, and charts the solve
+time of every tick up to it. A configuration with no run at all (in release 1.4.0, 10 servers
+on the heavy day, and 2 servers) shows as *not run in this release*.
 
 Most charts are interactive. Hover for values, drag to zoom, and double-click to reset.
 

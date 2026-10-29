@@ -68,10 +68,34 @@ def _same_schedule_note(run: data.Run, base: data.Run, tag: str) -> None:
 
 
 def _infeasibility(run: data.Run) -> None:
-    diag = data.infeasibility_frame(run.summary)
     status = run.solver.get("status", "unknown")
     st.error(f"**No optimized schedule.** The solver ended with status **{status}**, so this "
              "test has no charts.", icon="⛔")
+    _diagnosis(run)
+
+
+def _stuck(run: data.Run, stuck: dict) -> None:
+    """A per-tick run that stopped at a tick: where, why, what it keeps. It is a result of
+    the release, so a warning, not an error."""
+    clock = run.clock.set_index("t")["clock"].get(stuck.get("tick"))
+    st.warning(f"**No full-day result.** {data.stuck_sentence(run.summary, clock)}",
+               icon=":material/block:")
+    path = run.ref.path / "partial_schedule.csv"
+    if path.is_file():
+        part = pd.read_csv(path)
+        running = int(part["end"].isna().sum()) if "end" in part else 0
+        st.caption(f"Partial schedule: {len(part):,} workloads started before tick "
+                   f"{stuck.get('tick')}, {running:,} of them still running there "
+                   "(`partial_schedule.csv` on *Output files*). The key results, the "
+                   "comparison with the Base and the charts need a full day, so this page "
+                   "shows the solver's figures up to the stuck tick.")
+    _diagnosis(run)
+    _solver(run)
+    _checks(run)
+
+
+def _diagnosis(run: data.Run) -> None:
+    diag = data.infeasibility_frame(run.summary)
     if diag.empty:
         return
     with st.container(border=True):
@@ -103,12 +127,20 @@ def _violations(run: data.Run) -> None:
 def _per_tick(run: data.Run, sol: dict, ticks: dict) -> None:
     """The solver figures of a run re-planned at every tick, and its solve time per tick."""
     n, cap, limit = ticks.get("n_ticks"), data.ticks_at_cap(ticks), ticks.get("tick_time_limit_s")
-    c1, c2, c3 = st.columns(3)
+    stuck = ticks.get("stuck") if ticks.get("outcome") == "stuck" else None
+    if stuck:
+        n = int(ticks.get("n_ticks_optimal") or 0) + cap       # the ticks solved before it
+        c1, c2, c3, c4 = st.columns(4)
+        T = (run.summary.get("scenario") or {}).get("T")
+        c4.metric("Stuck at tick", f"{stuck.get('tick')}" + (f" of {T}" if T else ""),
+                  help=data.stuck_reason(stuck, limit).capitalize() + ".")
+    else:
+        c1, c2, c3 = st.columns(3)
     c1.metric("Solve time, all ticks", state.fmt_num(sol.get("solve_time_s"), 0, "s"))
-    gap = sol.get("mip_gap")
+    gap = ticks.get("max_mip_gap") if stuck else sol.get("mip_gap")
     c2.metric("Worst tick's MIP gap", "–" if gap is None else f"{gap * 100:.2f}%",
               help=f"Requested for every tick: {run.settings.get('mip_rel_gap', 0) * 100:g}%")
-    c3.metric("Ticks at the cap", f"{cap} of {n}",
+    c3.metric("Ticks at the cap", f"{cap} of {n}" + (" solved" if stuck else ""),
               help=f"Each tick's solve stops after {limit:g} s with the best plan found so far.")
     frame = data.load_ticks(run.ref.path)
     if frame is not None:
@@ -116,7 +148,8 @@ def _per_tick(run: data.Run, sol: dict, ticks: dict) -> None:
         st.caption("Solve time of each tick, at the time of its period. A tick sees the "
                    "workloads that have arrived and plans to the end of the day; only its own "
                    "period's decisions are kept. Hover a bar for its MIP gap and how many "
-                   "workloads were waiting.")
+                   "workloads were waiting."
+                   + (" The last bar is the stuck tick." if stuck else ""))
 
 
 def _solver(run: data.Run) -> None:
@@ -128,7 +161,8 @@ def _solver(run: data.Run) -> None:
             st.markdown("**Solver**")
             st.badge(data.solver_short(sol, ticks) if status != "unknown" else "unknown",
                      color=STATUS_COLOR.get(status, "gray"))
-        st.caption(data.solver_sentence(sol, ticks))
+        if data.stuck_info(run.summary) is None:      # a stuck run says it above
+            st.caption(data.solver_sentence(sol, ticks))
         if ticks is not None:
             _per_tick(run, sol, ticks)
         else:
@@ -143,12 +177,13 @@ def _solver(run: data.Run) -> None:
                       help="Lower bound on the optimum: no schedule can emit less.")
         with st.expander("Solver details"):
             obj = sol.get("objective_g")
+            size = (f" · {state.fmt_num(sol.get('n_variables'), 0)} variables "
+                    f"({state.fmt_num(sol.get('n_binaries'), 0)} binary) · "
+                    f"{state.fmt_num(sol.get('n_constraints'), 0)} constraints"
+                    if sol.get("n_variables") else "")     # a stuck run has no model to count
             st.caption(f"Objective (carbon) {state.fmt_num(None if obj is None else obj / 1000, 3, 'kg')}"
-                       f" · {state.fmt_num(sol.get('n_variables'), 0)} variables "
-                       f"({state.fmt_num(sol.get('n_binaries'), 0)} binary) · "
-                       f"{state.fmt_num(sol.get('n_constraints'), 0)} constraints"
-                       + (f" · {sol['solver_status_text']}" if sol.get("solver_status_text")
-                          else ""))
+                       + size + (f" · {sol['solver_status_text']}" if sol.get("solver_status_text")
+                                 else ""))
             if sol.get("relaxed"):
                 st.caption(f"Relaxed families: {', '.join(sol['relaxed'])}")
             for n in sol.get("notes") or []:
@@ -380,21 +415,36 @@ def render() -> None:
     cat = state.chapter6()[1]
     ref, _ = cat[(config.key, test.id)]
     if ref is None:
-        st.info(f"No run of {section.key} {tag} for {config.label} yet.")
+        if config.key not in data.configs_with_runs(cat):
+            st.info(f"No run: {config.label} is not run in this release.",
+                    icon=":material/do_not_disturb_on:")
+        else:
+            st.info(f"No run of {section.key} {tag} for {config.label} yet.")
         return
     run = state.load_run(ref)
+    _header(run)
+    if not run.has_optimized:
+        stuck = data.stuck_info(run.summary)
+        if stuck is not None:
+            _stuck(run, stuck)
+        else:
+            _infeasibility(run)
+        return
     base = None
     if tag != base_tag:
         base_ref, _ = cat[(config.key, base_id)]
         base = state.load_run(base_ref) if base_ref is not None else None
-        if base is None or not base.has_optimized:
-            st.caption(f"The {section.key} Base has no optimized schedule for {config.label} "
-                       "yet, so there is nothing to compare with.")
+        if base is None:
+            st.caption(f"The {section.key} Base has no run for {config.label}, so there is "
+                       "nothing to compare with.")
+        elif not base.has_optimized:
+            base_stuck = data.stuck_info(base.summary)
+            why = (f"got stuck at tick {base_stuck.get('tick')} "
+                   f"({data.stuck_reason(base_stuck, base.settings.get('tick_time_limit_s'))})"
+                   if base_stuck else f"ended with status {base.solver.get('status')}")
+            st.caption(f"The {section.key} Base {why} and has no full-day schedule, so there "
+                       "is nothing to compare with.")
             base = None
-    _header(run)
-    if not run.has_optimized:
-        _infeasibility(run)
-        return
     _violations(run)
     if base is not None and data.same_schedule(run, base):
         _same_schedule_note(run, base, tag)

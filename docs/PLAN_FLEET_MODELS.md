@@ -1,6 +1,6 @@
 # Plan: two server models (R840 + C6320)
 
-**Status (2026-10-28, evening):** items 1–8 done and merged into `fleet-models` (merge 9a6abfa; local, not pushed). 770 tests pass; 4 site tests wait for the 1.4.0 runs. **Blocked before item 9:** the timing run (servers6_heavy base, 60 s cap) got stuck at tick 110 of 288 with no schedule, see §8. No Actions run has been started. Implements
+**Status (2026-10-29):** items 1–8 done; items 9–10 done for 6 servers (Actions run 40693621559: 39 runs, 20 finished, 19 stuck at a tick, kept as valid results; committed locally, 33b68b7). 10 servers, light and normal day (26 runs), running on Actions; the 10-server heavy day is not run in this release. Release 1.4.0 prepared on `fleet-e-release` (version, changelog with a placeholder for the 10-server counts, scenarios stamped, notebooks synced, servers6 runs relabelled, site reads stuck runs and configurations with no run); the 10-server runs, publish and deploy remain. Implements
 [ADR 0001](adr/0001-server-fleet-from-processor-specs.md); the ADR holds the why, this file
 holds the work. Where they differ, this file wins for the work and the ADR for the reasons.
 
@@ -193,3 +193,5 @@ Each thread gets this file plus its brief.
 | 2026-10-28 | Rebuild: 6-server days now draw 91 / 257 / 370 workloads (the old 10-server counts; fleet memory is almost the same), 10-server days 199 / 414 / 604 with 0 / 77 / 267 repeats. Memory still fills first |
 | 2026-10-28 | Timing run (local M4): servers6_heavy base **stuck at tick 110** (no schedule in 60 s; 61 waiting, 42 running); 93 ticks optimal, 16 at the cap with gaps up to 26 %. 1.3.0: done, 283 / 5, gap 0.2 %. The batch needs a decision first: higher cap, smaller heavy day, or solver work |
 | 2026-10-28 | Stuck-tick diagnosis (tick 110 rebuilt from a checkpoint): a valid schedule exists (feasibility-only finds one in 138 s; full solve optimal, gap 0.1 %, in 490 s). Not a constraint conflict: 407 GB and 297 cores free, one C6320 empty, no waiting workload due within 6 ticks. Cause: 61 workloads held back for carbon make a 38,653-binary model (interior-point LPs above 30,000) and the warm start leaves the 7 new arrivals unplaced, so HiGHS needs > 60 s to find any schedule |
+| 2026-10-29 | 6-server batch done: 20 finished, 19 stuck (18 on the 60 s tick cap, heavy 6.4 Test 1 with no valid schedule at tick 68). Owner: stuck runs are valid results, reported as they are, not re-run |
+| 2026-10-29 | Owner: run the 10-server light and normal days; the 10-server heavy day is not run in 1.4.0. Release 1.4.0 prepared (thread E) |

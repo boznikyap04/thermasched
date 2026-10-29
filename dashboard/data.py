@@ -642,12 +642,75 @@ def load_ticks(run_dir: str | Path) -> pd.DataFrame | None:
     return df
 
 
+# The limit a per-tick run names when a tick has no schedule (scheduler/pertick.py), in a few
+# words. A stuck run stops at that tick: it keeps the ticks before it, not a whole day.
+TICK_TIME_LIMIT = "tick_time_limit"
+STUCK_LIMIT_WORDS = {
+    "deadlines_and_waiting": "deadlines", "thermal_cap": "thermal cap",
+    "capacity": "server capacity", "cooling_capacity": "cooling capacity",
+    "priority": "priority order", "supply_ramp": "supply-air ramps",
+    "several_limits_together": "several limits together", "model_input": "model inputs",
+}
+
+
+def stuck_info(summary: dict) -> dict | None:
+    """Where and why a per-tick run stopped (tick, limits, limit_text, detail, n_waiting,
+    n_running, relaxed_one_at_a_time); None for a run that did not get stuck."""
+    ticks = per_tick_info(summary)
+    if ticks is None or ticks.get("outcome") != "stuck":
+        return None
+    return ticks.get("stuck") or None
+
+
+def stuck_reason(stuck: dict, cap_s: float | None = None) -> str:
+    """Why a run stopped at its stuck tick, in a few words: 'no schedule within the 60 s cap'
+    (the solver ran out of time; a schedule may exist) or 'no valid schedule (deadlines vs.
+    server capacity)' (none exists, and relaxing any one of these alone would give one)."""
+    limits = list(stuck.get("limits") or [])
+    if limits == [TICK_TIME_LIMIT]:
+        return f"no schedule within the {cap_s:g} s cap" if cap_s else \
+            "no schedule within the per-tick cap"
+    return "no valid schedule (" + " vs. ".join(
+        STUCK_LIMIT_WORDS.get(x, x.replace("_", " ")) for x in limits) + ")"
+
+
+def stuck_sentence(summary: dict, clock: str | None = None) -> str:
+    """Where and why a stuck run stopped, and what it keeps, in a few sentences; ``clock``
+    is the local time of the stuck tick's period."""
+    stuck, ticks = stuck_info(summary) or {}, per_tick_info(summary) or {}
+    tick, T = stuck.get("tick"), (summary.get("scenario") or {}).get("T")
+    cap_s, cap = ticks.get("tick_time_limit_s"), ticks_at_cap(ticks)
+    solved = int(ticks.get("n_ticks_optimal") or 0) + cap
+    gap = ticks.get("max_mip_gap")
+    if list(stuck.get("limits") or []) == [TICK_TIME_LIMIT]:
+        why = (f"the solver found no schedule for it within the {cap_s:g} s per-tick cap, so "
+               "whether one exists is not known")
+    else:
+        why = ("no valid schedule exists for it: " + (stuck.get("detail") or
+                                                       stuck.get("limit_text") or "unknown"))
+    waiting = (f" {stuck['n_waiting']} workloads were waiting and {stuck['n_running']} "
+               "running at that tick." if stuck.get("n_waiting") is not None else "")
+    before = (f"The {solved} ticks before it were solved"
+              + (f" ({cap} at the cap, worst gap {gap * 100:.2f} %)" if cap and gap is not None
+                 else f" ({cap} at the cap)" if cap else "")
+              + " and are kept as a partial schedule")
+    return (f"Stuck at tick {tick}" + (f" of {T}" if T else "")
+            + (f" ({clock})" if clock else "") + f": {why}.{waiting} "
+            f"{before}. The run stops there, so it has no full-day schedule and no full-day "
+            "results.")
+
+
 def solver_short(solver: dict, ticks: dict | None = None) -> str:
     """The solver's outcome in a few words: 'Proven best', or 'Stopped at time limit, gap
     1.60 %' (the gap tells how far from the best possible the schedule may be). A per-tick
     run (``ticks``, from per_tick_info): 'Every tick solved', or '48 of 288 ticks at the
-    cap, worst gap 24.62 %'."""
+    cap, worst gap 24.62 %'; a stuck one 'Stuck at tick 55: no schedule within the 60 s
+    cap'."""
     status, gap = solver.get("status"), solver.get("mip_gap")
+    if ticks is not None and ticks.get("stuck"):
+        stuck = ticks["stuck"]
+        return (f"Stuck at tick {stuck.get('tick')}: "
+                + (stuck.get("reason") or stuck_reason(stuck, ticks.get("tick_time_limit_s"))))
     if ticks is not None and status in (STATUS_OPTIMAL, STATUS_TIME_LIMIT):
         n, cap = ticks.get("n_ticks"), ticks_at_cap(ticks)
         if not cap:
@@ -666,6 +729,8 @@ def solver_sentence(solver: dict, ticks: dict | None = None) -> str:
     """How complete the result is, in one sentence for the thesis."""
     status, gap, t = solver.get("status"), solver.get("mip_gap"), solver.get("solve_time_s")
     took = f" in {t:,.0f} s" if t is not None else ""
+    if ticks is not None and ticks.get("stuck"):    # stuck_sentence says more, from the summary
+        return f"{solver_short(solver, ticks)}. The run has no full-day schedule."
     if ticks is not None and status in (STATUS_OPTIMAL, STATUS_TIME_LIMIT):
         n, cap, limit = ticks.get("n_ticks"), ticks_at_cap(ticks), ticks.get("tick_time_limit_s")
         slow = ticks.get("slowest_tick_solve_s")
@@ -758,6 +823,9 @@ SECTIONS = ex.SECTIONS
 OTHER = "other"                 # runs of no configuration (another scenario, an archive)
 NOT_RUN_YET = "not run yet"
 NOT_APPLICABLE = "not applicable"
+# A configuration with no run at all: left out of this release, not waiting for one test.
+NOT_IN_RELEASE = "not run in this release"
+NO_RUN = (NOT_RUN_YET, NOT_APPLICABLE, NOT_IN_RELEASE)
 
 
 @dataclass(frozen=True)
@@ -822,11 +890,20 @@ def catalogue(runs: list[RunRef], infos: dict[str, RunInfo] | None = None
     return out
 
 
-def cell_status(config: ex.Configuration, test: ex.Test, used: RunRef | None) -> str | None:
-    """None when the test has a run, else NOT_APPLICABLE or NOT_RUN_YET."""
+def configs_with_runs(cat) -> set[str]:
+    """Keys of the configurations with at least one test run, from ``catalogue``."""
+    return {key for (key, _), (used, _) in cat.items() if used is not None}
+
+
+def cell_status(config: ex.Configuration, test: ex.Test, used: RunRef | None,
+                in_release: bool = True) -> str | None:
+    """None when the test has a run, else NOT_APPLICABLE, NOT_IN_RELEASE (the configuration
+    has no run at all) or NOT_RUN_YET."""
     if not ex.applicable(test, config):
         return NOT_APPLICABLE
-    return None if used is not None else NOT_RUN_YET
+    if used is not None:
+        return None
+    return NOT_RUN_YET if in_release else NOT_IN_RELEASE
 
 
 def config_runs(runs: list[RunRef], infos: dict[str, RunInfo] | None = None
@@ -891,12 +968,14 @@ CHAPTER6_COLUMNS = {
     "n_ticks": "Ticks re-planned",
     "n_ticks_at_cap": "Ticks at the per-tick cap",
     "tick_time_limit_s": "Per-tick cap (s)",
+    "stuck_tick": "Stuck at tick",
+    "stuck_reason": "Why it got stuck",
 }
 # Columns that hold results, for the change against each section's reference.
 CHAPTER6_METRICS = tuple(k for k in CHAPTER6_COLUMNS if k not in {
     "configuration", "servers", "level", "section", "tag", "label", "run", "release",
     "n_unplaced", "status", "mip_gap", "solve_time_s", "time_limit_s", "n_ticks",
-    "n_ticks_at_cap", "tick_time_limit_s"})
+    "n_ticks_at_cap", "tick_time_limit_s", "stuck_tick", "stuck_reason"})
 # What each section measures (the Chapter 6 document's "What to measure"), in its order.
 SECTION_MEASURES = {
     "6.1": ("n_moved_server", "n_moved_zone", "util_mean_pct", "E_crac_zone1_kWh",
@@ -944,6 +1023,10 @@ def chapter6_row(ref: RunRef, summary: dict) -> dict:
         row.update(time_limit_s=None, n_ticks=ticks.get("n_ticks"),
                    n_ticks_at_cap=ticks_at_cap(ticks),
                    tick_time_limit_s=ticks.get("tick_time_limit_s"))
+        stuck = stuck_info(summary)
+        if stuck is not None:
+            row.update(stuck_tick=stuck.get("tick"),
+                       stuck_reason=stuck_reason(stuck, ticks.get("tick_time_limit_s")))
     if not summary.get("has_optimized_schedule"):
         return row
     opt = summary.get("optimized") or {}
@@ -1056,6 +1139,7 @@ def chapter6_table(runs: list[RunRef], infos: dict[str, RunInfo] | None = None,
     below its section's reference. A test without a run says why in *status*."""
     infos = infos if infos is not None else run_infos(runs)
     cat = catalogue(runs, infos)
+    in_release = configs_with_runs(cat)
     rows, cache = [], {}
     for config in CONFIGURATIONS:
         if configs is not None and config.key not in configs:
@@ -1067,7 +1151,7 @@ def chapter6_table(runs: list[RunRef], infos: dict[str, RunInfo] | None = None,
                 row = dict(configuration=config.label, servers=config.size_label,
                            level=config.level_label, section=section.key, tag=tag,
                            label=test.name)
-                missing = cell_status(config, test, used)
+                missing = cell_status(config, test, used, config.key in in_release)
                 if missing:
                     row.update(run=None, status=missing)
                 else:
@@ -1079,7 +1163,13 @@ def chapter6_table(runs: list[RunRef], infos: dict[str, RunInfo] | None = None,
 
 
 def has_result(table: pd.DataFrame) -> pd.Series:
-    return ~table["status"].isin([NOT_RUN_YET, NOT_APPLICABLE])
+    """Rows with a run (a stuck run too, though its measures are blank)."""
+    return ~table["status"].isin(NO_RUN)
+
+
+def is_stuck(table: pd.DataFrame) -> pd.Series:
+    """Rows whose run stopped at a stuck tick."""
+    return pd.to_numeric(table["stuck_tick"], errors="coerce").notna()
 
 
 def _clean(x: float, tol: float = 1e-9) -> float:

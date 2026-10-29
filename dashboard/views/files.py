@@ -31,6 +31,11 @@ FILE_NOTES = {
                                   "removed next to their limits.",
     "compliance_workloads.csv": "One row per workload: whether it met each of its "
                                 "requirements.",
+    "ticks.csv": "One row per tick of a run re-planned every period: solver status, solve "
+                 "time, MIP gap, and the workloads waiting, started and running.",
+    "partial_schedule.csv": "A stuck run's schedule up to the tick it stopped at: each "
+                            "workload started before it, its server, start and end (blank "
+                            "while still running).",
 }
 SCHEDULES = {"baseline": "Baseline schedule", "optimized": "Optimized schedule"}
 
@@ -57,7 +62,7 @@ def render() -> None:
     config = state.pick_config("files")
     ref = state.pick_run(config, "files")
     if ref is None:
-        st.info(f"No runs of {config.label} yet.")
+        st.info(f"No runs of {config.label}: it is not run in this release.")
         return
     try:
         for warning in data.provenance_warnings(data.load_summary(ref.path)):
@@ -70,8 +75,9 @@ def render() -> None:
         return
     widget = f"file-{ref.key}"
     if st.session_state.get(FILE_KEY) not in files:
-        st.session_state[FILE_KEY] = next((f for f in files if f == "optimized/schedule.csv"),
-                                          files[0])
+        st.session_state[FILE_KEY] = next(
+            (f for f in ("optimized/schedule.csv", "partial_schedule.csv") if f in files),
+            files[0])
     st.session_state[widget] = st.session_state[FILE_KEY]
     rel = st.selectbox("File", files, key=widget, on_change=_keep_file, args=(widget,))
 

@@ -74,8 +74,10 @@ raw data ──► notebooks/data_prep.ipynb ──► scenarios/ ──► sche
 ```
 
 The scenarios are already in the repository, so you can run the solver right away.
-`results/` is empty until the per-tick runs of [`docs/PLAN.md`](docs/PLAN.md) are solved; the
-earlier whole-day results are in `archive/results_2026-10-25_whole_day/`. The cleaning notebook is only needed to
+`results/` holds the per-tick runs of release 1.4.0 (6 servers on all three days, 10 servers
+on the light and normal day; the 10-server heavy day is not run in this release), some of
+which stopped at a stuck tick: see [`results/README.md`](results/README.md). The earlier
+whole-day results are in `archive/results_2026-10-25_whole_day/`. The cleaning notebook is only needed to
 change the data. From the raw data it rebuilds the scenarios in the repository byte for
 byte, and checks that it did (fingerprints, its section 4).
 
@@ -204,7 +206,7 @@ Run every command from the repository root.
 │   ├── types.py               shared data types and constants
 │   └── version.py             the release version and the summary.json layout version
 │
-├── results/                   SOLVER OUTPUTS (the dashboard shows these); empty until the per-tick runs
+├── results/                   SOLVER OUTPUTS (the dashboard shows these): the per-tick runs of the release
 │   ├── <configuration>/<test>/  one run: summary.json, comparison_period.csv, baseline/, optimized/
 │   │                          (for example servers6_heavy/s2_base/; the test ids are in scheduler/experiments.py)
 │   └── validation/<scenario>/ validation tables (CSV) and validation.json (not shown on the site)
