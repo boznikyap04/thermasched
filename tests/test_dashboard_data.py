@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import json
+from pathlib import Path
+
 import numpy as np
 import pandas as pd
 import pytest
@@ -21,10 +24,12 @@ FASTEST = "archive-small/fastest_first_base27_free_optimize"
 COLD_PLATES = "servers6_light/base"          # Base, light day: cold plates on, a full day
 SERVERS6_BASE = "servers6/base"
 FULL_DAY = "servers6_light/base"             # a per-tick run with a full-day schedule
-# Runs of release 1.4.0 that stopped at a stuck tick: on the 60 s cap, and with no valid
-# schedule (6.4 Test 1 on the heavy day: deadlines vs. server capacity).
-STUCK_AT_CAP = "servers6_heavy/base"
-STUCK_INVALID = "servers6_heavy/s4_t1_no_moves"
+# A run stuck at a tick on the 60 s cap (6.3 Test 1 on the heavy day), and the summary of a
+# 1.4.0 run with no valid schedule at its tick (6.4 Test 1 on the heavy day, cold plates off:
+# deadlines vs. server capacity), kept as a fixture since its re-run finishes the day.
+STUCK_AT_CAP = "servers6_heavy/s3_t1_hmin_high"
+STUCK_INVALID = Path(__file__).parent / "fixtures" / "stuck_no_valid_schedule.json"
+RELABELLED = "servers10/base"                # a 1.4.0 run solved as 1.3.0
 
 pytestmark = pytest.mark.skipif(not RUNS, reason="no run outputs under results/")
 
@@ -363,7 +368,7 @@ def test_provenance_warnings():
 
 # -- Chapter 6: configurations, tests and the results table -------------------------------
 
-BASE = SERVERS6_BASE        # the servers6 Base (cold plates on), stuck at tick 138
+BASE = SERVERS6_BASE        # the servers6 Base (cold plates on), a full day
 # Per-tick runs on the site, by their test: each folder holds the run of its test.
 SERVERS10_TESTS = {
     "servers10/base": "base", "servers10/s1_t1_zones": "s1_t1_zones",
@@ -651,9 +656,12 @@ def test_per_tick_run_in_the_chapter6_table(loaded):
 
 
 def test_relabelled_run_says_so():
-    summary = data.load_summary(BY_KEY[SERVERS6_BASE].path)
+    if RELABELLED not in BY_KEY:
+        pytest.skip("the 1.4.0 servers10 runs are not under results/")
+    summary = data.load_summary(BY_KEY[RELABELLED].path)
     text = data.provenance_caption(summary)
     assert "ThermaSched 1.4.0" in text and "labelled 1.3.0 when solved" in text
+    assert "labelled" not in data.provenance_caption(data.load_summary(BY_KEY[BASE].path))
 
 
 # -- stuck runs and configurations not run -------------------------------------------------
@@ -661,21 +669,21 @@ def test_relabelled_run_says_so():
 def test_stuck_run_says_where_and_why():
     """A per-tick run stuck at a tick is a result: it names the tick and the limit, on the
     60 s cap (a schedule may exist) or with no valid schedule (none exists)."""
-    if not {STUCK_AT_CAP, STUCK_INVALID, FULL_DAY} <= set(BY_KEY):
-        pytest.skip("the 1.4.0 servers6 runs are not under results/")
+    if not {STUCK_AT_CAP, FULL_DAY} <= set(BY_KEY):
+        pytest.skip("the servers6 runs are not under results/")
     cap = data.load_summary(BY_KEY[STUCK_AT_CAP].path)
     stuck = data.stuck_info(cap)
-    assert stuck["tick"] == 104 and stuck["limits"] == [data.TICK_TIME_LIMIT]
+    assert stuck["tick"] == 122 and stuck["limits"] == [data.TICK_TIME_LIMIT]
     assert data.stuck_reason(stuck, 60.0) == "no schedule within the 60 s cap"
     ticks = data.per_tick_info(cap)
     assert data.solver_short(cap["solver"], ticks) == \
-        "Stuck at tick 104: no schedule within the 60 s cap"
-    text = data.stuck_sentence(cap, "14:37")
-    assert text.startswith("Stuck at tick 104 of 288 (14:37): the solver found no schedule")
-    assert "whether one exists is not known" in text and "103 ticks before it" in text
+        "Stuck at tick 122: no schedule within the 60 s cap"
+    text = data.stuck_sentence(cap, "10:10")
+    assert text.startswith("Stuck at tick 122 of 288 (10:10): the solver found no schedule")
+    assert "whether one exists is not known" in text and "121 ticks before it" in text
     assert "no full-day schedule" in data.solver_sentence(cap["solver"], ticks)
 
-    invalid = data.load_summary(BY_KEY[STUCK_INVALID].path)
+    invalid = json.loads(STUCK_INVALID.read_text())
     stuck = data.stuck_info(invalid)
     assert stuck["tick"] == 68
     assert data.stuck_reason(stuck, 60.0) == "no valid schedule (deadlines vs. server capacity)"
@@ -688,19 +696,18 @@ def test_stuck_run_says_where_and_why():
 
 def test_stuck_run_in_the_chapter6_table():
     if STUCK_AT_CAP not in BY_KEY:
-        pytest.skip("the 1.4.0 servers6 runs are not under results/")
+        pytest.skip("the servers6 runs are not under results/")
     ref = BY_KEY[STUCK_AT_CAP]
     row = data.chapter6_row(ref, data.load_summary(ref.path))
-    assert (row["status"], row["stuck_tick"], row["n_ticks"]) == ("no_solution", 104, 104)
+    assert (row["status"], row["stuck_tick"], row["n_ticks"]) == ("no_solution", 122, 122)
     assert row["stuck_reason"] == "no schedule within the 60 s cap"
     assert not set(data.CHAPTER6_METRICS) & set(row)       # no full-day figures
     table = data.chapter6_table(RUNS)
     stuck = table[data.is_stuck(table)]
     assert data.has_result(stuck).all()                     # a stuck run is a result
     heavy = stuck[stuck["configuration"] == "6 servers · heavy day"]
-    # every heavy-day run of 6 servers that is a test's run: the Base and 6.2 Tests 1 and 2
-    # until the runs with cold plates off are re-run
-    assert heavy["run"].nunique() == 3
+    # with cold plates on, only 6.3 Test 1 on the heavy day of 6 servers gets stuck
+    assert list(heavy["run"].unique()) == ["s3_t1_hmin_high"]
 
 
 def test_a_configuration_without_runs_is_not_run_in_this_release():

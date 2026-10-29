@@ -45,6 +45,10 @@ run.
 - **Results:** each day's 1.4.0 6.2 Base run (cold plates on, every other switch at its
   default) is now its Base (`s2_base` renamed `base`); 6.2 Tests 1 and 2 stand. The runs of
   6.1 Tests 1-2, 6.3 and 6.4 had cold plates off and wait for the re-run (`results/README.md`).
+- **6 servers re-run:** all 36 runs (light, normal, heavy) are re-solved with these changes
+  and replace their 1.4.0 runs: 35 finish the day, and 6.3 Test 1 on the heavy day is stuck
+  at tick 122 (no schedule within the cap). Every heavy-day run but that one now finishes,
+  where all of them were stuck in 1.4.0. The 10-server runs are still those of 1.4.0.
 - The slowdown validation check picks a server without a cold plate (an R840), since a plate
   keeps its server below the throttling temperature.
 

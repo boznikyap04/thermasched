@@ -48,17 +48,12 @@ def test_overview():
     grid = at.dataframe[0].value.set_index("Test")
     assert (grid["10 · heavy"] == "–").all()
     # stuck runs say at which tick, and why, in the grid and in a note
-    assert grid.loc["Base (every section)", "6 · heavy"] == \
-        "⛔ stuck at tick 104, no schedule in cap"
+    assert grid.loc["6.3 · Test 1 · High safety margin, 19 °C", "6 · heavy"] == \
+        "⛔ stuck at tick 122, no schedule in cap"
+    assert grid.loc["Base (every section)", "6 · heavy"].startswith("⏱ 29 at cap")
+    assert grid.loc["6.4 · Test 1 · No reassignment (r_is = 0)", "6 · heavy"] == "✅ every tick"
     note = next(i.value for i in at.info if "Stuck runs" in i.value)
-    if not _has_run("servers6_heavy", "s4_t1_no_moves"):
-        assert grid.loc["6.4 · Test 1 · No reassignment (r_is = 0)", "6 · heavy"] == "·"
-        assert "3 on 6 servers · heavy day" in note
-        return
-    assert grid.loc["6.4 · Test 1 · No reassignment (r_is = 0)", "6 · heavy"] == \
-        "⛔ stuck at tick 68, no valid schedule"
-    assert "13 on 6 servers · heavy day" in note
-    assert "6 servers · heavy day 6.4 Test 1 (tick 68) has no valid schedule" in note
+    assert "1 on 6 servers · heavy day" in note
 
 
 @pytest.mark.parametrize("config,level", [(c, lv) for c in CONFIGS + ["across"]
@@ -156,8 +151,10 @@ def test_output_files_of_a_stuck_run_open_on_its_partial_schedule():
     at.session_state["config"] = "servers6"
     at.session_state["level"] = "heavy"
     at.run()
+    at.selectbox(key="run-files-servers6_heavy").select_index(5).run()   # 6.3 Test 1, stuck
     _ok(at)
     run = at.session_state["run-files-servers6_heavy"]
+    assert run == "servers6_heavy/s3_t1_hmin_high"
     assert at.selectbox(key=f"file-{run}").value == "partial_schedule.csv"
     assert any("stuck run's schedule" in c.value for c in at.caption)
 
@@ -249,38 +246,31 @@ def test_per_tick_run_shows_its_ticks():
 def test_stuck_run_says_where_and_why():
     """A run stuck at a tick is a result: its page says at which tick (and when), why, and
     what it keeps, and charts the ticks up to it, as a warning, not an error."""
-    at = _charts("servers6", "6.1", "Base", level="heavy")
+    at = _charts("servers6", "6.3", "Test 1", level="heavy")
     _ok(at)
     text = next(w.value for w in at.warning if "No full-day result" in w.value)
-    assert "Stuck at tick 104 of 288" in text and "within the 60 s per-tick cap" in text
+    assert "Stuck at tick 122 of 288" in text and "within the 60 s per-tick cap" in text
     metrics = {m.label: m.value for m in at.metric}
-    assert metrics["Stuck at tick"] == "104 of 288"
-    assert metrics["Ticks at the cap"] == "13 of 103 solved"
+    assert metrics["Stuck at tick"] == "122 of 288"
+    assert metrics["Ticks at the cap"] == "16 of 121 solved"
     assert any("Partial schedule" in c.value for c in at.caption)
     assert at.get("plotly_chart")                           # solve time of every tick
     assert not at.toggle                                    # no topics without a full day
 
-    if not _has_run("servers6_heavy", "s4_t1_no_moves"):
-        return                                              # waits for the cold-plate re-run
-    at = _charts("servers6", "6.4", "Test 1", level="heavy")
-    _ok(at)
-    text = next(w.value for w in at.warning if "No full-day result" in w.value)
-    assert "Stuck at tick 68 of 288" in text and "no valid schedule exists" in text
-    assert at.dataframe                                     # which limits cause it
-
 
 def test_section_page_with_stuck_runs():
-    at = _section("6.1")
+    at = _section("6.3")
     at.session_state["config"] = "servers6"
     at.session_state["level"] = "heavy"
     at.run()
     _ok(at)
     note = next(i.value for i in at.info if "Stuck runs" in i.value)
-    assert "**Base** at tick 104 (no schedule within the 60 s cap)" in note
+    assert "**Test 1** at tick 122 (no schedule within the 60 s cap)" in note
     table = at.dataframe[0].value.set_index("Measure")
-    assert table.loc["Solver status", "Base"] == \
-        "Stuck at tick 104: no schedule within the 60 s cap"
-    assert any("No run of this section has a full-day schedule" in c.value for c in at.caption)
+    assert table.loc["Solver status", "Test 1: High safety margin, 19 °C"] == \
+        "Stuck at tick 122: no schedule within the 60 s cap"
+    assert not any("No run of this section has a full-day schedule" in c.value
+                   for c in at.caption)
 
 
 @pytest.mark.parametrize("key", [s.key for s in ex.SECTIONS])

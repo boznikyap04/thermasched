@@ -1,92 +1,92 @@
 i,workload_id,type,B_running,original_server,original_zone,final_server,final_zone,reassigned,cross_zone,reason
-1,w0092,delay_tolerant,0,1,1,4,2,1,1,faster server; less IT energy for its work; cooler server
-2,w0589,delay_tolerant,0,2,2,4,2,1,0,faster server; less IT energy for its work
+1,w0092,delay_tolerant,0,1,1,1,1,0,0,kept
+2,w0589,delay_tolerant,0,2,2,2,2,0,0,kept
 3,w0154,time_sensitive,0,2,2,4,2,1,0,faster server; less IT energy for its work
-4,w0725,delay_tolerant,0,3,1,4,2,1,1,less IT energy for its work; cooler server
-5,w0427,time_sensitive,0,4,2,4,2,0,0,kept
-6,w0428,time_sensitive,0,3,1,4,2,1,1,original server full at the chosen start; less IT energy for its work; cooler server
-7,w0398,delay_tolerant,0,5,1,4,2,1,1,less IT energy for its work
-8,w0727,delay_tolerant,0,6,2,4,2,1,0,less IT energy for its work; cooler server
-9,w0364,delay_tolerant,0,1,1,4,2,1,1,faster server; less IT energy for its work; cooler server
-10,w0462,delay_tolerant,0,4,2,4,2,0,0,kept
-11,w0035,delay_tolerant,0,4,2,4,2,0,0,kept
-12,w0219,delay_tolerant,0,5,1,4,2,1,1,less IT energy for its work
-13,w0244,delay_tolerant,0,4,2,4,2,0,0,kept
+4,w0725,delay_tolerant,0,3,1,2,2,1,1,cooler server
+5,w0427,time_sensitive,0,4,2,3,1,1,1,carbon trade-off across the fleet (no single local cause)
+6,w0428,time_sensitive,0,3,1,4,2,1,1,less IT energy for its work; cooler server
+7,w0398,delay_tolerant,0,5,1,2,2,1,1,less IT energy for its work
+8,w0727,delay_tolerant,0,6,2,5,1,1,1,cooler server
+9,w0364,delay_tolerant,0,1,1,6,2,1,1,faster server; cooler server
+10,w0462,delay_tolerant,0,4,2,1,1,1,1,carbon trade-off across the fleet (no single local cause)
+11,w0035,delay_tolerant,0,4,2,3,1,1,1,carbon trade-off across the fleet (no single local cause)
+12,w0219,delay_tolerant,0,5,1,3,1,1,0,less IT energy for its work
+13,w0244,delay_tolerant,0,4,2,1,1,1,1,carbon trade-off across the fleet (no single local cause)
 14,w0573,delay_tolerant,0,4,2,4,2,0,0,kept
 15,w0352,delay_tolerant,0,5,1,4,2,1,1,less IT energy for its work
-16,w0630,delay_tolerant,0,6,2,4,2,1,0,less IT energy for its work; cooler server
-17,w0693,delay_tolerant,0,6,2,3,1,1,1,less IT energy for its work
-18,w0104,time_sensitive,0,2,2,3,1,1,1,faster server; less IT energy for its work
-19,w0147,delay_tolerant,0,3,1,3,1,0,0,kept
-20,w0441,time_sensitive,0,4,2,3,1,1,1,original server full at the chosen start
+16,w0630,delay_tolerant,0,6,2,4,2,1,0,less IT energy for its work
+17,w0693,delay_tolerant,0,6,2,4,2,1,0,less IT energy for its work
+18,w0104,time_sensitive,0,2,2,2,2,0,0,kept
+19,w0147,delay_tolerant,0,3,1,1,1,1,0,cooler server
+20,w0441,time_sensitive,0,4,2,2,2,1,0,cooler server
 21,w0701,delay_tolerant,0,1,1,3,1,1,0,faster server; less IT energy for its work
-22,w0500,delay_tolerant,0,6,2,3,1,1,1,less IT energy for its work
-23,w0214,time_sensitive,0,2,2,3,1,1,1,faster server; less IT energy for its work
-24,w0673,delay_tolerant,0,4,2,3,1,1,1,original server full at the chosen start
-25,w0501,delay_tolerant,0,5,1,3,1,1,0,less IT energy for its work
-26,w0456,delay_tolerant,0,5,1,3,1,1,0,less IT energy for its work
+22,w0500,delay_tolerant,0,6,2,5,1,1,1,cooler server
+23,w0214,time_sensitive,0,2,2,6,2,1,0,faster server; less IT energy for its work; cooler server
+24,w0673,delay_tolerant,0,4,2,6,2,1,0,original server full at the chosen start; faster server; cooler server
+25,w0501,delay_tolerant,0,5,1,5,1,0,0,kept
+26,w0456,delay_tolerant,0,5,1,4,2,1,1,less IT energy for its work
 27,w0195,delay_tolerant,0,6,2,3,1,1,1,less IT energy for its work
-28,w0472,delay_tolerant,0,1,1,4,2,1,1,faster server; less IT energy for its work
+28,w0472,delay_tolerant,0,1,1,5,1,1,0,faster server; cooler server
 29,w0551,delay_tolerant,0,1,1,3,1,1,0,faster server; less IT energy for its work
-30,w0089,time_sensitive,0,2,2,4,2,1,0,faster server; less IT energy for its work
-31,w0403,delay_tolerant,0,4,2,4,2,0,0,kept
+30,w0089,time_sensitive,0,2,2,6,2,1,0,faster server; less IT energy for its work; cooler server
+31,w0403,delay_tolerant,0,4,2,2,2,1,0,cooler server
 32,w0410,time_sensitive,0,4,2,4,2,0,0,kept
-33,w0216,time_sensitive,0,6,2,4,2,1,0,less IT energy for its work
-34,w0106,delay_tolerant,0,1,1,4,2,1,1,faster server; less IT energy for its work
-35,w0660,delay_tolerant,0,1,1,4,2,1,1,faster server; less IT energy for its work
-36,w0192,delay_tolerant,0,1,1,4,2,1,1,faster server; less IT energy for its work
-37,w0471,time_sensitive,0,6,2,3,1,1,1,less IT energy for its work
-38,w0245,delay_tolerant,0,1,1,3,1,1,0,faster server; less IT energy for its work
+33,w0216,time_sensitive,0,6,2,2,2,1,0,carbon trade-off across the fleet (no single local cause)
+34,w0106,delay_tolerant,0,1,1,3,1,1,0,faster server; less IT energy for its work
+35,w0660,delay_tolerant,0,1,1,5,1,1,0,faster server; cooler server
+36,w0192,delay_tolerant,0,1,1,2,2,1,1,cooler server
+37,w0471,time_sensitive,0,6,2,5,1,1,1,cooler server
+38,w0245,delay_tolerant,0,1,1,6,2,1,1,faster server; cooler server
 39,w0265,delay_tolerant,0,2,2,3,1,1,1,faster server; less IT energy for its work
-40,w0567,delay_tolerant,0,3,1,4,2,1,1,original server full at the chosen start; less IT energy for its work; cooler server
-41,w0021,delay_tolerant,0,5,1,4,2,1,1,less IT energy for its work
-42,w0132,time_sensitive,0,3,1,3,1,0,0,kept
-43,w0230,time_sensitive,0,1,1,3,1,1,0,faster server; less IT energy for its work
-44,w0585,delay_tolerant,0,5,1,3,1,1,0,less IT energy for its work
-45,w0231,time_sensitive,0,6,2,1,1,1,1,less IT energy for its work
+40,w0567,delay_tolerant,0,3,1,1,1,1,0,cooler server
+41,w0021,delay_tolerant,0,5,1,2,2,1,1,less IT energy for its work
+42,w0132,time_sensitive,0,3,1,6,2,1,1,faster server; cooler server
+43,w0230,time_sensitive,0,1,1,1,1,0,0,kept
+44,w0585,delay_tolerant,0,5,1,1,1,1,0,less IT energy for its work
+45,w0231,time_sensitive,0,6,2,3,1,1,1,less IT energy for its work
 46,w0668,delay_tolerant,0,6,2,4,2,1,0,less IT energy for its work
-47,w0556,time_sensitive,0,1,1,1,1,0,0,kept
-48,w0653,delay_tolerant,0,6,2,3,1,1,1,less IT energy for its work
-49,w0014,delay_tolerant,0,1,1,4,2,1,1,faster server; less IT energy for its work
+47,w0556,time_sensitive,0,1,1,5,1,1,0,faster server; cooler server
+48,w0653,delay_tolerant,0,6,2,6,2,0,0,kept
+49,w0014,delay_tolerant,0,1,1,3,1,1,0,faster server; less IT energy for its work
 50,w0276,delay_tolerant,0,1,1,3,1,1,0,faster server; less IT energy for its work
-51,w0278,delay_tolerant,0,3,1,3,1,0,0,kept
+51,w0278,delay_tolerant,0,3,1,4,2,1,1,less IT energy for its work; cooler server
 52,w0221,delay_tolerant,0,6,2,4,2,1,0,less IT energy for its work
 53,w0357,delay_tolerant,0,6,2,4,2,1,0,less IT energy for its work
-54,w0470,delay_tolerant,0,1,1,4,2,1,1,faster server; less IT energy for its work
-55,w0547,delay_tolerant,0,3,1,3,1,0,0,kept
+54,w0470,delay_tolerant,0,1,1,4,2,1,1,faster server; less IT energy for its work; cooler server
+55,w0547,delay_tolerant,0,3,1,2,2,1,1,cooler server
 56,w0116,delay_tolerant,0,6,2,4,2,1,0,less IT energy for its work
-57,w0115,delay_tolerant,0,3,1,3,1,0,0,kept
-58,w0036,time_sensitive,0,5,1,4,2,1,1,less IT energy for its work
-59,w0298,delay_tolerant,0,5,1,4,2,1,1,less IT energy for its work
-60,w0003,delay_tolerant,0,5,1,4,2,1,1,less IT energy for its work
-61,w0255,delay_tolerant,0,1,1,3,1,1,0,faster server; less IT energy for its work
-62,w0454,delay_tolerant,0,4,2,3,1,1,1,original server full at the chosen start
-63,w0408,delay_tolerant,0,5,1,3,1,1,0,less IT energy for its work
-64,w0160,time_sensitive,0,4,2,4,2,0,0,kept
-65,w0223,time_sensitive,0,4,2,3,1,1,1,original server full at the chosen start
+57,w0115,delay_tolerant,0,3,1,5,1,1,0,faster server; cooler server
+58,w0036,time_sensitive,0,5,1,6,2,1,1,less IT energy for its work
+59,w0298,delay_tolerant,0,5,1,6,2,1,1,less IT energy for its work
+60,w0003,delay_tolerant,0,5,1,2,2,1,1,carbon trade-off across the fleet (no single local cause)
+61,w0255,delay_tolerant,0,1,1,5,1,1,0,faster server; cooler server
+62,w0454,delay_tolerant,0,4,2,2,2,1,0,cooler server
+63,w0408,delay_tolerant,0,5,1,6,2,1,1,less IT energy for its work
+64,w0160,time_sensitive,0,4,2,6,2,1,0,faster server; cooler server
+65,w0223,time_sensitive,0,4,2,1,1,1,1,carbon trade-off across the fleet (no single local cause)
 66,w0720,delay_tolerant,0,5,1,4,2,1,1,less IT energy for its work
-67,w0528,time_sensitive,0,5,1,4,2,1,1,less IT energy for its work
-68,w0529,delay_tolerant,0,3,1,1,1,1,0,cooler server
-69,w0369,delay_tolerant,0,1,1,4,2,1,1,faster server; less IT energy for its work
-70,w0444,time_sensitive,0,1,1,3,1,1,0,faster server; less IT energy for its work
-71,w0445,delay_tolerant,0,3,1,4,2,1,1,less IT energy for its work; cooler server
-72,w0175,delay_tolerant,0,4,2,4,2,0,0,kept
-73,w0575,delay_tolerant,0,4,2,4,2,0,0,kept
-74,w0182,delay_tolerant,0,1,1,3,1,1,0,faster server; less IT energy for its work
-75,w0416,time_sensitive,0,1,1,4,2,1,1,faster server; less IT energy for its work
-76,w0188,delay_tolerant,0,1,1,4,2,1,1,faster server; less IT energy for its work
-77,w0669,delay_tolerant,0,4,2,4,2,0,0,kept
-78,w0243,delay_tolerant,0,1,1,4,2,1,1,faster server; less IT energy for its work
-79,w0190,delay_tolerant,0,1,1,3,1,1,0,faster server; less IT energy for its work
-80,w0338,delay_tolerant,0,4,2,4,2,0,0,kept
-81,w0455,delay_tolerant,0,5,1,4,2,1,1,less IT energy for its work
-82,w0411,delay_tolerant,0,4,2,4,2,0,0,kept
+67,w0528,time_sensitive,0,5,1,5,1,0,0,kept
+68,w0529,delay_tolerant,0,3,1,6,2,1,1,faster server; cooler server
+69,w0369,delay_tolerant,0,1,1,5,1,1,0,faster server; cooler server
+70,w0444,time_sensitive,0,1,1,2,2,1,1,cooler server
+71,w0445,delay_tolerant,0,3,1,6,2,1,1,faster server; cooler server
+72,w0175,delay_tolerant,0,4,2,1,1,1,1,carbon trade-off across the fleet (no single local cause)
+73,w0575,delay_tolerant,0,4,2,1,1,1,1,carbon trade-off across the fleet (no single local cause)
+74,w0182,delay_tolerant,0,1,1,2,2,1,1,cooler server
+75,w0416,time_sensitive,0,1,1,2,2,1,1,cooler server
+76,w0188,delay_tolerant,0,1,1,5,1,1,0,faster server; cooler server
+77,w0669,delay_tolerant,0,4,2,5,1,1,1,faster server; cooler server
+78,w0243,delay_tolerant,0,1,1,6,2,1,1,faster server; cooler server
+79,w0190,delay_tolerant,0,1,1,6,2,1,1,faster server; cooler server
+80,w0338,delay_tolerant,0,4,2,2,2,1,0,cooler server
+81,w0455,delay_tolerant,0,5,1,5,1,0,0,kept
+82,w0411,delay_tolerant,0,4,2,3,1,1,1,original server full at the chosen start
 83,w0449,time_sensitive,0,3,1,4,2,1,1,less IT energy for its work; cooler server
-84,w0323,delay_tolerant,0,5,1,3,1,1,0,less IT energy for its work
+84,w0323,delay_tolerant,0,5,1,5,1,0,0,kept
 85,w0026,delay_tolerant,0,3,1,4,2,1,1,less IT energy for its work; cooler server
-86,w0367,delay_tolerant,0,3,1,1,1,1,0,cooler server
-87,w0368,delay_tolerant,0,3,1,1,1,1,0,cooler server
-88,w0451,time_sensitive,0,2,2,3,1,1,1,faster server; less IT energy for its work
+86,w0367,delay_tolerant,0,3,1,4,2,1,1,less IT energy for its work; cooler server
+87,w0368,delay_tolerant,0,3,1,4,2,1,1,less IT energy for its work; cooler server
+88,w0451,time_sensitive,0,2,2,1,1,1,1,less IT energy for its work
 89,w0644,delay_tolerant,0,2,2,4,2,1,0,faster server; less IT energy for its work
-90,w0541,time_sensitive,0,6,2,4,2,1,0,less IT energy for its work
-91,w0388,delay_tolerant,0,1,1,4,2,1,1,faster server; less IT energy for its work
+90,w0541,time_sensitive,0,6,2,2,2,1,0,carbon trade-off across the fleet (no single local cause)
+91,w0388,delay_tolerant,0,1,1,1,1,0,0,kept
