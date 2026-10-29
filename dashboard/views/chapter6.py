@@ -151,8 +151,7 @@ def _status_grid(table: pd.DataFrame) -> pd.DataFrame:
     """One row per test (the base once), one column per configuration: servers · load level."""
     rows = {}
     for r in table.itertuples():
-        test = f"{r.section} · {r.tag} · {r.label}" if r.tag != "Base" or r.section == "6.2" \
-            else "Base (6.1, 6.3, 6.4)"
+        test = f"{r.section} · {r.tag} · {r.label}" if r.tag != "Base" else "Base (every section)"
         ticks = row_ticks(r) if r.status not in data.NO_RUN else None
         if r.status in data.NO_RUN:
             icon = {data.NOT_RUN_YET: "·", data.NOT_APPLICABLE: "n/a",

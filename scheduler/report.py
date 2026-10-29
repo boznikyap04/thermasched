@@ -24,7 +24,7 @@ from .version import SCHEMA_VERSION, VERSION
 AIRFLOW_TEXT = "not modelled"
 AIRFLOW_NOTE = "Airflow and fan power are not modelled (fan power and airflow are zero)."
 NO_COLD_PLATE_NOTE = ("Cold plates are off (cold-plate heat removal and pump power are zero; "
-                      "run with --cold-plates to model them).")
+                      "--no-cold-plates was set).")
 # Flagged with the thesis group: explain in the writeup, revisit after the first prototype.
 COLD_PLATE_FLAG = ("FLAGGED: cold-plate flow and coolant temperature carry almost no cost (pump "
                    "power is at most about 1 mW per plate, and no equation charges energy for "

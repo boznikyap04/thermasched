@@ -14,6 +14,13 @@ CONFIGS = list(ex.FLEETS)
 LEVELS = [lv.key for lv in ex.LEVELS]
 
 pytestmark = pytest.mark.skipif(not data.discover_runs(), reason="no runs under results/")
+CATALOGUE = data.catalogue(data.discover_runs())
+
+
+def _has_run(config: str, test_id: str) -> bool:
+    """True when the test has a run. The 1.4.0 runs with cold plates off are no test's run
+    since plates became the default; their tests wait for the re-run."""
+    return CATALOGUE[(config, test_id)][0] is not None
 
 
 def _page(call: str) -> AppTest:
@@ -41,11 +48,15 @@ def test_overview():
     grid = at.dataframe[0].value.set_index("Test")
     assert (grid["10 · heavy"] == "–").all()
     # stuck runs say at which tick, and why, in the grid and in a note
-    assert grid.loc["Base (6.1, 6.3, 6.4)", "6 · heavy"] == \
-        "⛔ stuck at tick 55, no schedule in cap"
+    assert grid.loc["Base (every section)", "6 · heavy"] == \
+        "⛔ stuck at tick 104, no schedule in cap"
+    note = next(i.value for i in at.info if "Stuck runs" in i.value)
+    if not _has_run("servers6_heavy", "s4_t1_no_moves"):
+        assert grid.loc["6.4 · Test 1 · No reassignment (r_is = 0)", "6 · heavy"] == "·"
+        assert "3 on 6 servers · heavy day" in note
+        return
     assert grid.loc["6.4 · Test 1 · No reassignment (r_is = 0)", "6 · heavy"] == \
         "⛔ stuck at tick 68, no valid schedule"
-    note = next(i.value for i in at.info if "Stuck runs" in i.value)
     assert "13 on 6 servers · heavy day" in note
     assert "6 servers · heavy day 6.4 Test 1 (tick 68) has no valid schedule" in note
 
@@ -194,6 +205,8 @@ def test_test_charts_other_configurations(config):
 
 def test_test_charts_say_when_a_test_keeps_the_base_schedule():
     # per-tick results: on the light day, regrouping the zones leaves the schedule as it is
+    if not _has_run("servers6_light", "s1_t1_zones"):
+        pytest.skip("6.1 Test 1 on the light day waits for the cold-plate re-run")
     at = _charts("servers6", "6.1", "Test 1", level="light")
     assert any("same optimized schedule as the Base" in i.value for i in at.info)
     assert not _charts("servers6", "6.1", "Test 2", level="light").info
@@ -211,6 +224,8 @@ def test_test_charts_keep_the_test_when_the_scenario_changes():
 
 
 def test_scenario_page_says_which_tests_keep_the_base_schedule():
+    if not _has_run("servers6_light", "s1_t1_zones"):
+        pytest.skip("6.1 Test 1 on the light day waits for the cold-plate re-run")
     at = _section("6.1")
     at.session_state["config"] = "servers6"
     at.session_state["level"] = "light"
@@ -221,7 +236,7 @@ def test_scenario_page_says_which_tests_keep_the_base_schedule():
 def test_per_tick_run_shows_its_ticks():
     """A per-tick run's solver block counts the ticks at the cap and charts every tick, and
     says nothing of a whole-day time limit or best bound."""
-    at = _charts("servers6", "6.1", "Test 2")       # 9 of 288 ticks at the cap
+    at = _charts("servers6", "6.2", "Test 1")       # 36 of 288 ticks at the cap
     _ok(at)
     labels = {m.label for m in at.metric}
     assert {"Ticks at the cap", "Worst tick's MIP gap"} <= labels
@@ -237,14 +252,16 @@ def test_stuck_run_says_where_and_why():
     at = _charts("servers6", "6.1", "Base", level="heavy")
     _ok(at)
     text = next(w.value for w in at.warning if "No full-day result" in w.value)
-    assert "Stuck at tick 55 of 288" in text and "within the 60 s per-tick cap" in text
+    assert "Stuck at tick 104 of 288" in text and "within the 60 s per-tick cap" in text
     metrics = {m.label: m.value for m in at.metric}
-    assert metrics["Stuck at tick"] == "55 of 288"
-    assert metrics["Ticks at the cap"] == "3 of 54 solved"
+    assert metrics["Stuck at tick"] == "104 of 288"
+    assert metrics["Ticks at the cap"] == "13 of 103 solved"
     assert any("Partial schedule" in c.value for c in at.caption)
     assert at.get("plotly_chart")                           # solve time of every tick
     assert not at.toggle                                    # no topics without a full day
 
+    if not _has_run("servers6_heavy", "s4_t1_no_moves"):
+        return                                              # waits for the cold-plate re-run
     at = _charts("servers6", "6.4", "Test 1", level="heavy")
     _ok(at)
     text = next(w.value for w in at.warning if "No full-day result" in w.value)
@@ -259,10 +276,10 @@ def test_section_page_with_stuck_runs():
     at.run()
     _ok(at)
     note = next(i.value for i in at.info if "Stuck runs" in i.value)
-    assert "**Base** at tick 55 (no schedule within the 60 s cap)" in note
+    assert "**Base** at tick 104 (no schedule within the 60 s cap)" in note
     table = at.dataframe[0].value.set_index("Measure")
     assert table.loc["Solver status", "Base"] == \
-        "Stuck at tick 55: no schedule within the 60 s cap"
+        "Stuck at tick 104: no schedule within the 60 s cap"
     assert any("No run of this section has a full-day schedule" in c.value for c in at.caption)
 
 

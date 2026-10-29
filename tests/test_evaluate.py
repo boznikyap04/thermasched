@@ -57,7 +57,7 @@ def sched(*items) -> Schedule:
 
 
 HAND_SCHEDULE = sched((1, 1, 1, 3), (2, 2, 3, 4))
-SETTINGS = RunSettings(scenario="tiny")
+SETTINGS = RunSettings(scenario="tiny", cold_plates=False)     # the hand calculation: CRAC only
 
 
 def test_hand_calculation():
@@ -72,7 +72,7 @@ def test_hand_calculation():
 
     # P_IT = idle + (max - idle) * util
     np.testing.assert_allclose(ev.P_IT_W, [[200, 200, 100], [50, 50, 100]])
-    assert np.all(ev.Q_cp_W == 0) and np.all(ev.P_cp_W == 0)    # cold plates off by default
+    assert np.all(ev.Q_cp_W == 0) and np.all(ev.P_cp_W == 0)    # cold plates off
 
     # Server 1: steady = 20 + 2 + 0.5 * 200 = 122; T = 0.5 * prev + 0.5 * steady
     #   t1 = 0.5*40 + 0.5*122 = 81
@@ -425,7 +425,7 @@ def test_cold_plate_settings_checked():
     sc = tiny()
     supply = constant_supply_temp(sc, 20.0)
     with pytest.raises(ValueError):
-        RunSettings(cold_plate_count=1).validate()          # count without the switch
+        RunSettings(cold_plates=False, cold_plate_count=1).validate()   # count, plates off
     with pytest.raises(ValueError):
         RunSettings(cold_plates=True, cold_plate_count=-1).validate()
     with pytest.raises(ValueError):                          # baseline flow must be a setting
@@ -454,7 +454,7 @@ def test_reference_baseline_it_energy_and_carbon(name, e_it, carbon_kg):
 def test_servers6_thermal_and_cooling_numbers():
     sc = load_scenario("servers6")
     ref = load_reference_baseline("servers6")
-    st = RunSettings(scenario="servers6")
+    st = RunSettings(scenario="servers6", cold_plates=False)     # the CRAC alone
     ev18 = evaluate(sc, ref, constant_supply_temp(sc, 18.0), st)
     ev27 = evaluate(sc, ref, constant_supply_temp(sc, 27.0), st)
     assert ev18.totals["hottest_T_C"] == pytest.approx(66.3, abs=0.1)

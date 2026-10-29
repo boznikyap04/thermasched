@@ -1,3 +1,0 @@
-z,supply_min_C,supply_max_C,supply_allowed_min_C,supply_allowed_max_C,zone_limit_C,max_ramp_short_C,ramp_short_limit_C,max_ramp_long_C,ramp_long_limit_C,Q_crac_peak_kW,Q_crac_capacity_kW
-1,18.0,18.0,18.0,27.0,32.0,0.0,5.0,0.0,20.0,1.316419343090878,116.0
-2,18.0,18.0,18.0,27.0,32.0,0.0,5.0,0.0,20.0,1.4153305960313447,116.0

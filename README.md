@@ -208,7 +208,7 @@ Run every command from the repository root.
 │
 ├── results/                   SOLVER OUTPUTS (the dashboard shows these): the per-tick runs of the release
 │   ├── <configuration>/<test>/  one run: summary.json, comparison_period.csv, baseline/, optimized/
-│   │                          (for example servers6_heavy/s2_base/; the test ids are in scheduler/experiments.py)
+│   │                          (for example servers6_heavy/s2_t1_crac/; the test ids are in scheduler/experiments.py)
 │   └── validation/<scenario>/ validation tables (CSV) and validation.json (not shown on the site)
 ├── exports/                   zips of notebook runs, for the dashboard (not in git)
 │

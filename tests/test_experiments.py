@@ -69,12 +69,12 @@ def test_sections_list_known_tests_with_the_reference_first():
         assert all(tid in ex.TEST_BY_ID for _, tid in section.tests)
     used = {tid for s in ex.SECTIONS for _, tid in s.tests}
     assert used == set(ex.TEST_BY_ID)
-    assert [s.key for s, _ in ex.sections_of("base")] == ["6.1", "6.3", "6.4"]
+    assert [s.key for s, _ in ex.sections_of("base")] == ["6.1", "6.2", "6.3", "6.4"]
 
 
 def test_not_applicable_tests():
     config = ex.FLEETS
-    regroup, cold = ex.TEST_BY_ID["s1_t1_zones"], ex.TEST_BY_ID["s2_base"]
+    regroup, cold = ex.TEST_BY_ID["s1_t1_zones"], ex.TEST_BY_ID["s2_t1_crac"]
     assert ex.applicable(regroup, config["servers2"])
     assert not ex.applicable(cold, config["servers2"])
     assert all(ex.applicable(t, config["servers10"]) for t in ex.TESTS)
@@ -88,7 +88,11 @@ def test_matching_by_settings():
     assert _ids({"zone_map": [1, 1, 1, 2, 2, 2, 2, 2, 2, 2]}, "thesis10") == ["s1_t1_zones"]
     assert _ids({"zone_map": [1, 1, 1, 1, 2, 2, 2, 2, 2, 2]}, "thesis10") == []    # the 1.3.0 map
     assert _ids({"zone_map": [1, 1, 2, 2, 2, 2]}, "consolidated6") == ["s1_t1_zones"]
+    assert _ids({"cp_mode": "fixed"}, "thesis10") == ["s2_t1_crac"]
     assert _ids({"cold_plates": True, "cp_mode": "fixed"}, "thesis10") == ["s2_t1_crac"]
+    # Cold plates are on in every test: a run with them off is no test's run.
+    assert _ids({"cold_plates": False}, "servers6") == []
+    assert _ids({"cold_plates": False, "reassignment": "none"}, "servers6") == []
     assert _ids({"H_min_C": 19}, "thesis10") == ["s3_t1_hmin_high"]
     assert _ids({"placement": "thermal_blind"}, "servers6") == ["s4_t2_blind"]
     # Names, time limits and gaps never decide a test.
@@ -116,7 +120,7 @@ def test_carbon_intensity_is_one_switch():
 def test_a_not_applicable_test_never_matches():
     # Two mid servers have no cold plate, so 6.2's switches are no test there.
     assert _ids({"zone_map": [1, 1]}, "servers2") == ["s1_t1_zones"]
-    assert _ids({"cold_plates": True}, "servers2") == []
+    assert _ids({"cp_mode": "fixed"}, "servers2") == []
 
 
 @pytest.mark.parametrize("test", ex.TESTS, ids=lambda t: t.id)

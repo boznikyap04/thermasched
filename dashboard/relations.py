@@ -18,7 +18,7 @@ from dashboard.data import VARIANT_LABELS, WORKLOAD_TYPES, Run
 from dashboard.theme import Palette, style
 
 TIME_TITLE = "Local time (HH:MM)"
-COLD_PLATE_RUN = "6.2 · Base · Both cooling systems optimized"
+COLD_PLATE_RUN = "Base"      # cold plates are on in every run but --no-cold-plates ones
 
 
 @dataclass(frozen=True)

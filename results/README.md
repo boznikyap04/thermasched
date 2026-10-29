@@ -9,6 +9,15 @@ The runs were solved with the code of 1.4.0 before its version number was set, s
 `summary.json` says 1.4.0 with `relabelled_from: 1.3.0` in its provenance. The whole-day
 results of earlier releases are in `archive/results_2026-10-25_whole_day/`.
 
+**Cold plates: only the Base and 6.2 count for now.** Since cold plates are on by default
+(the C6320s carry theirs in every test), a run made with them off is no test's run. Of the
+1.4.0 runs, only the 6.2 runs had them on. The 6.2 Base, which has every other switch at its
+default, is now each day's Base: its folder `s2_base` was renamed `base` (`renamed_from` in its
+provenance), replacing the Base run with cold plates off. 6.2 Tests 1 and 2 stand as they are.
+The other folders (6.1 Tests 1-2, 6.3, 6.4) still hold their runs with cold plates off until
+they are re-run; the site shows those tests as not run yet. The counts below are of the 1.4.0
+batch as it was solved, before the rename.
+
 **Stuck runs are results.** A per-tick run stops at the first tick it cannot plan and keeps
 `summary.json` (`per_tick.stuck` names the tick and the limit), `ticks.csv` and
 `partial_schedule.csv` (the workloads started before that tick), with no `optimized/` folder.

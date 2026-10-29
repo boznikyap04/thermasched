@@ -245,8 +245,9 @@ class RunSettings:
     H_min_C: float | None = None               # None: use the scenario constant
     time_limit_s: float = 600.0
     mip_rel_gap: float = 1e-3
-    # cold plates (off: Q_cp and pump power are zero everywhere)
-    cold_plates: bool = False
+    # cold plates, on by default: the servers.csv plates (the C6320s) are modelled in every run
+    # (off: Q_cp and pump power are zero everywhere)
+    cold_plates: bool = True
     cold_plate_count: int | None = None        # plates on every server; None: servers.csv
     baseline_cp_flow_Lmin: float = 0.30        # baseline runs its cold plates fixed at these
     baseline_cp_coolant_C: float = 20.0

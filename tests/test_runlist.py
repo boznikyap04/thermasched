@@ -1,4 +1,4 @@
-"""tools/runlist.py: the 39 per-tick runs of the six- and the ten-server fleet (docs/PLAN.md §3)."""
+"""tools/runlist.py: the 36 per-tick runs of the six- and the ten-server fleet (docs/PLAN.md §3)."""
 
 from __future__ import annotations
 
@@ -25,15 +25,14 @@ def _per_tick_supported() -> bool:
     return True
 
 
-FIRST_BATCH = {"base", "s1_t1_zones", "s1_t2_same_zone", "s2_base", "s2_t1_crac",
-               "s2_t2_cold_plate"}
+FIRST_BATCH = {"base", "s1_t1_zones", "s1_t2_same_zone", "s2_t1_crac", "s2_t2_cold_plate"}
 DAYS = {"servers6_light", "servers6", "servers6_heavy"}
 
 
-def test_thirty_nine_runs_with_unique_ids():
-    assert len(RUNS) == 39
-    assert len({r["id"] for r in RUNS}) == 39
-    assert len({(r["scenario"], r["run_name"]) for r in RUNS}) == 39
+def test_thirty_six_runs_with_unique_ids():
+    assert len(RUNS) == 36
+    assert len({r["id"] for r in RUNS}) == 36
+    assert len({(r["scenario"], r["run_name"]) for r in RUNS}) == 36
     assert {r["configuration"] for r in RUNS} == DAYS
     assert {r["run_name"] for r in RUNS} == FIRST_BATCH | {
         "s3_t1_hmin_high", "s3_t2_hmin_med", "s3_t3_hmin_low", "s4_t1_no_moves", "s4_t2_blind",
@@ -41,8 +40,8 @@ def test_thirty_nine_runs_with_unique_ids():
     assert runlist.TIMING_RUN in {r["id"] for r in RUNS}
 
 
-def test_ten_server_fleet_has_the_same_thirty_nine_tests():
-    assert len(RUNS10) == 39 and len({r["id"] for r in RUNS10}) == 39
+def test_ten_server_fleet_has_the_same_thirty_six_tests():
+    assert len(RUNS10) == 36 and len({r["id"] for r in RUNS10}) == 36
     assert {r["configuration"] for r in RUNS10} == {"servers10_light", "servers10",
                                                      "servers10_heavy"}
     assert [(r["run_name"], r["level"]) for r in RUNS10] == \
@@ -57,8 +56,8 @@ def test_ten_server_fleet_has_the_same_thirty_nine_tests():
 
 def test_first_batch_is_sections_6_1_and_6_2():
     first = runlist.runs(sections=("6.1", "6.2"))
-    assert len(first) == 18 and {r["run_name"] for r in first} == FIRST_BATCH
-    assert [r["id"] for r in first] == [r["id"] for r in RUNS[:18]]
+    assert len(first) == 15 and {r["run_name"] for r in first} == FIRST_BATCH
+    assert [r["id"] for r in first] == [r["id"] for r in RUNS[:15]]
 
 
 def test_carbon_tests_run_flat_or_on_the_swing_twin():
@@ -116,9 +115,15 @@ def test_matrix_and_selection(capsys):
     timing = json.loads(capsys.readouterr().out)["include"]
     assert [e["id"] for e in timing] == ["servers10_heavy__base"]
     assert runlist.main(["--format", "matrix", "--fleet", "servers10"]) == 0
-    assert len(json.loads(capsys.readouterr().out)["include"]) == 39
+    assert len(json.loads(capsys.readouterr().out)["include"]) == 36
     with pytest.raises(SystemExit):
         runlist.main(["--only", "servers6__nope"])
+
+
+def test_cold_plates_are_on_in_every_run():
+    for r in RUNS + RUNS10:
+        assert "--no-cold-plates" not in r["args"] and parse_args(r["args"])[0].cold_plates
+    assert runlist.switch_args({"cold_plates": False}) == ["--no-cold-plates"]
 
 
 def test_unknown_switch_is_an_error():

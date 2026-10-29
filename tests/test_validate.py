@@ -77,8 +77,11 @@ def test_crac_supply_is_a_decision(small):
     assert cops[-1]["COP"] > cops[0]["COP"]          # warmer supply air, better COP
 
 
-def test_heat_slows_the_run(thesis10):
-    cool, warm = validate.slowdown_check(thesis10)
+def test_heat_slows_the_run():
+    # servers6: the check picks a server without a cold plate (an R840), as plates are on
+    sc = load_scenario("servers6")
+    cool, warm = validate.slowdown_check(sc)
+    assert sc.servers[[sv.name for sv in sc.servers].index(cool["Server"])].plates == 0
     assert cool["Pass"] and warm["Pass"]
     assert cool["Periods run"] == 6 and warm["Periods run"] == 7
     assert warm["Lowest DPF during the run"] < 1.0 <= cool["Lowest DPF during the run"]

@@ -14,6 +14,23 @@ run.
   section 4 shows which scenarios differ from before), then solve again. The site warns when
   a run was solved on a different scenario build than the one it holds.
 
+## Unreleased
+
+**Re-run:** solver. Runs of 1.4.0 with cold plates off are no longer any test's run.
+
+- **Cold plates are on in every run.** The C6320s carry their cold plate in every test, not
+  only in 6.2; until now the Base and every test of 6.1, 6.3 and 6.4 ran with cold plates off,
+  so the C6320s were cooled by the CRAC alone. `--cold-plates` is on by default and
+  `--no-cold-plates` turns it off; a run with cold plates off gets `_nocp` in its default name.
+- **6.2's Base is the shared Base.** With cold plates on everywhere, 6.2 Base (both cooling
+  systems optimized) is the same run as the Base, so `s2_base` is gone and a fleet has 36
+  runs instead of 39.
+- **Results:** each day's 1.4.0 6.2 Base run (cold plates on, every other switch at its
+  default) is now its Base (`s2_base` renamed `base`); 6.2 Tests 1 and 2 stand. The runs of
+  6.1 Tests 1-2, 6.3 and 6.4 had cold plates off and wait for the re-run (`results/README.md`).
+- The slowdown validation check picks a server without a cold plate (an R840), since a plate
+  keeps its server below the throttling temperature.
+
 ## 1.4.0 (2026-10-29)
 
 **Re-run:** cleaning, then solver. The fleet is new (two server models, new hosts, new tiers),

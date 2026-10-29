@@ -152,8 +152,8 @@ One period is 5 minutes. Scenarios built in `notebooks/solver.ipynb` (see
 | `--h-min` | `10` (from scenario) | minimum thermal headroom, °C. The server temperature cap is 90 − H_min |
 | `--time-limit` | `600` | solver time limit, seconds |
 | `--mip-gap` | `0.001` | relative MIP gap at which the solver stops |
-| `--cold-plates` | off | model cold plates, using `n_cold_plates` per server from `servers.csv` |
-| `--cold-plate-count N` | — | put N cold plates on every server (turns on `--cold-plates`) |
+| `--cold-plates` / `--no-cold-plates` | on | model cold plates, using `n_cold_plates` per server from `servers.csv` (the C6320s); `--no-cold-plates` turns them off |
+| `--cold-plate-count N` | — | put N cold plates on every server (not with `--no-cold-plates`) |
 | `--baseline-cp-flow` / `--baseline-cp-coolant` | `0.30` L/min / `20` °C | the baseline's fixed cold-plate settings |
 | `--cp-mode` | `optimize` | `fixed` holds the optimized run's cold plates at `--fixed-cp-flow` / `--fixed-cp-coolant` (default: the baseline's), for S2 T2 |
 | `--no-priority` | off | drop the priority rules, Eq. (56)-(57) (see below) |
@@ -202,7 +202,7 @@ level (`--scenario servers6_light`, `servers6`, `servers6_heavy`, and the same f
 | Scenario | Command switches |
 |---|---|
 | S1 base / T1 / T2 | default / `--zone-map 1,1,2,2,2,2` on 6 servers, `--zone-map 1,1,1,2,2,2,2,2,2,2` on 10 (the 2.1 GHz R840 tier in zone 1, the 2.4 GHz R840s and the 2.6 GHz C6320s in zone 2) / `--reassignment same_zone` |
-| S2 base / T1 / T2 | `--cold-plates` (both optimized) / `--cold-plates --cp-mode fixed` (CRAC optimized) / `--cold-plates --supply-temp-mode fixed` (cold plates optimized). Airflow is not modelled |
+| S2 base / T1 / T2 | default, the shared base (both optimized) / `--cp-mode fixed` (CRAC optimized) / `--supply-temp-mode fixed` (cold plates optimized). Cold plates are on in every run; airflow is not modelled |
 | S3 | `--h-min <value>` |
 | S4 base / T1 / T2 / T3 | default / `--reassignment none` / `--thermal-blind` / `--ci-flat` or `--carbon-file <csv>` |
 

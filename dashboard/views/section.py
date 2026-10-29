@@ -195,9 +195,10 @@ def _moves(loaded: list[tuple[str, data.Run]], section: str) -> None:
 
 def _this_configuration(table, cat, config: ex.Configuration, section: ex.Section) -> None:
     tests = [ex.TEST_BY_ID[tid] for _, tid in section.tests]
-    if not any(ex.applicable(t, config) for t in tests):
-        st.info(f"{section.key} does not apply to {config.label}: "
-                f"{NOT_APPLICABLE[tests[0].needs]}.")
+    # The Base applies everywhere; a section applies when one of its other tests does.
+    if not any(ex.applicable(t, config) for t in tests[1:]):
+        needs = next(t.needs for t in tests[1:] if t.needs)
+        st.info(f"{section.key} does not apply to {config.label}: {NOT_APPLICABLE[needs]}.")
         return
     if config.key not in data.configs_with_runs(cat):
         st.info(f"{config.label} is not run in this release: no test of it has a run.",

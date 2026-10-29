@@ -142,12 +142,11 @@ TESTS: tuple[Test, ...] = (
          (("zone_map", REGROUP),), needs="regroup"),
     Test("s1_t2_same_zone", "Moves only within the original zone",
          (("reassignment", "same_zone"),)),
-    Test("s2_base", "Both cooling systems optimized", (("cold_plates", True),),
-         needs="cold_plates"),
+    # Cold plates are on in every run (RunSettings default), so 6.2's reference is the Base.
     Test("s2_t1_crac", "CRAC changed, cold plates fixed",
-         (("cold_plates", True), ("cp_mode", "fixed")), needs="cold_plates"),
+         (("cp_mode", "fixed"),), needs="cold_plates"),
     Test("s2_t2_cold_plate", "Cold plates changed, CRAC fixed",
-         (("cold_plates", True), ("supply_temp_mode", "fixed")), needs="cold_plates"),
+         (("supply_temp_mode", "fixed"),), needs="cold_plates"),
     Test("s3_t1_hmin_high", "High safety margin, 19 °C", (("H_min_C", 19.0),)),
     Test("s3_t2_hmin_med", "Medium safety margin, 15 °C", (("H_min_C", 15.0),)),
     Test("s3_t3_hmin_low", "Low safety margin, 5 °C", (("H_min_C", 5.0),)),
@@ -185,11 +184,12 @@ SECTIONS: tuple[Section, ...] = (
             "Which cooling system has a greater impact on reducing server temperature?",
             "Determine which cooling system has a greater effect on reducing server "
             "temperature.",
-            (("Base", "s2_base"), ("Test 1", "s2_t1_crac"), ("Test 2", "s2_t2_cold_plate")),
-            "Both cooling systems stay active. Test 1 lets the CRAC supply air temperature "
-            "change with the cold plates fixed; Test 2 lets the cold-plate coolant "
-            "temperature and flow change with the CRAC fixed at 18 °C. Airflow is not "
-            "modelled, so the CRAC changes only its supply air temperature."),
+            (("Base", "base"), ("Test 1", "s2_t1_crac"), ("Test 2", "s2_t2_cold_plate")),
+            "Both cooling systems stay active, as in every run; the Base optimizes both. "
+            "Test 1 lets the CRAC supply air temperature change with the cold plates fixed; "
+            "Test 2 lets the cold-plate coolant temperature and flow change with the CRAC "
+            "fixed at 18 °C. Airflow is not modelled, so the CRAC changes only its supply air "
+            "temperature."),
     Section("6.3", "Effect of thermal headroom on workload completion and QoS",
             "How does controlling thermal stress affect workload completion time and QoS "
             "under deadline-aware scheduling?",
@@ -215,7 +215,7 @@ SECTION_BY_KEY = {s.key: s for s in SECTIONS}
 
 
 def sections_of(test_id: str) -> list[tuple[Section, str]]:
-    """Every (section, tag) a test appears in; the base appears in 6.1, 6.3 and 6.4."""
+    """Every (section, tag) a test appears in; the base appears in every section."""
     return [(s, tag) for s in SECTIONS for tag, tid in s.tests if tid == test_id]
 
 

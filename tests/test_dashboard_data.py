@@ -18,8 +18,9 @@ INFEASIBLE = "archive-small/infeasible_demo_hmin20"
 CONSOLIDATED6_FREE = "archive-consolidated6/least_loaded_base18_free_optimize"
 SMALL_FREE = "archive-small/least_loaded_base18_free_optimize"
 FASTEST = "archive-small/fastest_first_base27_free_optimize"
-COLD_PLATES = "servers6_light/s2_base"       # 6.2 Base, light day: a full-day schedule
+COLD_PLATES = "servers6_light/base"          # Base, light day: cold plates on, a full day
 SERVERS6_BASE = "servers6/base"
+FULL_DAY = "servers6_light/base"             # a per-tick run with a full-day schedule
 # Runs of release 1.4.0 that stopped at a stuck tick: on the 60 s cap, and with no valid
 # schedule (6.4 Test 1 on the heavy day: deadlines vs. server capacity).
 STUCK_AT_CAP = "servers6_heavy/base"
@@ -362,11 +363,11 @@ def test_provenance_warnings():
 
 # -- Chapter 6: configurations, tests and the results table -------------------------------
 
-BASE = SERVERS6_BASE        # a full-day per-tick run of this release, 53 of 288 ticks at the cap
+BASE = SERVERS6_BASE        # the servers6 Base (cold plates on), stuck at tick 138
 # Per-tick runs on the site, by their test: each folder holds the run of its test.
 SERVERS10_TESTS = {
     "servers10/base": "base", "servers10/s1_t1_zones": "s1_t1_zones",
-    "servers10/s1_t2_same_zone": "s1_t2_same_zone", "servers10/s2_base": "s2_base",
+    "servers10/s1_t2_same_zone": "s1_t2_same_zone",
     "servers10/s2_t1_crac": "s2_t1_crac", "servers10/s2_t2_cold_plate": "s2_t2_cold_plate",
     "servers10/s3_t2_hmin_med": "s3_t2_hmin_med", "servers10/s3_t3_hmin_low": "s3_t3_hmin_low",
     "servers10/s4_t1_no_moves": "s4_t1_no_moves", "servers10/s4_t2_blind": "s4_t2_blind",
@@ -425,10 +426,9 @@ def test_chapter6_table_rows_and_columns():
     assert (ten["servers"] == "10 servers").all() and (ten["level"] == "Normal day").all()
     assert list(zip(ten["section"], ten["tag"])) == \
         [(s.key, tag) for s in ex.SECTIONS for tag, _ in s.tests]
-    # One base run is the reference (first row) of 6.1, 6.3 and 6.4.
+    # One base run is the reference (first row) of every section.
     firsts = ten.groupby("section", sort=False)["run"].first()
-    assert firsts["6.1"] == firsts["6.3"] == firsts["6.4"] == "base"
-    assert firsts["6.2"] == "s2_base"
+    assert firsts["6.1"] == firsts["6.2"] == firsts["6.3"] == firsts["6.4"] == "base"
     for _, row in table.iterrows():
         if row["run"] is None or pd.isna(row["run"]):
             assert row["status"] in data.NO_RUN
@@ -531,8 +531,7 @@ def test_chapter6_uses_the_newest_matching_run(tmp_path):
     assert used.name == "new" and [r.name for r in found] == ["old", "new"]
     assert cat[("servers6", "s1_t1_zones")] == (None, [])
     table = data.chapter6_table(runs, configs=["servers6"])
-    assert table.loc[(table["tag"] == "Base") & (table["section"] != "6.2"), "run"].tolist() \
-        == ["new"] * 3
+    assert table.loc[table["tag"] == "Base", "run"].tolist() == ["new"] * 4
     groups = data.config_runs(runs)
     assert [r.name for r in groups["servers6"]] == ["new", "old"]   # used first, then older
 
@@ -641,7 +640,7 @@ def test_per_tick_ticks_without_a_bound(tmp_path):
 
 
 def test_per_tick_run_in_the_chapter6_table(loaded):
-    ref = BY_KEY[SERVERS6_BASE]
+    ref = BY_KEY[FULL_DAY]
     summary = data.load_summary(ref.path)
     assert data.per_tick_info(summary)["n_ticks"] == 288
     row = data.chapter6_row(ref, summary)
@@ -662,18 +661,18 @@ def test_relabelled_run_says_so():
 def test_stuck_run_says_where_and_why():
     """A per-tick run stuck at a tick is a result: it names the tick and the limit, on the
     60 s cap (a schedule may exist) or with no valid schedule (none exists)."""
-    if not {STUCK_AT_CAP, STUCK_INVALID, SERVERS6_BASE} <= set(BY_KEY):
+    if not {STUCK_AT_CAP, STUCK_INVALID, FULL_DAY} <= set(BY_KEY):
         pytest.skip("the 1.4.0 servers6 runs are not under results/")
     cap = data.load_summary(BY_KEY[STUCK_AT_CAP].path)
     stuck = data.stuck_info(cap)
-    assert stuck["tick"] == 55 and stuck["limits"] == [data.TICK_TIME_LIMIT]
+    assert stuck["tick"] == 104 and stuck["limits"] == [data.TICK_TIME_LIMIT]
     assert data.stuck_reason(stuck, 60.0) == "no schedule within the 60 s cap"
     ticks = data.per_tick_info(cap)
     assert data.solver_short(cap["solver"], ticks) == \
-        "Stuck at tick 55: no schedule within the 60 s cap"
-    text = data.stuck_sentence(cap, "10:32")
-    assert text.startswith("Stuck at tick 55 of 288 (10:32): the solver found no schedule")
-    assert "whether one exists is not known" in text and "54 ticks before it" in text
+        "Stuck at tick 104: no schedule within the 60 s cap"
+    text = data.stuck_sentence(cap, "14:37")
+    assert text.startswith("Stuck at tick 104 of 288 (14:37): the solver found no schedule")
+    assert "whether one exists is not known" in text and "103 ticks before it" in text
     assert "no full-day schedule" in data.solver_sentence(cap["solver"], ticks)
 
     invalid = data.load_summary(BY_KEY[STUCK_INVALID].path)
@@ -684,7 +683,7 @@ def test_stuck_run_says_where_and_why():
     assert set(data.infeasibility_frame(invalid)["family"]) >= {"deadlines_and_waiting",
                                                                  "capacity"}
 
-    assert data.stuck_info(data.load_summary(BY_KEY[SERVERS6_BASE].path)) is None
+    assert data.stuck_info(data.load_summary(BY_KEY[FULL_DAY].path)) is None
 
 
 def test_stuck_run_in_the_chapter6_table():
@@ -692,14 +691,16 @@ def test_stuck_run_in_the_chapter6_table():
         pytest.skip("the 1.4.0 servers6 runs are not under results/")
     ref = BY_KEY[STUCK_AT_CAP]
     row = data.chapter6_row(ref, data.load_summary(ref.path))
-    assert (row["status"], row["stuck_tick"], row["n_ticks"]) == ("no_solution", 55, 55)
+    assert (row["status"], row["stuck_tick"], row["n_ticks"]) == ("no_solution", 104, 104)
     assert row["stuck_reason"] == "no schedule within the 60 s cap"
     assert not set(data.CHAPTER6_METRICS) & set(row)       # no full-day figures
     table = data.chapter6_table(RUNS)
     stuck = table[data.is_stuck(table)]
     assert data.has_result(stuck).all()                     # a stuck run is a result
     heavy = stuck[stuck["configuration"] == "6 servers · heavy day"]
-    assert heavy["run"].nunique() == 13                     # every heavy-day run of 6 servers
+    # every heavy-day run of 6 servers that is a test's run: the Base and 6.2 Tests 1 and 2
+    # until the runs with cold plates off are re-run
+    assert heavy["run"].nunique() == 3
 
 
 def test_a_configuration_without_runs_is_not_run_in_this_release():

@@ -1,8 +1,8 @@
 """The per-tick batch runs, from the experiment list in scheduler/experiments.py.
 
-    uv run python tools/runlist.py                    # the 39 runs, one per line
-    uv run python tools/runlist.py --fleet servers10  # the 39 runs of the 10-server fleet
-    uv run python tools/runlist.py --sections 6.1,6.2 # the 18 runs of the first batch
+    uv run python tools/runlist.py                    # the 36 runs, one per line
+    uv run python tools/runlist.py --fleet servers10  # the 36 runs of the 10-server fleet
+    uv run python tools/runlist.py --sections 6.1,6.2 # 15 runs (6.1 and 6.2)
     uv run python tools/runlist.py --format json      # the same, with every field
     uv run python tools/runlist.py --format matrix    # {"include": [...]} for the Actions matrix
     uv run python tools/runlist.py --only servers6_heavy__base --format matrix
@@ -58,7 +58,7 @@ WALL_TIME_LIMIT_S = 5.5 * 3600
 _FLAGS = {
     "zone_map": lambda v: ["--zone-map", ",".join(str(z) for z in v)],
     "reassignment": lambda v: ["--reassignment", v],
-    "cold_plates": lambda v: ["--cold-plates"] if v else [],
+    "cold_plates": lambda v: [] if v else ["--no-cold-plates"],     # on by default
     "cp_mode": lambda v: ["--cp-mode", v],
     "supply_temp_mode": lambda v: ["--supply-temp-mode", v],
     "H_min_C": lambda v: ["--h-min", f"{v:g}"],

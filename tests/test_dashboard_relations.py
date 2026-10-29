@@ -9,7 +9,7 @@ from dashboard import data, relations
 from dashboard.theme import palette
 
 BASE = data.RESULTS_DIR / "servers10" / "base"
-COLD = data.RESULTS_DIR / "servers10" / "s2_base"
+COLD = BASE                 # cold plates are on in every run
 FLAT = data.RESULTS_DIR / "servers10" / "s4_t3a_ci_flat"
 
 pytestmark = pytest.mark.skipif(
@@ -35,8 +35,7 @@ def test_every_relationship_has_a_reading_and_a_figure(runs):
             assert len(fig.data) > 0, rel.key
 
 
-def test_cold_plates_are_detected_only_where_they_are_on(runs):
-    assert not relations.has_cold_plates(runs["base"])
+def test_cold_plates_are_detected(runs):
     assert relations.has_cold_plates(runs["cold"])
     cp = relations.cold_plate_rows(runs["cold"], "optimized")
     assert cp["s"].nunique() == 3 and cp["cp_flow_Lmin"].notna().all()

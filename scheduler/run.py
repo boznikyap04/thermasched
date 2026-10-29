@@ -2,10 +2,10 @@
 
     uv run python -m scheduler.run --scenario small
     uv run python -m scheduler.run --scenario small --baseline-rule fastest_first --baseline-supply-temp 27
-    uv run python -m scheduler.run --scenario small --cold-plates
+    uv run python -m scheduler.run --scenario small --no-cold-plates
     uv run python -m scheduler.run --scenario small --cold-plate-count 2
     uv run python -m scheduler.run --scenario servers6 --zone-map 1,1,1,2,2,2
-    uv run python -m scheduler.run --scenario servers6 --cold-plates --cp-mode fixed
+    uv run python -m scheduler.run --scenario servers6 --cp-mode fixed
     uv run python -m scheduler.run --scenario servers6 --ci-flat
     uv run python -m scheduler.run --scenario small --thermal-blind
     uv run python -m scheduler.run --scenario small --per-tick --tick-time-limit 30
@@ -77,12 +77,12 @@ def parse_args(argv=None) -> tuple[RunSettings, argparse.Namespace]:
                    help="override the minimum thermal headroom H_min, degC")
     p.add_argument("--time-limit", type=float, default=d.time_limit_s, help="seconds")
     p.add_argument("--mip-gap", type=float, default=d.mip_rel_gap, help="relative gap")
-    p.add_argument("--cold-plates", action="store_true",
-                   help="model cold plates; plates per server from servers.csv (n_cold_plates, "
-                        "else CT_s_cold_plate)")
+    p.add_argument("--cold-plates", action=argparse.BooleanOptionalAction, default=d.cold_plates,
+                   help="model cold plates (on by default); plates per server from servers.csv "
+                        "(n_cold_plates, else CT_s_cold_plate). --no-cold-plates turns them off")
     p.add_argument("--cold-plate-count", type=int, default=None,
                    help="put this many cold plates on every server (0 disables them); "
-                        "implies --cold-plates")
+                        "needs cold plates on")
     p.add_argument("--baseline-cp-flow", type=float, default=d.baseline_cp_flow_Lmin,
                    help="fixed cold-plate flow of the baseline, L/min (one of the flow settings)")
     p.add_argument("--baseline-cp-coolant", type=float, default=d.baseline_cp_coolant_C,
@@ -121,7 +121,6 @@ def parse_args(argv=None) -> tuple[RunSettings, argparse.Namespace]:
     p.add_argument("--scenarios-dir", default="scenarios")
     p.add_argument("--results-dir", default="results")
     a = p.parse_args(argv)
-    cold_plates = a.cold_plates or a.cold_plate_count is not None
     zone_map = None
     if a.zone_map:
         try:
@@ -135,7 +134,7 @@ def parse_args(argv=None) -> tuple[RunSettings, argparse.Namespace]:
         placement="thermal_blind" if a.thermal_blind else d.placement,
         supply_temp_mode=a.supply_temp_mode, fixed_supply_temp_C=a.fixed_supply_temp,
         H_min_C=a.h_min, time_limit_s=a.time_limit, mip_rel_gap=a.mip_gap,
-        cold_plates=cold_plates, cold_plate_count=a.cold_plate_count,
+        cold_plates=a.cold_plates, cold_plate_count=a.cold_plate_count,
         baseline_cp_flow_Lmin=a.baseline_cp_flow, baseline_cp_coolant_C=a.baseline_cp_coolant,
         cp_mode=a.cp_mode, fixed_cp_flow_Lmin=a.fixed_cp_flow, fixed_cp_coolant_C=a.fixed_cp_coolant,
         priority=not a.no_priority, zone_map=zone_map, carbon_file=a.carbon_file,
@@ -163,8 +162,9 @@ def default_run_name(settings: RunSettings) -> str:
     return "_".join([
         st.baseline_rule, f"base{st.baseline_supply_temp_C:g}", st.reassignment,
         st.supply_temp_mode if st.supply_temp_mode == "optimize" else f"fixed{fixed_temp:g}",
-    ] + (["tblind"] if st.placement == "thermal_blind" else []) + ([] if not st.cold_plates else
-         ["cp" if st.cold_plate_count is None else f"cp{st.cold_plate_count}"])
+    ] + (["tblind"] if st.placement == "thermal_blind" else [])
+      + (["nocp"] if not st.cold_plates else
+         [] if st.cold_plate_count is None else [f"cp{st.cold_plate_count}"])
       + ([f"bcp{st.baseline_cp_flow_Lmin:g}-{st.baseline_cp_coolant_C:g}"]
          if st.cold_plates and cp_values else [])
       + ([] if not cp_fixed else

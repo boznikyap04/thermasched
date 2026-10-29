@@ -1,4 +1,4 @@
-# The per-tick batch (docs/PLAN.md §3 and §4): the 39 runs of one fleet, one job each, on
+# The per-tick batch (docs/PLAN.md §3 and §4): the 36 runs of one fleet, one job each, on
 # GitHub-hosted runners. The run list comes from tools/runlist.py. How to start, resume and
 # collect: docs/PLAN.md §4.
 #
@@ -19,7 +19,7 @@ on:
         options: [servers6, servers10]
         default: servers6
       batch:
-        description: "all: the fleet's 39 runs; timing: only its heavy-day 6.1 Base, e.g. servers6_heavy__base"
+        description: "all: the fleet's 36 runs; timing: only its heavy-day 6.1 Base, e.g. servers6_heavy__base"
         type: choice
         options: [all, timing]
         default: all

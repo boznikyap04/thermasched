@@ -1135,7 +1135,7 @@ def reassignment_table(run: Run) -> pd.DataFrame:
 def chapter6_table(runs: list[RunRef], infos: dict[str, RunInfo] | None = None,
                    configs: list[str] | None = None) -> pd.DataFrame:
     """One row per configuration, section and test, in that order, with the columns of
-    CHAPTER6_COLUMNS. The base run appears in 6.1, 6.3 and 6.4, so every test sits right
+    CHAPTER6_COLUMNS. The base run appears in every section, so every test sits right
     below its section's reference. A test without a run says why in *status*."""
     infos = infos if infos is not None else run_infos(runs)
     cat = catalogue(runs, infos)

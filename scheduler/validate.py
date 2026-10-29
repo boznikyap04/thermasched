@@ -414,7 +414,8 @@ def slowdown_check(scenario: Scenario, server: str | None = None, share: float =
     warmer one it passes T_dvfs, DPF drops below 1 and the run needs an extra period.
     ``h_min`` 5 °C (the 6.3 low margin) leaves room above T_dvfs before the cap. A row passes
     when the run takes exactly ``periods`` with DPF 1 throughout, and longer once DPF drops.
-    By default the server is the one that heats up fastest under this load."""
+    By default the server is the one without a cold plate that heats up fastest under this load
+    (cold plates are on in every run, and a plate keeps its server below T_dvfs)."""
     c = scenario.constants
     dt = scenario.dt_seconds
     top = _top_supply(scenario)
@@ -426,7 +427,8 @@ def slowdown_check(scenario: Scenario, server: str | None = None, share: float =
             for _ in range(periods):
                 temp = sv.th_alpha * temp + (1 - sv.th_alpha) * (top + sv.th_a_C + sv.th_R_C_per_W * p)
             return temp
-        server = max(scenario.servers, key=heat).name
+        air_only = [sv for sv in scenario.servers if sv.plates == 0] or list(scenario.servers)
+        server = max(air_only, key=heat).name
     sv = _server(scenario, server)
     cores = max(1, round(share * sv.C_cores))
     work = cores * sv.f_MHz * dt * periods
@@ -594,6 +596,12 @@ def _named_run(runs: list[Path], names: tuple[str, ...]) -> Path | None:
     return None
 
 
+def _plates_on(run_dir: Path) -> bool:
+    """True if the run modelled cold plates (a run made before they were on by default may not)."""
+    summary = json.loads((Path(run_dir) / "summary.json").read_text())
+    return bool((summary.get("cold_plates") or {}).get("enabled"))
+
+
 def solver_rows(results_dir: Path, scenario_name: str) -> list[dict]:
     """One row per run of the scenario: what it allowed, the solver's status in plain words,
     the gap, the solve time, carbon, the solver's lower bound, and the most a better
@@ -652,10 +660,9 @@ def write_table(path: Path, rows: list[dict]) -> None:
 
 
 # Runs the run-based checks read, under results/<scenario>/ (or another scenario's folder).
-# The run with cold plates on and the base run, by the names a run may have: the short
-# Chapter 6 name, or the name the solver gives it.
-COLD_PLATE_RUN = ("s2_base", "least_loaded_base18_free_optimize_cp_tl1800")
-NO_PLATE_RUN = ("base", "least_loaded_base18_free_optimize_tl1800")
+# The run with cold plates on, by the names a run may have: the short Chapter 6 name, or the
+# name the solver gives it. Cold plates are on by default, so it is the base run.
+COLD_PLATE_RUN = ("base", "least_loaded_base18_free_optimize_tl1800")
 WARM_RUN = ("thesis10_warm", "least_loaded_base18_free_optimize")
 
 
@@ -702,9 +709,9 @@ def write_all(scenario_name: str = "servers6", scenarios_dir="scenarios", result
         table("throttled_servers", srv, note=f"{WARM_RUN[0]}/{WARM_RUN[1]}")
         table("throttled_workloads", wl, note=f"{WARM_RUN[0]}/{WARM_RUN[1]}")
     runs = runs_of(results_dir, scenario_name)
-    cp_dir, base_dir = _named_run(runs, COLD_PLATE_RUN), _named_run(runs, NO_PLATE_RUN)
-    if cp_dir is not None:
-        table("cold_plates", cold_plate_rows(cp_dir, sc, base_dir),
+    cp_dir = _named_run(runs, COLD_PLATE_RUN)
+    if cp_dir is not None and _plates_on(cp_dir):
+        table("cold_plates", cold_plate_rows(cp_dir, sc),
               note=f"{cp_dir.parent.name}/{cp_dir.name}")
     table("solver", solver_rows(results_dir, scenario_name))
 

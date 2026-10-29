@@ -617,13 +617,13 @@ def test_cold_plates_move_work_and_match_the_evaluator():
     assert ev.total_carbon_g == pytest.approx(res.objective_g, rel=1e-6)
     np.testing.assert_allclose(ev.Q_cp_W[1], ev.P_IT_W[1])       # the plate takes all the heat
     np.testing.assert_allclose(res.model_values["Q_cp_W"], ev.Q_cp_W, atol=1e-6)
-    off = solve(sc, {1: 1, 2: 1}, settings())
+    off = solve(sc, {1: 1, 2: 1}, settings(cold_plates=False))
     assert res.objective_g < off.objective_g
 
 
 def test_cold_plate_count_zero_matches_off():
     sc = cold_plate_scenario()
-    off = solve(sc, {1: 1, 2: 1}, settings())
+    off = solve(sc, {1: 1, 2: 1}, settings(cold_plates=False))
     zero = solve(sc, {1: 1, 2: 1}, settings(cold_plates=True, cold_plate_count=0))
     assert zero.objective_g == pytest.approx(off.objective_g, rel=1e-9)
     assert zero.cold_plate_ops is None

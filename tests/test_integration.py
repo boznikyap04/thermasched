@@ -39,7 +39,7 @@ def test_baseline_it_energy_and_carbon(name, kwh, kg):
 @pytest.mark.parametrize("supply,hottest,cooling", [(18.0, 66.26, 14.62), (27.0, 75.26, 7.20)])
 def test_servers6_baseline_thermal_and_cooling(supply, hottest, cooling):
     sc = load_scenario("servers6")
-    st = RunSettings(scenario="servers6", baseline_supply_temp_C=supply)
+    st = RunSettings(scenario="servers6", baseline_supply_temp_C=supply, cold_plates=False)
     ev = evaluate(sc, build_baseline(sc, st), constant_supply_temp(sc, supply), st)
     assert ev.totals["hottest_T_C"] == pytest.approx(hottest, abs=0.05)
     assert ev.totals["periods_above_cap"] == 0 and ev.T_C.max() < 80.0
@@ -108,10 +108,10 @@ def test_undefined_switch_is_refused(capsys):
 
 
 def test_small_cold_plate_run_passes_every_check(tmp_path):
-    rc = main(["--scenario", "small", "--cold-plates", "--reassignment", "none",
+    rc = main(["--scenario", "small", "--reassignment", "none",      # cold plates on by default
                "--supply-temp-mode", "fixed", "--results-dir", str(tmp_path)])
     assert rc == 0
-    out = tmp_path / "small" / "least_loaded_base18_none_fixed18_cp"
+    out = tmp_path / "small" / "least_loaded_base18_none_fixed18"
     summary = json.loads((out / "summary.json").read_text())
     assert all(c["passed"] in (True, None) for c in summary["checks"].values())
     assert summary["cold_plates"]["enabled"] and summary["cold_plates"]["plates_per_server"] == [0, 0, 1]
@@ -199,7 +199,10 @@ def test_zone_map_and_carbon_overrides(tmp_path):
 
 def test_switch_run_names():
     st, _ = parse_args(["--cold-plates", "--cp-mode", "fixed", "--no-priority"])
-    assert st.run_name == "least_loaded_base18_free_optimize_cp_cpfixed_noprio"
+    assert st.run_name == "least_loaded_base18_free_optimize_cpfixed_noprio"
+    assert st.cold_plates and parse_args([])[0].cold_plates            # on by default
+    st_off, _ = parse_args(["--no-cold-plates"])
+    assert not st_off.cold_plates and st_off.run_name == "least_loaded_base18_free_optimize_nocp"
     assert st.cp_mode == "fixed" and not st.priority
     assert st.optimized_fixed_cp() == (0.30, 20.0)
     st, _ = parse_args(["--cold-plates", "--cp-mode", "fixed", "--fixed-cp-flow", "0.2",
@@ -211,7 +214,7 @@ def test_run_names_differ_for_every_switch_that_changes_the_result():
     """A sweep over any one switch writes each run to its own folder."""
     variants = [[], ["--h-min", "5"], ["--h-min", "15"], ["--time-limit", "120"],
                 ["--mip-gap", "0.01"], ["--baseline-rule", "random", "--seed", "1"],
-                ["--baseline-rule", "random", "--seed", "2"], ["--cold-plates"],
+                ["--baseline-rule", "random", "--seed", "2"], ["--no-cold-plates"],
                 ["--cold-plates", "--baseline-cp-flow", "0.2"],
                 ["--cold-plates", "--cp-mode", "fixed"],
                 ["--cold-plates", "--cp-mode", "fixed", "--fixed-cp-flow", "0.2"],
