@@ -226,10 +226,98 @@ def test_tick_without_a_bound_is_saved_with_an_unknown_gap(tmp_path, monkeypatch
     assert (row["status"], row["mip_gap"]) == (STATUS_TIME_LIMIT, "")
 
 
+def _no_schedule_at_tick(tick_no: int, times: int):
+    """A stand-in for pertick.solve: at tick ``tick_no`` the first ``times`` solves stop with
+    no schedule (as HiGHS does at its time limit); every limit asked for is recorded."""
+    from scheduler.types import STATUS_NO_SOLUTION
+    seen = {"tick": 0, "left": times, "limits": []}
+
+    def fake(sc, *a, **kw):
+        if sc.name.endswith(f"@tick{tick_no}"):
+            seen["limits"].append(kw["time_limit_s"])
+            if seen["left"] > 0:
+                seen["left"] -= 1
+                res = solve(sc, *a, **kw)
+                res.status, res.schedule, res.solve_time_s = STATUS_NO_SOLUTION, None, 60.0
+                return res
+        return solve(sc, *a, **kw)
+    return fake, seen
+
+
+def test_tick_with_no_schedule_is_solved_again_up_to_the_no_schedule_limit(tmp_path,
+                                                                             monkeypatch):
+    from scheduler import pertick
+    fake, seen = _no_schedule_at_tick(3, times=1)
+    monkeypatch.setattr(pertick, "solve", fake)
+    argv = ARGS + ["--results-dir", str(tmp_path)]
+    assert main(argv) == 0
+    assert seen["limits"] == [60.0, 240.0]       # 60 s, then the rest of 300 s
+    folder = tmp_path / "small" / parse_args(argv)[0].run_name
+    pt = json.loads((folder / "summary.json").read_text())["per_tick"]
+    assert pt["n_ticks_extended"] == 1 and pt["tick_no_schedule_limit_s"] == 300.0
+    with open(folder / TICKS_FILE) as fh:
+        rows = list(csv.DictReader(fh))
+    assert [r["tick"] for r in rows if r["extended"] == "1"] == ["3"]
+    assert float(rows[2]["solve_s"]) >= 60.0
+
+
+def test_tick_with_no_schedule_at_the_no_schedule_limit_is_stuck(tmp_path, monkeypatch):
+    from scheduler import pertick
+    from scheduler.pertick import LIMIT_TICK_TIME
+    fake, seen = _no_schedule_at_tick(2, times=2)
+    monkeypatch.setattr(pertick, "solve", fake)
+    st, sc, original = _setup(ARGS + ["--tick-no-schedule-limit", "100"])
+    out = run_per_tick(sc, original, st, tmp_path / "run")
+    assert out.status == OUTCOME_STUCK and out.stuck["tick"] == 2
+    assert out.stuck["limits"] == [LIMIT_TICK_TIME] and "100 s" in out.stuck["detail"]
+    assert seen["limits"] == [60.0, 40.0]
+    assert out.ticks[-1]["extended"] is True
+
+
+def test_no_second_solve_when_the_no_schedule_limit_is_the_tick_limit(tmp_path, monkeypatch):
+    from scheduler import pertick
+    fake, seen = _no_schedule_at_tick(2, times=1)
+    monkeypatch.setattr(pertick, "solve", fake)
+    st, sc, original = _setup(ARGS + ["--tick-no-schedule-limit", "60"])
+    out = run_per_tick(sc, original, st, tmp_path / "run")
+    assert out.status == OUTCOME_STUCK and seen["limits"] == [60.0]
+
+
+def test_warm_start_fill_places_open_workloads_within_capacity():
+    """Workloads the start leaves open are placed by the baseline rule inside their windows,
+    on servers they may use, without overfilling cores or memory."""
+    from scheduler.optimize import _build, _extract_schedule, _warm_start_values
+    from scheduler.types import Schedule
+    st, sc, original = _setup(ARGS)
+    built = _build(sc, original, st, (), False)
+    vals, n = _warm_start_values(sc, built, Schedule(()), None, st, fill=True)
+    x = np.zeros(built.lp.n_cols)
+    for col, v in vals.items():
+        x[col] = v
+    sched = _extract_schedule(sc, built, x)
+    assert n == len(sc.workloads) and all(p.server is not None for p in sched.placements)
+    cores = np.zeros((sc.S, sc.T + 2))
+    mem = np.zeros((sc.S, sc.T + 2))
+    for p in sched.placements:
+        wd = built.win[(p.i, p.server)]
+        assert wd.a <= p.start <= wd.b and p.end - 1 <= wd.yb
+        assert wd.n_min <= p.end - p.start <= wd.n_max
+        w = sc.workloads[p.i - 1]
+        cores[p.server - 1, p.start:p.end] += w.C_req
+        mem[p.server - 1, p.start:p.end] += w.M_req_MB
+    for sv in sc.servers:
+        assert (cores[sv.s - 1] <= sv.C_cores).all() and (mem[sv.s - 1] <= sv.M_MB).all()
+    # without fill nothing is placed
+    assert _warm_start_values(sc, built, Schedule(()), None, st)[1] == 0
+
+
 def test_per_tick_run_names_and_test_matching():
     names = {tuple(v): parse_args(["--scenario", "small"] + v)[0].run_name
              for v in ([], ["--per-tick"], ["--per-tick", "--tick-time-limit", "20"],
-                       ["--per-tick", "--time-limit", "100"])}
+                       ["--per-tick", "--time-limit", "100"],
+                       ["--per-tick", "--tick-no-schedule-limit", "600"])}
+    assert names[("--per-tick", "--tick-no-schedule-limit", "600")] == \
+        "least_loaded_base18_free_optimize_pertick_nsl600"
     assert names[()] == "least_loaded_base18_free_optimize"
     assert names[("--per-tick",)] == "least_loaded_base18_free_optimize_pertick"
     assert names[("--per-tick", "--tick-time-limit", "20")] == \

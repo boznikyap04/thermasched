@@ -265,6 +265,9 @@ class RunSettings:
     # per-tick re-planning (docs/PLAN.md section 2): re-solve every period, keep its decisions
     per_tick: bool = False
     tick_time_limit_s: float = 60.0            # HiGHS time cap of each tick's solve
+    # a tick with no schedule at tick_time_limit_s is solved again until this much time in all
+    # (at or below tick_time_limit_s: no second solve)
+    tick_no_schedule_limit_s: float = 300.0
 
     def validate(self) -> None:
         if self.baseline_rule not in BASELINE_RULES:
@@ -288,6 +291,8 @@ class RunSettings:
                 raise ValueError("cold_plate_count must be 0 or more")
         if not self.tick_time_limit_s > 0:
             raise ValueError("tick_time_limit_s must be positive")
+        if not self.tick_no_schedule_limit_s > 0:
+            raise ValueError("tick_no_schedule_limit_s must be positive")
         if self.fan_power:
             raise NotDefinedYet(
                 "fan_power: not defined yet. The model document has no fan-power "

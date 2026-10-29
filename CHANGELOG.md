@@ -25,6 +25,23 @@ run.
 - **6.2's Base is the shared Base.** With cold plates on everywhere, 6.2 Base (both cooling
   systems optimized) is the same run as the Base, so `s2_base` is gone and a fleet has 36
   runs instead of 39.
+- **Every tick starts from a complete set of placements.** A tick's solve starts from the
+  previous tick's plan; the workloads that arrived since were left open in it, and on the
+  busiest ticks HiGHS could not complete it within 60 s (one 6-server heavy tick needed
+  138 s), so the run stopped there. They are now placed by the baseline rule first (arrival
+  order, earliest start with room, least loaded server first), and HiGHS chooses the cooling
+  for the placements. This uses only arrived workloads, so re-planning still has no foresight, and the solver may change any of it. `ticks.csv` gains
+  `warm_start_filled`. Each tick's solution is then polished: with every decision held, the
+  continuous values (CRAC heat, coolant temperature) are solved again to their cheapest, so a
+  start HiGHS keeps within the gap carries no slack and the solver's carbon still equals the
+  evaluator's.
+- **A tick with no schedule gets more time.** A tick that has no schedule at the 60 s tick
+  limit is solved again, up to 300 s in all (`--tick-no-schedule-limit`); only after that is
+  the run stuck. Ticks that have a schedule still stop at 60 s. `ticks.csv` gains `extended`,
+  and `summary.json` `per_tick` gains `tick_no_schedule_limit_s` and `n_ticks_extended`.
+- **All runs are re-run** with these two changes and cold plates on: 36 per fleet, on the
+  6- and 10-server fleets, light, normal and heavy (72 runs, the 10-server heavy day
+  included).
 - **Results:** each day's 1.4.0 6.2 Base run (cold plates on, every other switch at its
   default) is now its Base (`s2_base` renamed `base`); 6.2 Tests 1 and 2 stand. The runs of
   6.1 Tests 1-2, 6.3 and 6.4 had cold plates off and wait for the re-run (`results/README.md`).

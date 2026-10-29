@@ -14,7 +14,10 @@ the end of the horizon. The window holds:
 
 Only period t's decisions are kept: which workloads start at t and on which server, the supply
 temperature of each zone and the cold-plate settings. The rest of the plan is offered to the
-next tick as a starting solution and otherwise discarded. Period t is then played out with the
+next tick as a starting solution and otherwise discarded; the workloads it does not place (those
+that arrived since) are added to that start by the baseline rule, using only arrived workloads,
+so every tick starts from a complete schedule. A tick that still has no schedule at the tick
+time limit is solved again, up to the no-schedule limit in all. Period t is then played out with the
 same physics as the evaluator: the server temperatures, and for every running workload the work
 delivered at the DPF it actually ran at. A running workload ends once its work is done.
 
@@ -76,7 +79,7 @@ LIMIT_TEXT = {
 
 TICK_COLUMNS = ["tick", "status", "solve_s", "mip_gap", "n_waiting", "n_started", "n_running",
                 "n_arrived", "n_done", "objective_g", "kept_carbon_g", "n_binaries",
-                "n_constraints", "tick_wall_s"]
+                "n_constraints", "tick_wall_s", "extended", "warm_start_filled"]
 
 
 @dataclass
@@ -245,9 +248,11 @@ class _Tick:
                                    supply_history=hist)
 
     def warm_start(self, state: _State):
-        """The previous tick's plan in window numbers; new arrivals are left open."""
+        """The previous tick's plan in window numbers; workloads it does not place (new
+        arrivals, and at tick 1 every workload) are left open here and placed by the baseline
+        rule in the solver (optimize._fill_warm_start)."""
         if state.plan is None:
-            return None, None
+            return Schedule(()), None
         run_set = set(self.running)
         pl = []
         for k, i in enumerate(self.ids, start=1):
@@ -269,15 +274,30 @@ class _Tick:
 
 
 def _solve_tick(tick: _Tick, settings: RunSettings, warm, warm_supply, log: bool) -> SolveResult:
-    sc, limit = tick.scenario, settings.tick_time_limit_s
+    """Solve tick t within tick_time_limit_s. If HiGHS stops there with no schedule at all,
+    solve again from the same start for the rest of tick_no_schedule_limit_s; the tick's
+    solve_s counts both."""
+    res = _solve_tick_once(tick, settings, warm, warm_supply, log, settings.tick_time_limit_s)
+    rest = settings.tick_no_schedule_limit_s - res.solve_time_s
+    if res.status != STATUS_NO_SOLUTION or rest < 1.0:
+        return res
+    res2 = _solve_tick_once(tick, settings, warm, warm_supply, log, rest)
+    res2.solve_time_s += res.solve_time_s
+    res2.model_values["extended"] = True
+    return res2
+
+
+def _solve_tick_once(tick: _Tick, settings: RunSettings, warm, warm_supply, log: bool,
+                     limit: float) -> SolveResult:
+    sc = tick.scenario
     if settings.placement != "thermal_blind":
         return solve(sc, tick.original, settings, warm_start=warm,
                      warm_start_supply_temp_C=warm_supply, time_limit_s=limit, log=log,
-                     extras=tick.extras)
+                     extras=tick.extras, warm_start_fill=True)
     # thermal-blind: servers chosen with temperature left out, then the full model on them
     pass1 = solve(sc, tick.original, settings, warm_start=warm,
                   warm_start_supply_temp_C=warm_supply, time_limit_s=BLIND_SHARE * limit,
-                  log=log, ignore_temperature=True, extras=tick.extras)
+                  log=log, ignore_temperature=True, extras=tick.extras, warm_start_fill=True)
     if not pass1.has_schedule:
         return pass1
     servers = pass1.schedule.server_of()
@@ -323,8 +343,10 @@ def _diagnose(tick: _Tick, settings: RunSettings, res: SolveResult | None, error
         limits, detail = [LIMIT_MODEL], error
     elif res.status == STATUS_NO_SOLUTION:
         limits = [LIMIT_TICK_TIME]
-        detail = (f"HiGHS stopped at the tick time limit ({settings.tick_time_limit_s:g} s) "
-                  "without a schedule; whether one exists is not known")
+        detail = (f"HiGHS found no schedule within the tick time limit "
+                  f"({settings.tick_time_limit_s:g} s, then up to "
+                  f"{settings.tick_no_schedule_limit_s:g} s in all); whether one exists is "
+                  "not known")
     else:
         built = _build(tick.scenario, tick.original, settings, (), False,
                        extras=tick.extras)
@@ -430,6 +452,10 @@ def _aggregate(scenario: Scenario, state: _State) -> SolveResult:
         "each server's temperature at the end of the previous tick (Eq. 30), and the supply "
         "temperatures of the previous ticks bound the ramps (35)-(36). Only the tick's own "
         "decisions are kept.",
+        "Each tick starts from the previous tick's plan, with the workloads that arrived since "
+        "placed by the baseline rule (arrival order, earliest start with room for cores and "
+        "memory, least loaded server first); the solver may change any of it. A tick with no "
+        "schedule at the tick time limit is solved again until the no-schedule limit.",
         f"{n} ticks: {n_opt} solved to the gap, {n_tl} stopped at the tick time limit "
         f"(slowest {slow['solve_s']:.1f} s, tick {slow['tick']}). "
         "The objective is the sum of each tick's own carbon for its period; the gap shown is "
@@ -455,6 +481,9 @@ def per_tick_block(outcome: PerTickOutcome, settings: RunSettings) -> dict:
         "outcome": outcome.status,
         "n_ticks": len(ticks),
         "tick_time_limit_s": settings.tick_time_limit_s,
+        "tick_no_schedule_limit_s": settings.tick_no_schedule_limit_s,
+        # ticks with no schedule at tick_time_limit_s that were solved again
+        "n_ticks_extended": sum(1 for r in ticks if r.get("extended")),
         "n_ticks_optimal": sum(1 for r in ticks if r["status"] == STATUS_OPTIMAL),
         "n_ticks_time_limit": sum(1 for r in ticks if r["status"] == STATUS_TIME_LIMIT),
         # of those, stopped before a bound was found: gap unknown, left out of max_mip_gap
@@ -537,7 +566,10 @@ def run_per_tick(scenario: Scenario, original: dict[int, int], settings: RunSett
                    "n_done": len(state.end), "objective_g": None, "kept_carbon_g": None,
                    "n_binaries": None if res is None else res.n_binaries,
                    "n_constraints": None if res is None else res.n_constraints,
-                   "tick_wall_s": time.perf_counter() - t0}
+                   "tick_wall_s": time.perf_counter() - t0,
+                   "extended": bool(res is not None and res.model_values.get("extended")),
+                   "warm_start_filled": None if res is None
+                   else res.model_values.get("warm_start_filled")}
             ticks = state.ticks + [row]
             _write_ticks(run_dir / TICKS_FILE, ticks)
             _write_partial(run_dir / PARTIAL_FILE, scenario, state)
@@ -596,7 +628,9 @@ def run_per_tick(scenario: Scenario, original: dict[int, int], settings: RunSett
             "objective_g": None if res.objective_g is None else float(res.objective_g),
             "kept_carbon_g": _kept_carbon_g(tick, res),
             "n_binaries": res.n_binaries, "n_constraints": res.n_constraints,
-            "tick_wall_s": time.perf_counter() - t0})
+            "tick_wall_s": time.perf_counter() - t0,
+            "extended": bool(res.model_values.get("extended")),
+            "warm_start_filled": res.model_values.get("warm_start_filled")})
         state.next_tick = t + 1
         done_here += 1
         if state.next_tick <= T:

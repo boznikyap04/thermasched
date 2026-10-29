@@ -109,6 +109,9 @@ def parse_args(argv=None) -> tuple[RunSettings, argparse.Namespace]:
                         "keep that period's decisions (instead of one plan for the whole day)")
     p.add_argument("--tick-time-limit", type=float, default=d.tick_time_limit_s,
                    help="per-tick: HiGHS time limit of each tick's solve, seconds")
+    p.add_argument("--tick-no-schedule-limit", type=float, default=d.tick_no_schedule_limit_s,
+                   help="per-tick: a tick with no schedule at --tick-time-limit is solved "
+                        "again until this many seconds in all; equal to it: no second solve")
     p.add_argument("--wall-time-limit", type=float, default=None,
                    help="per-tick: after a tick, if this many seconds have passed, save the "
                         "checkpoint and exit with code 3; the same command resumes the run")
@@ -139,7 +142,7 @@ def parse_args(argv=None) -> tuple[RunSettings, argparse.Namespace]:
         cp_mode=a.cp_mode, fixed_cp_flow_Lmin=a.fixed_cp_flow, fixed_cp_coolant_C=a.fixed_cp_coolant,
         priority=not a.no_priority, zone_map=zone_map, carbon_file=a.carbon_file,
         ci_flat=a.ci_flat, fan_power=a.fan_power, per_tick=a.per_tick,
-        tick_time_limit_s=a.tick_time_limit,
+        tick_time_limit_s=a.tick_time_limit, tick_no_schedule_limit_s=a.tick_no_schedule_limit,
     )
     settings.run_name = a.run_name or default_run_name(settings)
     return settings, a
@@ -150,7 +153,8 @@ def default_run_name(settings: RunSettings) -> str:
 
     Every switch that can change the result and differs from its default is in the name,
     so two runs with different switches never share a folder. A per-tick run ends in
-    ``_pertick`` (and ``_ttl<s>`` for a tick time limit other than the default); the whole-day
+    ``_pertick`` (and ``_ttl<s>`` / ``_nsl<s>`` for a tick time limit or no-schedule limit other
+    than the default); the whole-day
     time limit does not apply to it and is left out."""
     st, d = settings, RunSettings()
     fixed_temp = st.optimized_fixed_supply_temp_C()
@@ -180,7 +184,9 @@ def default_run_name(settings: RunSettings) -> str:
       + ([f"gap{st.mip_rel_gap:g}"] if st.mip_rel_gap != d.mip_rel_gap else [])
       + (["pertick"] if st.per_tick else [])
       + ([f"ttl{st.tick_time_limit_s:g}"]
-         if st.per_tick and st.tick_time_limit_s != d.tick_time_limit_s else []))
+         if st.per_tick and st.tick_time_limit_s != d.tick_time_limit_s else [])
+      + ([f"nsl{st.tick_no_schedule_limit_s:g}"]
+         if st.per_tick and st.tick_no_schedule_limit_s != d.tick_no_schedule_limit_s else []))
 
 
 def solve_staged(scenario, original, settings, base_sched, base_supply, warm_start, log,

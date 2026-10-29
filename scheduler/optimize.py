@@ -801,9 +801,68 @@ def _infeasible_result(built: _Built, relax, t0: float, text: str) -> SolveResul
         solver_status_text=text, notes=list(built.notes))
 
 
+def _fill_warm_start(scenario: Scenario, built: _Built,
+                     runs: dict[int, tuple[int, int, int]]) -> int:
+    """Place every workload the starting schedule leaves open, by the baseline rule: in
+    workload order, at the earliest start of its window where a server it may use has room
+    for its cores and memory (Eq. 12-13) and is available (Eq. 11) for the whole run, least
+    loaded server first. The run is n_max periods (the longest, so it delivers its work at
+    any DPF), cut at the window's end. Temperature, cooling and priority are not checked: a
+    start that breaks them is rejected by HiGHS as before. Adds to ``runs`` (i -> server,
+    start, length) and returns how many workloads it placed."""
+    T = scenario.T
+    servers = scenario.servers
+    AV = scenario.availability()
+    cores = np.zeros((scenario.S, T + 2))
+    mem = np.zeros((scenario.S, T + 2))
+    wl = {w.i: w for w in scenario.workloads}
+    for i, (s, st, m) in runs.items():
+        cores[s - 1, st:st + m] += wl[i].C_req
+        mem[s - 1, st:st + m] += wl[i].M_req_MB
+    by_i: dict[int, list[int]] = {}
+    for (i, s) in built.win:
+        by_i.setdefault(i, []).append(s)
+    n = 0
+    for w in scenario.workloads:
+        if w.i in runs or w.i not in by_i:
+            continue
+        cands = sorted(by_i[w.i])
+        starts = sorted({t for s in cands for t in range(built.win[(w.i, s)].a,
+                                                          built.win[(w.i, s)].b + 1)})
+        for st in starts:
+            fits = []
+            for s in cands:
+                wd = built.win[(w.i, s)]
+                if not wd.a <= st <= wd.b:
+                    continue
+                m = min(wd.n_max, wd.yb - st + 1)
+                sv = servers[s - 1]
+                k = s - 1
+                if (cores[k, st:st + m] + w.C_req <= sv.C_cores).all() \
+                        and (mem[k, st:st + m] + w.M_req_MB <= sv.M_MB).all() \
+                        and AV[k, st - 1:st - 1 + m].all():
+                    fits.append((cores[k, st], s, m))
+            if fits:
+                _, s, m = min(fits)
+                runs[w.i] = (s, st, m)
+                cores[s - 1, st:st + m] += w.C_req
+                mem[s - 1, st:st + m] += w.M_req_MB
+                n += 1
+                break
+    return n
+
+
 def _warm_start_values(scenario: Scenario, built: _Built, schedule: Schedule,
-                       supply: np.ndarray | None, settings: RunSettings) -> dict[int, float]:
+                       supply: np.ndarray | None, settings: RunSettings,
+                       fill: bool = False) -> tuple[dict[int, float], int]:
+    """Column values of the starting schedule, and how many workloads ``fill`` placed.
+
+    With ``fill`` only the placements are given: the supply temperatures and cold-plate
+    settings are left to HiGHS, which completes them for the placements. The previous plan's
+    cooling (and the baseline's cold-plate flow) need not cool the workloads added to it,
+    and a start with them fixed can be infeasible where the placements alone are not."""
     vals: dict[int, float] = {}
+    runs: dict[int, tuple[int, int, int]] = {}      # i -> (server, start, run length)
     for p in schedule.placements:
         if p.server is None or p.start is None or p.end is None:
             continue
@@ -813,16 +872,22 @@ def _warm_start_values(scenario: Scenario, built: _Built, schedule: Schedule,
         m = min(p.end - p.start, wd.n_max)       # a longer run is cut to n_max (never needed)
         if m < wd.n_min or p.start + m - 1 > wd.yb:
             continue
+        runs[p.i] = (p.server, p.start, m)
+    n_filled = _fill_warm_start(scenario, built, runs) if fill else 0
+    for i, (server, start, m) in runs.items():
+        wd = built.win[(i, server)]
         for s in range(1, scenario.S + 1):
-            xc = built.X.get((p.i, s))
+            xc = built.X.get((i, s))
             if xc is None:
                 continue
-            on = s == p.server
+            on = s == server
             vals[xc] = 1.0 if on else 0.0
-            for t, uc in built.U[(p.i, s)].items():
-                vals[uc] = 1.0 if (on and t >= p.start) else 0.0
-            for t, ec in built.E[(p.i, s)].items():
-                vals[ec] = 1.0 if (on and p.start + wd.n_min <= t < p.start + m) else 0.0
+            for t, uc in built.U[(i, s)].items():
+                vals[uc] = 1.0 if (on and t >= start) else 0.0
+            for t, ec in built.E[(i, s)].items():
+                vals[ec] = 1.0 if (on and start + wd.n_min <= t < start + m) else 0.0
+    if fill:
+        return vals, n_filled
     if built.cp_cols.b:
         lv = (built.cp_cols.fixed[0] if built.cp_cols.fixed is not None
               else scenario.cold_plate.level_of(settings.baseline_cp_flow_Lmin))
@@ -839,7 +904,7 @@ def _warm_start_values(scenario: Scenario, built: _Built, schedule: Schedule,
                 if k in built.levels:
                     for col, lv in zip(cols, built.levels):
                         vals[col] = 1.0 if lv == k else 0.0
-    return vals
+    return vals, n_filled
 
 
 def _solve_impl(scenario: Scenario, original_server: dict[int, int], settings: RunSettings, *,
@@ -847,7 +912,9 @@ def _solve_impl(scenario: Scenario, original_server: dict[int, int], settings: R
                 warm_start_supply_temp_C: np.ndarray | None, time_limit_s: float | None,
                 log: bool, feasibility_only: bool,
                 ignore_temperature: bool = False,
-                extras: WindowExtras | None = None) -> SolveResult:
+                extras: WindowExtras | None = None,
+                warm_start_fill: bool = False) -> SolveResult:
+    """See solve. With ``warm_start_fill`` the solution is also polished (_polish)."""
     relax = tuple(relax)
     t_build0 = time.perf_counter()
     built = _build(scenario, original_server, settings, relax, feasibility_only,
@@ -878,9 +945,11 @@ def _solve_impl(scenario: Scenario, original_server: dict[int, int], settings: R
                      "on large models.")
     h.setOptionValue("log_to_console", bool(log))
     log_path = None
-    n_ws_set = 0
+    n_ws_set = n_ws_filled = 0
     if warm_start is not None and not feasibility_only:
-        vals = _warm_start_values(scenario, built, warm_start, warm_start_supply_temp_C, settings)
+        vals, n_ws_filled = _warm_start_values(scenario, built, warm_start,
+                                               warm_start_supply_temp_C, settings,
+                                               fill=warm_start_fill)
         if vals:
             idx = np.array(sorted(vals), dtype=np.int32)
             h.setSolution(len(idx), idx, np.array([vals[k] for k in idx], dtype=np.float64))
@@ -924,6 +993,7 @@ def _solve_impl(scenario: Scenario, original_server: dict[int, int], settings: R
     out.model_values["mip_lp_solver"] = lp_solver
     if n_ws_set:
         out.model_values["warm_start_columns_set"] = n_ws_set
+        out.model_values["warm_start_filled"] = n_ws_filled
         out.model_values["warm_start_log"] = "\n".join(
             ln for ln in ws_text.splitlines() if "MIP start" in ln or "solution" in ln.lower())[:2000]
     if status in (STATUS_OPTIMAL, STATUS_TIME_LIMIT) and has_sol:
@@ -931,6 +1001,8 @@ def _solve_impl(scenario: Scenario, original_server: dict[int, int], settings: R
         out.objective_g = None if feasibility_only else float(info.objective_function_value)
         out.best_bound_g = None if feasibility_only else float(info.mip_dual_bound)
         out.mip_gap = None if feasibility_only else float(info.mip_gap)
+        if warm_start_fill and not feasibility_only:
+            x = _polish(h, lp, x, out)
         out.schedule = _extract_schedule(scenario, built, x)
         out.supply_temp_C = _extract_supply(scenario, built, x)
         S, Z, T = scenario.S, scenario.Z, scenario.T
@@ -954,6 +1026,37 @@ def _solve_impl(scenario: Scenario, original_server: dict[int, int], settings: R
     elif status == STATUS_INFEASIBLE:
         pass
     return out
+
+
+POLISH_TIME_LIMIT_S = 30.0
+
+
+def _polish(h: highspy.Highs, lp, x: np.ndarray, out: SolveResult) -> np.ndarray:
+    """Re-solve with every binary fixed at the solution's value, so the continuous columns
+    (CRAC heat, coolant temperature, ...) take their cheapest values for those decisions. A
+    solution HiGHS accepted within the gap can carry slack there, most often when it kept a
+    completed warm start, and then the solver's carbon exceeds the evaluator's. The decisions,
+    the bound and the status stay; the objective and gap are updated. Returns the polished
+    column values, or ``x`` if the re-solve does not give a solution at least as good."""
+    idx = np.flatnonzero(np.asarray(lp.integer, dtype=bool)).astype(np.int32)
+    t0 = time.perf_counter()
+    if len(idx):
+        v = np.round(x[idx]).astype(np.float64)
+        h.changeColsBounds(len(idx), idx, v, v)
+    h.setOptionValue("time_limit", POLISH_TIME_LIMIT_S)
+    h.run()
+    out.model_values["polish_s"] = time.perf_counter() - t0
+    info = h.getInfo()
+    if info.primal_solution_status != 2:
+        return x
+    obj = float(info.objective_function_value)
+    if obj > out.objective_g + 1e-9 * max(1.0, abs(out.objective_g)):
+        return x
+    out.model_values["polish_saved_g"] = out.objective_g - obj
+    out.objective_g = obj
+    if out.best_bound_g is not None and math.isfinite(out.best_bound_g):
+        out.mip_gap = abs(obj - out.best_bound_g) / max(abs(obj), 1e-9)
+    return np.asarray(h.getSolution().col_value)
 
 
 def _extract_schedule(scenario: Scenario, built: _Built, x: np.ndarray) -> Schedule:
@@ -1007,16 +1110,19 @@ def solve(scenario: Scenario, original_server: dict[int, int], settings: RunSett
           relax: tuple[str, ...] = (), warm_start: Schedule | None = None,
           warm_start_supply_temp_C: np.ndarray | None = None,
           time_limit_s: float | None = None, log: bool = False,
-          ignore_temperature: bool = False, extras: WindowExtras | None = None) -> SolveResult:
+          ignore_temperature: bool = False, extras: WindowExtras | None = None,
+          warm_start_fill: bool = False) -> SolveResult:
     """Build and solve the MILP. See the module docstring for the model.
 
     ``ignore_temperature`` solves it without server temperature (no recursion, no thermal
     cap, DPF = 1); its schedule is not checked against the thermal limits. ``extras``: what a
-    per-tick window adds, see WindowExtras."""
+    per-tick window adds, see WindowExtras. ``warm_start_fill``: workloads the warm start
+    leaves open are placed by the baseline rule first (see _fill_warm_start)."""
     return _solve_impl(scenario, original_server, settings, relax=relax, warm_start=warm_start,
                        warm_start_supply_temp_C=warm_start_supply_temp_C,
                        time_limit_s=time_limit_s, log=log, feasibility_only=False,
-                       ignore_temperature=ignore_temperature, extras=extras)
+                       ignore_temperature=ignore_temperature, extras=extras,
+                       warm_start_fill=warm_start_fill)
 
 
 def diagnose_infeasibility(scenario: Scenario, original_server: dict[int, int],

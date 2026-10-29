@@ -68,8 +68,16 @@ kept decisions of all ticks are the schedule, which the evaluator scores like an
 baseline is the same as in a whole-day run. The code is in `pertick.py`.
 
 - `--tick-time-limit` (default 60 s) is the HiGHS time limit of each tick; `--mip-gap`
-  applies to each tick, `--time-limit` does not apply. The run name ends in `_pertick` (and
-  `_ttl<s>` for another tick limit).
+  applies to each tick, `--time-limit` does not apply. A tick that has no schedule at that
+  limit is solved again from the same start, up to `--tick-no-schedule-limit` (default 300 s)
+  in all. The run name ends in `_pertick` (and `_ttl<s>` / `_nsl<s>` for other limits).
+- Each tick's solve starts from the previous tick's plan, with the workloads that arrived
+  since placed by the baseline rule (arrival order, earliest start with room for cores and
+  memory, least loaded server first). This uses only arrived workloads, and the solver may
+  change any of it; it gives HiGHS a complete set of placements to start from, and HiGHS
+  chooses the supply temperatures and cold-plate settings for them, so a tick rarely ends
+  its time limit with no schedule. Temperature and priority are not checked when filling; a
+  start that breaks them is rejected by HiGHS and the tick searches from scratch.
 - The state is saved after every tick in `<run folder>/checkpoint/`. Running the same
   command again resumes from it (other settings are refused); the folder is deleted when the
   run ends. A resumed run gives the same schedule as an unbroken one, as long as no tick
@@ -81,7 +89,9 @@ baseline is the same as in a whole-day run. The code is in `pertick.py`.
   `summary.json` (`per_tick.stuck`) and the printout name the tick and the limit.
   `partial_schedule.csv` lists the starts kept before it.
 - `ticks.csv` has one row per tick: status, solve time, gap, workloads waiting, started this
-  tick, running, arrived and done, the window's objective, the tick's own carbon, model size.
+  tick, running, arrived and done, the window's objective, the tick's own carbon, model size,
+  whether it was solved again for lack of a schedule (`extended`) and how many workloads the
+  baseline rule added to its start (`warm_start_filled`).
 - `summary.json` has `"mode": "per_tick"` and a `per_tick` block (ticks, slowest tick,
   ticks at the time limit, outcome). The solver status is `optimal` when every tick was, the
   gap is the largest of any tick, and the objective is the sum of each tick's own carbon,
@@ -166,6 +176,7 @@ One period is 5 minutes. Scenarios built in `notebooks/solver.ipynb` (see
 | `--diagnosis-time-limit` | `120` | seconds per relaxed re-solve when the model is infeasible |
 | `--per-tick` | off | re-plan at every period with only the arrived workloads (see [Per-tick re-planning](#per-tick-re-planning)) |
 | `--tick-time-limit` | `60` | per tick: HiGHS time limit of each tick's solve, seconds |
+| `--tick-no-schedule-limit` | `300` | per tick: a tick with no schedule at `--tick-time-limit` is solved again until this many seconds in all |
 | `--wall-time-limit` | none | per tick: after a tick, save the checkpoint and exit with code 3 once this many seconds have passed |
 
 Run `uv run python -m scheduler.run --help` for the full list.
