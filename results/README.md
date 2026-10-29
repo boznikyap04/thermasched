@@ -22,7 +22,17 @@ They are reported as they are, not re-run.
     for the tick within the 60 s cap (a schedule may exist); 6.4 Test 1 (no moves) has no valid
     schedule at tick 68: without moves, the waiting workloads cannot meet their deadlines on
     the capacity left (relaxing deadlines or server capacity alone gives a schedule).
-- **10 servers**, light and normal day: **[ORCHESTRATOR: fill in when the 26 runs are
-  installed: Actions run ids, finished / stuck per day, stuck ticks and limits.]** Until then
-  `servers10/` and `servers10_light/` hold the 1.3.0 runs on the old fleet.
+- **10 servers** (Actions runs 40754754068, 40754820788, 40754837540, 40754856946): 26 runs,
+  11 finished, 12 stuck, 3 crashed. All twelve stuck runs found no schedule for the tick
+  within the 60 s cap.
+  - Light day (`servers10_light`): 9 finished; stuck: the Base, 6.2 Test 2 and 6.3 Test 1
+    (all at tick 125); crashed: 6.4 Test 3a (tick 112).
+  - Normal day (`servers10`): 6.4 Test 1 and 6.4 Test 2 finished; stuck: the Base (tick 131),
+    6.1 Test 1 (131), 6.1 Test 2 (71), 6.2 Base (55), 6.2 Test 1 (55), 6.3 Test 1 (71),
+    6.3 Test 2 (55), 6.3 Test 3 (55), 6.4 Test 3b (144); crashed: 6.2 Test 2 (tick 107) and
+    6.4 Test 3a (tick 58).
+  - The three crashed runs have no folder here. The solver process died with a segmentation
+    fault (exit code 139) on the GitHub runner; resumed from their checkpoints (Actions runs
+    40821776650 and 40821779530) they crashed again at the same tick, which solves on macOS,
+    so the fault is in HiGHS 1.15.1 on the Linux runner, not in the model.
 - **10 servers, heavy day:** not run in this release.

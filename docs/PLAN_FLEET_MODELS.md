@@ -1,6 +1,6 @@
 # Plan: two server models (R840 + C6320)
 
-**Status (2026-10-29):** items 1–8 done; items 9–10 done for 6 servers (Actions run 40693621559: 39 runs, 20 finished, 19 stuck at a tick, kept as valid results; committed locally, 33b68b7). 10 servers, light and normal day (26 runs), running on Actions; the 10-server heavy day is not run in this release. Release 1.4.0 prepared on `fleet-e-release` (version, changelog with a placeholder for the 10-server counts, scenarios stamped, notebooks synced, servers6 runs relabelled, site reads stuck runs and configurations with no run); the 10-server runs, publish and deploy remain. Implements
+**Status (2026-10-29):** items 1–8 done; items 9–10 done for 6 servers (Actions run 40693621559: 39 runs, 20 finished, 19 stuck at a tick, kept as valid results; committed locally, 33b68b7). 10 servers, light and normal day (Actions runs 40754754068, 40754820788, 40754837540, 40754856946): 26 runs, 11 finished, 12 stuck, 3 crashed (HiGHS segfault on the Linux runner, repeated on resume; same tick solves on macOS; no result kept). The 10-server heavy day is not run in this release. Release 1.4.0 published from these results. Implements
 [ADR 0001](adr/0001-server-fleet-from-processor-specs.md); the ADR holds the why, this file
 holds the work. Where they differ, this file wins for the work and the ADR for the reasons.
 

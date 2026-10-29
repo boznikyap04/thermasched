@@ -1,7 +1,7 @@
 {
   "scenario": {
     "name": "servers10",
-    "I": 257,
+    "I": 414,
     "S": 10,
     "Z": 2,
     "T": 288,
@@ -24,11 +24,13 @@
   },
   "provenance": {
     "schema_version": 1,
-    "thermasched_version": "1.3.0",
+    "thermasched_version": "1.4.0",
+    "relabelled_from": "1.3.0",
+    "relabel_note": "solved with the code of release 1.4.0 (commit below) before its version number was set",
     "made_with": "command line",
-    "created_utc": "2026-10-25T23:05:48Z",
-    "git_commit": "b0db44a",
-    "scenario_fingerprint": "3edf034fdf46",
+    "created_utc": "2026-10-28T20:39:34Z",
+    "git_commit": "5812f4b",
+    "scenario_fingerprint": "feae62d07c18",
     "scenario_built_with": "1.3.0",
     "highspy": "1.15.1",
     "python": "3.12.3"
@@ -68,10 +70,11 @@
     "tick_time_limit_s": 60.0,
     "n_ticks_optimal": 288,
     "n_ticks_time_limit": 0,
-    "total_solve_s": 1765.2681637639996,
-    "slowest_tick": 112,
-    "slowest_tick_solve_s": 45.85340879199998,
-    "max_mip_gap": 0.0007779687851983589,
+    "n_ticks_no_bound": 0,
+    "total_solve_s": 4091.3394546580016,
+    "slowest_tick": 131,
+    "slowest_tick_solve_s": 57.73104118900028,
+    "max_mip_gap": 0.0009606794945517936,
     "resumed_from_tick": null,
     "stuck": null,
     "ticks_file": "ticks.csv"
@@ -143,13 +146,13 @@
     "valid": true,
     "violations": [],
     "metrics": {
-      "carbon_kg": 36.53147928939077,
-      "E_IT_kWh": 42.75163997395833,
-      "E_crac_kWh": 15.978337559410349,
+      "carbon_kg": 54.137348046521815,
+      "E_IT_kWh": 63.332217424479154,
+      "E_crac_kWh": 23.670286075825672,
       "E_cp_kWh": 0.0,
       "Q_cp_kWh": 0.0,
       "E_fan_kWh": 0.0,
-      "E_total_kWh": 58.72997753336868,
+      "E_total_kWh": 87.00250350030483,
       "n_late": 0,
       "n_noncompliant": 0,
       "mean_wait_RT": 0.0,
@@ -157,30 +160,30 @@
       "mean_wait_DT": 0.0,
       "max_wait_DT": 0.0,
       "n_priority_violations": 0,
-      "hottest_T_C": 70.92704234592,
-      "mean_T_C": 52.462335094314675,
-      "min_headroom_C": 19.07295765408,
-      "mean_headroom_C": 37.537664905685325,
+      "hottest_T_C": 66.43344668736671,
+      "mean_T_C": 54.38606515489983,
+      "min_headroom_C": 23.56655331263329,
+      "mean_headroom_C": 35.61393484510017,
       "periods_above_dvfs": 0,
       "periods_above_cap": 0,
       "n_throttled_servers": 0,
       "n_reassigned": 0,
       "n_cross_zone": 0,
-      "hottest_server": 10,
-      "hottest_period": 1,
+      "hottest_server": 6,
+      "hottest_period": 122,
       "n_unplaced": 0,
       "min_DPF": 1.0
     },
     "totals": {
-      "E_IT_kWh": 42.75163997395833,
-      "E_crac_kWh": 15.978337559410349,
+      "E_IT_kWh": 63.332217424479154,
+      "E_crac_kWh": 23.670286075825672,
       "E_cp_kWh": 0.0,
       "E_fan_kWh": 0.0,
       "Q_cp_kWh": 0.0,
-      "E_total_kWh": 58.72997753336868,
-      "carbon_g": 36531.479289390765,
-      "carbon_kg": 36.53147928939077,
-      "n_workloads": 257,
+      "E_total_kWh": 87.00250350030483,
+      "carbon_g": 54137.348046521816,
+      "carbon_kg": 54.137348046521815,
+      "n_workloads": 414,
       "n_unplaced": 0,
       "n_late": 0,
       "n_wait_exceeded": 0,
@@ -190,20 +193,20 @@
       "max_wait_RT": 0.0,
       "mean_wait_DT": 0.0,
       "max_wait_DT": 0.0,
-      "hottest_T_C": 70.92704234592,
-      "hottest_server": 10,
-      "hottest_period": 1,
-      "min_headroom_C": 19.07295765408,
+      "hottest_T_C": 66.43344668736671,
+      "hottest_server": 6,
+      "hottest_period": 122,
+      "min_headroom_C": 23.56655331263329,
       "periods_above_dvfs": 0,
       "periods_above_cap": 0,
       "min_DPF": 1.0,
       "n_throttled_servers": 0,
-      "mean_T_C": 52.462335094314675,
-      "mean_headroom_C": 37.537664905685325,
+      "mean_T_C": 54.38606515489983,
+      "mean_headroom_C": 35.61393484510017,
       "n_priority_violations": 0,
       "E_crac_by_zone_kWh": [
-        8.091249835511972,
-        7.887087723898378
+        10.889600270733666,
+        12.780685805092006
       ]
     },
     "compliance_flags": {
@@ -226,67 +229,67 @@
     "valid": true,
     "violations": [],
     "metrics": {
-      "carbon_kg": 30.98176625675431,
-      "E_IT_kWh": 42.22341341145833,
-      "E_crac_kWh": 7.773037560382717,
+      "carbon_kg": 45.460280095316016,
+      "E_IT_kWh": 61.734638997395834,
+      "E_crac_kWh": 11.383781425972611,
       "E_cp_kWh": 0.0,
       "Q_cp_kWh": 0.0,
       "E_fan_kWh": 0.0,
-      "E_total_kWh": 49.99645097184106,
+      "E_total_kWh": 73.11842042336843,
       "n_late": 0,
       "n_noncompliant": 0,
-      "mean_wait_RT": 1.7837837837837838,
-      "max_wait_RT": 27.0,
-      "mean_wait_DT": 23.120218579234972,
+      "mean_wait_RT": 1.9435483870967742,
+      "max_wait_RT": 24.0,
+      "mean_wait_DT": 28.586206896551722,
       "max_wait_DT": 96.0,
       "n_priority_violations": 0,
-      "hottest_T_C": 76.37530084106011,
-      "mean_T_C": 60.437964439933744,
-      "min_headroom_C": 13.62469915893989,
-      "mean_headroom_C": 29.56203556006625,
-      "periods_above_dvfs": 65,
+      "hottest_T_C": 76.2081336249289,
+      "mean_T_C": 62.55966993843068,
+      "min_headroom_C": 13.791866375071095,
+      "mean_headroom_C": 27.44033006156932,
+      "periods_above_dvfs": 133,
       "periods_above_cap": 0,
-      "n_throttled_servers": 2,
-      "n_reassigned": 231,
-      "n_cross_zone": 117,
-      "hottest_server": 9,
-      "hottest_period": 122,
+      "n_throttled_servers": 3,
+      "n_reassigned": 366,
+      "n_cross_zone": 230,
+      "hottest_server": 6,
+      "hottest_period": 96,
       "n_unplaced": 0,
-      "min_DPF": 0.9792054512831712
+      "min_DPF": 0.981733019591075
     },
     "totals": {
-      "E_IT_kWh": 42.22341341145833,
-      "E_crac_kWh": 7.773037560382717,
+      "E_IT_kWh": 61.734638997395834,
+      "E_crac_kWh": 11.383781425972611,
       "E_cp_kWh": 0.0,
       "E_fan_kWh": 0.0,
       "Q_cp_kWh": 0.0,
-      "E_total_kWh": 49.99645097184106,
-      "carbon_g": 30981.76625675431,
-      "carbon_kg": 30.98176625675431,
-      "n_workloads": 257,
+      "E_total_kWh": 73.11842042336843,
+      "carbon_g": 45460.28009531602,
+      "carbon_kg": 45.460280095316016,
+      "n_workloads": 414,
       "n_unplaced": 0,
       "n_late": 0,
       "n_wait_exceeded": 0,
       "n_work_short": 0,
       "n_noncompliant": 0,
-      "mean_wait_RT": 1.7837837837837838,
-      "max_wait_RT": 27.0,
-      "mean_wait_DT": 23.120218579234972,
+      "mean_wait_RT": 1.9435483870967742,
+      "max_wait_RT": 24.0,
+      "mean_wait_DT": 28.586206896551722,
       "max_wait_DT": 96.0,
-      "hottest_T_C": 76.37530084106011,
-      "hottest_server": 9,
-      "hottest_period": 122,
-      "min_headroom_C": 13.62469915893989,
-      "periods_above_dvfs": 65,
+      "hottest_T_C": 76.2081336249289,
+      "hottest_server": 6,
+      "hottest_period": 96,
+      "min_headroom_C": 13.791866375071095,
+      "periods_above_dvfs": 133,
       "periods_above_cap": 0,
-      "min_DPF": 0.9792054512831712,
-      "n_throttled_servers": 2,
-      "mean_T_C": 60.437964439933744,
-      "mean_headroom_C": 29.56203556006625,
+      "min_DPF": 0.981733019591075,
+      "n_throttled_servers": 3,
+      "mean_T_C": 62.55966993843068,
+      "mean_headroom_C": 27.44033006156932,
       "n_priority_violations": 0,
       "E_crac_by_zone_kWh": [
-        3.9753040662432415,
-        3.7977334941394756
+        5.614286089783187,
+        5.769495336189423
       ]
     },
     "compliance_flags": {
@@ -308,22 +311,22 @@
   "has_optimized_schedule": true,
   "comparison": {
     "carbon_kg": {
-      "baseline": 36.53147928939077,
-      "optimized": 30.98176625675431,
-      "diff": -5.549713032636458,
-      "pct": -15.191591308617411
+      "baseline": 54.137348046521815,
+      "optimized": 45.460280095316016,
+      "diff": -8.6770679512058,
+      "pct": -16.02787773008264
     },
     "E_IT_kWh": {
-      "baseline": 42.75163997395833,
-      "optimized": 42.22341341145833,
-      "diff": -0.5282265625000022,
-      "pct": -1.235570291155533
+      "baseline": 63.332217424479154,
+      "optimized": 61.734638997395834,
+      "diff": -1.5975784270833202,
+      "pct": -2.5225366994111034
     },
     "E_crac_kWh": {
-      "baseline": 15.978337559410349,
-      "optimized": 7.773037560382717,
-      "diff": -8.205299999027632,
-      "pct": -51.35265147903431
+      "baseline": 23.670286075825672,
+      "optimized": 11.383781425972611,
+      "diff": -12.286504649853061,
+      "pct": -51.90687011764171
     },
     "E_cp_kWh": {
       "baseline": 0.0,
@@ -344,10 +347,10 @@
       "pct": null
     },
     "E_total_kWh": {
-      "baseline": 58.72997753336868,
-      "optimized": 49.99645097184106,
-      "diff": -8.733526561527626,
-      "pct": -14.870645159987482
+      "baseline": 87.00250350030483,
+      "optimized": 73.11842042336843,
+      "diff": -13.884083076936392,
+      "pct": -15.95825696772938
     },
     "n_late": {
       "baseline": 0,
@@ -363,20 +366,20 @@
     },
     "mean_wait_RT": {
       "baseline": 0.0,
-      "optimized": 1.7837837837837838,
-      "diff": 1.7837837837837838,
+      "optimized": 1.9435483870967742,
+      "diff": 1.9435483870967742,
       "pct": null
     },
     "max_wait_RT": {
       "baseline": 0.0,
-      "optimized": 27.0,
-      "diff": 27.0,
+      "optimized": 24.0,
+      "diff": 24.0,
       "pct": null
     },
     "mean_wait_DT": {
       "baseline": 0.0,
-      "optimized": 23.120218579234972,
-      "diff": 23.120218579234972,
+      "optimized": 28.586206896551722,
+      "diff": 28.586206896551722,
       "pct": null
     },
     "max_wait_DT": {
@@ -392,33 +395,33 @@
       "pct": null
     },
     "hottest_T_C": {
-      "baseline": 70.92704234592,
-      "optimized": 76.37530084106011,
-      "diff": 5.448258495140109,
-      "pct": 7.6814968098744005
+      "baseline": 66.43344668736671,
+      "optimized": 76.2081336249289,
+      "diff": 9.774686937562194,
+      "pct": 14.713502648088546
     },
     "mean_T_C": {
-      "baseline": 52.462335094314675,
-      "optimized": 60.437964439933744,
-      "diff": 7.975629345619069,
-      "pct": 15.202581683184333
+      "baseline": 54.38606515489983,
+      "optimized": 62.55966993843068,
+      "diff": 8.173604783530848,
+      "pct": 15.02885851412705
     },
     "min_headroom_C": {
-      "baseline": 19.07295765408,
-      "optimized": 13.62469915893989,
-      "diff": -5.448258495140109,
-      "pct": -28.56535726631073
+      "baseline": 23.56655331263329,
+      "optimized": 13.791866375071095,
+      "diff": -9.774686937562194,
+      "pct": -41.47694746826763
     },
     "mean_headroom_C": {
-      "baseline": 37.537664905685325,
-      "optimized": 29.56203556006625,
-      "diff": -7.975629345619076,
-      "pct": -21.247004483784803
+      "baseline": 35.61393484510017,
+      "optimized": 27.44033006156932,
+      "diff": -8.173604783530848,
+      "pct": -22.950580493509797
     },
     "periods_above_dvfs": {
       "baseline": 0,
-      "optimized": 65,
-      "diff": 65,
+      "optimized": 133,
+      "diff": 133,
       "pct": null
     },
     "periods_above_cap": {
@@ -429,33 +432,33 @@
     },
     "n_throttled_servers": {
       "baseline": 0,
-      "optimized": 2,
-      "diff": 2,
+      "optimized": 3,
+      "diff": 3,
       "pct": null
     },
     "n_reassigned": {
       "baseline": 0,
-      "optimized": 231,
-      "diff": 231,
+      "optimized": 366,
+      "diff": 366,
       "pct": null
     },
     "n_cross_zone": {
       "baseline": 0,
-      "optimized": 117,
-      "diff": 117,
+      "optimized": 230,
+      "diff": 230,
       "pct": null
     }
   },
   "solver": {
     "status": "optimal",
     "solver_status_text": "per tick: 288 of 288 optimal, 0 at the tick time limit",
-    "solve_time_s": 1765.2681637639996,
-    "mip_gap": 0.0007779687851983589,
-    "objective_g": 30981.766256754305,
+    "solve_time_s": 4091.3394546580016,
+    "mip_gap": 0.0009606794945517936,
+    "objective_g": 45460.280095316,
     "best_bound_g": null,
-    "n_variables": 24768,
-    "n_binaries": 6705,
-    "n_constraints": 20523,
+    "n_variables": 27189,
+    "n_binaries": 9979,
+    "n_constraints": 30851,
     "relaxed": [],
     "has_schedule": true,
     "notes": [
@@ -477,7 +480,7 @@
       "Availability (11): every server is available in every period (AV = 1).",
       "Cold plates are off: Q_cp and P_cp are columns fixed at zero.",
       "Per-tick re-planning: the model above is solved once per tick over a window from the tick to the end of the horizon, holding only the workloads that have arrived; running workloads keep their server and start and count only the work they have left; T0 is each server's temperature at the end of the previous tick (Eq. 30), and the supply temperatures of the previous ticks bound the ramps (35)-(36). Only the tick's own decisions are kept.",
-      "288 ticks: 288 solved to the gap, 0 stopped at the tick time limit (slowest 45.9 s, tick 112). The objective is the sum of each tick's own carbon for its period; the gap shown is the largest of any tick."
+      "288 ticks: 288 solved to the gap, 0 stopped at the tick time limit (slowest 57.7 s, tick 131). The objective is the sum of each tick's own carbon for its period; the gap shown is the largest of any tick."
     ]
   },
   "infeasibility": null,
@@ -487,9 +490,9 @@
     },
     "optimizer_objective_equals_evaluator_carbon": {
       "passed": true,
-      "optimizer_objective_g": 30981.766256754305,
-      "evaluator_carbon_g": 30981.76625675431,
-      "relative_difference": 1.1742322167634972e-16
+      "optimizer_objective_g": 45460.280095316,
+      "evaluator_carbon_g": 45460.28009531602,
+      "relative_difference": 4.801526254740191e-16
     },
     "optimized_schedule_valid_under_evaluator": {
       "passed": true,

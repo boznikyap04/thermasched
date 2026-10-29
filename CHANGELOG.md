@@ -60,8 +60,16 @@ compare with runs of 1.4.0.
   does have one, which takes longer than 60 s to find); 6.4 Test 1 (no moves) on the heavy day
   has no valid schedule at tick 68: with no moves allowed, the deadlines and the servers'
   capacity cannot both be met (relaxing either alone gives a schedule).
-  **[ORCHESTRATOR: 10-server counts. The 10-server fleet, light and normal day: 26 runs, N
-  finished, M stuck (…which, at which tick, and why).]** The 10-server heavy day is not run in
+  The 10-server fleet, light and normal day: 26 runs, 11 finished, 12 stuck and 3 crashed.
+  On the light day 9 finished; the Base, 6.2 Test 2 and 6.3 Test 1 got stuck at tick 125. On
+  the normal day 6.4 Test 1 and 6.4 Test 2 finished; the Base and 6.1 Test 1 got stuck at tick
+  131, 6.1 Test 2 and 6.3 Test 1 at 71, 6.2 Base, 6.2 Test 1, 6.3 Test 2 and 6.3 Test 3 at 55,
+  6.4 Test 3b at 144; all twelve found no schedule within the 60 s cap. Three runs have no
+  result: the solver process crashed (segmentation fault) on the GitHub runner at tick 107 of
+  6.2 Test 2 (normal day) and at ticks 58 and 112 of 6.4 Test 3a (normal and light day).
+  Resumed from their checkpoints, they crashed again at the same tick, while the same tick
+  solves on macOS, so the crash is in HiGHS on the Linux runner, not in the model; the site
+  lists these three as not run yet. The 10-server heavy day is not run in
   this release. The runs were solved with the code of this release before its version number
   was set, so their `summary.json` was relabelled 1.4.0 and keeps `relabelled_from: 1.3.0`.
   The 1.3.0 results (old fleet) are no longer on the site.

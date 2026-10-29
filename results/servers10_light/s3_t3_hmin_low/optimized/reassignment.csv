@@ -1,92 +1,200 @@
 i,workload_id,type,B_running,original_server,original_zone,final_server,final_zone,reassigned,cross_zone,reason
-1,w0092,delay_tolerant,0,1,1,8,2,1,1,faster server; less IT energy for its work
-2,w0589,delay_tolerant,0,2,2,1,1,1,1,less IT energy for its work
-3,w0154,time_sensitive,0,2,2,8,2,1,0,faster server; less IT energy for its work
-4,w0725,delay_tolerant,0,3,1,8,2,1,1,faster server; less IT energy for its work
-5,w0427,time_sensitive,0,4,2,8,2,1,0,faster server; less IT energy for its work
-6,w0428,time_sensitive,0,3,1,8,2,1,1,faster server; less IT energy for its work
-7,w0398,delay_tolerant,0,5,1,8,2,1,1,faster server; less IT energy for its work
-8,w0727,delay_tolerant,0,6,2,8,2,1,0,faster server; less IT energy for its work
-9,w0364,delay_tolerant,0,7,1,8,2,1,1,faster server; less IT energy for its work
-10,w0462,delay_tolerant,0,8,2,8,2,0,0,kept
-11,w0035,delay_tolerant,0,4,2,1,1,1,1,less IT energy for its work; cooler server
-12,w0219,delay_tolerant,0,9,1,8,2,1,1,less IT energy for its work
-13,w0244,delay_tolerant,0,4,2,8,2,1,0,faster server; less IT energy for its work
-14,w0573,delay_tolerant,0,8,2,9,1,1,1,original server full at the chosen start; cooler server
-15,w0352,delay_tolerant,0,10,2,8,2,1,0,less IT energy for its work
-16,w0630,delay_tolerant,0,1,1,8,2,1,1,faster server; less IT energy for its work
-17,w0693,delay_tolerant,0,4,2,8,2,1,0,faster server; less IT energy for its work
-18,w0104,time_sensitive,0,5,1,9,1,1,0,faster server; less IT energy for its work
-19,w0147,delay_tolerant,0,1,1,9,1,1,0,faster server; less IT energy for its work
-20,w0441,time_sensitive,0,5,1,1,1,1,0,less IT energy for its work; cooler server
-21,w0701,delay_tolerant,0,6,2,8,2,1,0,faster server; less IT energy for its work
-22,w0500,delay_tolerant,0,9,1,9,1,0,0,kept
-23,w0214,time_sensitive,0,6,2,8,2,1,0,faster server; less IT energy for its work
-24,w0673,delay_tolerant,0,9,1,8,2,1,1,original server full at the chosen start; less IT energy for its work
-25,w0501,delay_tolerant,0,7,1,8,2,1,1,faster server; less IT energy for its work
-26,w0456,delay_tolerant,0,7,1,9,1,1,0,faster server; less IT energy for its work
-27,w0195,delay_tolerant,0,6,2,1,1,1,1,less IT energy for its work; cooler server
-28,w0472,delay_tolerant,0,2,2,8,2,1,0,faster server; less IT energy for its work
-29,w0551,delay_tolerant,0,3,1,1,1,1,0,less IT energy for its work; cooler server
-30,w0089,time_sensitive,0,4,2,9,1,1,1,faster server; less IT energy for its work
-31,w0403,delay_tolerant,0,5,1,5,1,0,0,kept
-32,w0410,time_sensitive,0,5,1,8,2,1,1,faster server; less IT energy for its work
-33,w0216,time_sensitive,0,6,2,8,2,1,0,faster server; less IT energy for its work
-34,w0106,delay_tolerant,0,2,2,9,1,1,1,faster server; less IT energy for its work
-35,w0660,delay_tolerant,0,3,1,8,2,1,1,faster server; less IT energy for its work
-36,w0192,delay_tolerant,0,6,2,8,2,1,0,faster server; less IT energy for its work
-37,w0471,time_sensitive,0,7,1,1,1,1,0,less IT energy for its work; cooler server
-38,w0245,delay_tolerant,0,8,2,8,2,0,0,kept
-39,w0265,delay_tolerant,0,4,2,8,2,1,0,faster server; less IT energy for its work
-40,w0567,delay_tolerant,0,9,1,8,2,1,1,less IT energy for its work; cooler server
-41,w0021,delay_tolerant,0,10,2,8,2,1,0,less IT energy for its work
-42,w0132,time_sensitive,0,1,1,5,1,1,0,faster server; less IT energy for its work
-43,w0230,time_sensitive,0,3,1,8,2,1,1,faster server; less IT energy for its work
-44,w0585,delay_tolerant,0,9,1,9,1,0,0,kept
-45,w0231,time_sensitive,0,2,2,9,1,1,1,faster server; less IT energy for its work
-46,w0668,delay_tolerant,0,3,1,8,2,1,1,faster server; less IT energy for its work
-47,w0556,time_sensitive,0,7,1,9,1,1,0,faster server; less IT energy for its work
-48,w0653,delay_tolerant,0,6,2,1,1,1,1,less IT energy for its work
-49,w0014,delay_tolerant,0,7,1,8,2,1,1,faster server; less IT energy for its work
-50,w0276,delay_tolerant,0,8,2,8,2,0,0,kept
-51,w0278,delay_tolerant,0,10,2,9,1,1,1,less IT energy for its work
-52,w0221,delay_tolerant,0,6,2,8,2,1,0,faster server; less IT energy for its work
-53,w0357,delay_tolerant,0,6,2,8,2,1,0,faster server; less IT energy for its work
-54,w0470,delay_tolerant,0,7,1,8,2,1,1,faster server; less IT energy for its work
-55,w0547,delay_tolerant,0,1,1,9,1,1,0,faster server; less IT energy for its work
-56,w0116,delay_tolerant,0,8,2,8,2,0,0,kept
-57,w0115,delay_tolerant,0,9,1,8,2,1,1,less IT energy for its work
-58,w0036,time_sensitive,0,10,2,1,1,1,1,less IT energy for its work; cooler server
-59,w0298,delay_tolerant,0,1,1,1,1,0,0,kept
-60,w0003,delay_tolerant,0,6,2,1,1,1,1,less IT energy for its work
-61,w0255,delay_tolerant,0,2,2,8,2,1,0,faster server; less IT energy for its work
-62,w0454,delay_tolerant,0,9,1,8,2,1,1,less IT energy for its work
-63,w0408,delay_tolerant,0,9,1,8,2,1,1,less IT energy for its work
-64,w0160,time_sensitive,0,5,1,8,2,1,1,faster server; less IT energy for its work
-65,w0223,time_sensitive,0,5,1,8,2,1,1,faster server; less IT energy for its work
-66,w0720,delay_tolerant,0,5,1,8,2,1,1,faster server; less IT energy for its work
-67,w0528,time_sensitive,0,9,1,8,2,1,1,less IT energy for its work
-68,w0529,delay_tolerant,0,5,1,1,1,1,0,less IT energy for its work; cooler server
-69,w0369,delay_tolerant,0,2,2,9,1,1,1,faster server; less IT energy for its work
-70,w0444,time_sensitive,0,1,1,1,1,0,0,kept
-71,w0445,delay_tolerant,0,9,1,1,1,1,0,less IT energy for its work; cooler server
-72,w0175,delay_tolerant,0,5,1,5,1,0,0,kept
-73,w0575,delay_tolerant,0,6,2,1,1,1,1,less IT energy for its work
-74,w0182,delay_tolerant,0,9,1,9,1,0,0,kept
-75,w0416,time_sensitive,0,9,1,8,2,1,1,less IT energy for its work; cooler server
-76,w0188,delay_tolerant,0,10,2,8,2,1,0,less IT energy for its work
-77,w0669,delay_tolerant,0,9,1,1,1,1,0,less IT energy for its work; cooler server
-78,w0243,delay_tolerant,0,8,2,8,2,0,0,kept
-79,w0190,delay_tolerant,0,8,2,9,1,1,1,original server full at the chosen start; cooler server
-80,w0338,delay_tolerant,0,8,2,8,2,0,0,kept
-81,w0455,delay_tolerant,0,8,2,8,2,0,0,kept
-82,w0411,delay_tolerant,0,10,2,8,2,1,0,less IT energy for its work
-83,w0449,time_sensitive,0,4,2,8,2,1,0,faster server; less IT energy for its work; cooler server
-84,w0323,delay_tolerant,0,8,2,8,2,0,0,kept
-85,w0026,delay_tolerant,0,4,2,1,1,1,1,less IT energy for its work; cooler server
-86,w0367,delay_tolerant,0,4,2,9,1,1,1,faster server; less IT energy for its work
-87,w0368,delay_tolerant,0,7,1,9,1,1,0,faster server; less IT energy for its work
-88,w0451,time_sensitive,0,1,1,9,1,1,0,faster server; less IT energy for its work
-89,w0644,delay_tolerant,0,2,2,9,1,1,1,faster server; less IT energy for its work
-90,w0541,time_sensitive,0,6,2,5,1,1,1,less IT energy for its work
-91,w0388,delay_tolerant,0,1,1,8,2,1,1,faster server; less IT energy for its work
+1,w0605,time_sensitive,0,1,1,4,2,1,1,faster server; less IT energy for its work; cooler server
+2,w0460,delay_tolerant,0,2,2,4,2,1,0,faster server; less IT energy for its work
+3,w0092,delay_tolerant,0,3,1,4,2,1,1,faster server; less IT energy for its work; cooler server
+4,w0142,delay_tolerant,0,4,2,4,2,0,0,kept
+5,w0542,delay_tolerant,0,5,1,4,2,1,1,less IT energy for its work; cooler server
+6,w0589,delay_tolerant,0,1,1,3,1,1,0,less IT energy for its work
+7,w0452,time_sensitive,0,6,2,4,2,1,0,less IT energy for its work; cooler server
+8,w0371,delay_tolerant,0,1,1,3,1,1,0,less IT energy for its work
+9,w0735,time_sensitive,0,7,1,4,2,1,1,less IT energy for its work; cooler server
+10,w0154,time_sensitive,0,8,2,4,2,1,0,less IT energy for its work
+11,w0725,delay_tolerant,0,5,1,3,1,1,0,less IT energy for its work
+12,w0101,time_sensitive,0,7,1,4,2,1,1,original server full at the chosen start; less IT energy for its work; cooler server
+13,w0102,delay_tolerant,0,9,1,4,2,1,1,less IT energy for its work; cooler server
+14,w0427,time_sensitive,0,10,2,4,2,1,0,less IT energy for its work; cooler server
+15,w0396,delay_tolerant,0,5,1,4,2,1,1,original server full at the chosen start; less IT energy for its work; cooler server
+16,w0428,time_sensitive,0,1,1,4,2,1,1,faster server; less IT energy for its work
+17,w0397,delay_tolerant,0,2,2,4,2,1,0,faster server; less IT energy for its work
+18,w0398,delay_tolerant,0,3,1,4,2,1,1,faster server; less IT energy for its work; cooler server
+19,w0548,delay_tolerant,0,2,2,4,2,1,0,faster server; less IT energy for its work
+20,w0727,delay_tolerant,0,4,2,4,2,0,0,kept
+21,w0364,delay_tolerant,0,10,2,4,2,1,0,less IT energy for its work
+22,w0462,delay_tolerant,0,6,2,3,1,1,1,less IT energy for its work
+23,w0035,delay_tolerant,0,7,1,3,1,1,0,original server full at the chosen start; less IT energy for its work
+24,w0219,delay_tolerant,0,3,1,4,2,1,1,faster server; less IT energy for its work; cooler server
+25,w0698,time_sensitive,0,9,1,7,1,1,0,less IT energy for its work
+26,w0103,time_sensitive,0,6,2,4,2,1,0,less IT energy for its work; cooler server
+27,w0236,time_sensitive,0,9,1,4,2,1,1,less IT energy for its work; cooler server
+28,w0507,delay_tolerant,0,7,1,4,2,1,1,original server full at the chosen start; less IT energy for its work; cooler server
+29,w0244,delay_tolerant,0,9,1,7,1,1,0,less IT energy for its work
+30,w0733,time_sensitive,0,1,1,7,1,1,0,faster server; less IT energy for its work
+31,w0095,delay_tolerant,0,5,1,3,1,1,0,original server full at the chosen start; less IT energy for its work
+32,w0573,delay_tolerant,0,4,2,3,1,1,1,original server full at the chosen start
+33,w0056,time_sensitive,0,5,1,7,1,1,0,less IT energy for its work
+34,w0352,delay_tolerant,0,8,2,3,1,1,1,less IT energy for its work
+35,w0363,delay_tolerant,0,9,1,7,1,1,0,less IT energy for its work
+36,w0630,delay_tolerant,0,10,2,4,2,1,0,less IT energy for its work; cooler server
+37,w0125,delay_tolerant,0,6,2,4,2,1,0,less IT energy for its work; cooler server
+38,w0468,delay_tolerant,0,3,1,4,2,1,1,faster server; less IT energy for its work; cooler server
+39,w0469,delay_tolerant,0,5,1,4,2,1,1,original server full at the chosen start; less IT energy for its work; cooler server
+40,w0019,delay_tolerant,0,2,2,4,2,1,0,faster server; less IT energy for its work
+41,w0020,time_sensitive,0,2,2,7,1,1,1,faster server; less IT energy for its work
+42,w0693,delay_tolerant,0,6,2,7,1,1,1,less IT energy for its work
+43,w0104,time_sensitive,0,10,2,7,1,1,1,less IT energy for its work
+44,w0412,time_sensitive,0,3,1,7,1,1,0,original server full at the chosen start; faster server; less IT energy for its work; cooler server
+45,w0212,time_sensitive,0,1,1,3,1,1,0,less IT energy for its work
+46,w0549,delay_tolerant,0,2,2,7,1,1,1,faster server; less IT energy for its work
+47,w0147,delay_tolerant,0,4,2,7,1,1,1,original server full at the chosen start
+48,w0441,time_sensitive,0,9,1,7,1,1,0,less IT energy for its work
+49,w0701,delay_tolerant,0,9,1,3,1,1,0,less IT energy for its work
+50,w0587,delay_tolerant,0,5,1,4,2,1,1,original server full at the chosen start; less IT energy for its work; cooler server
+51,w0400,delay_tolerant,0,5,1,4,2,1,1,original server full at the chosen start; less IT energy for its work; cooler server
+52,w0500,delay_tolerant,0,5,1,3,1,1,0,original server full at the chosen start
+53,w0290,delay_tolerant,0,6,2,5,1,1,1,less IT energy for its work
+54,w0477,delay_tolerant,0,7,1,3,1,1,0,original server full at the chosen start; less IT energy for its work
+55,w0008,delay_tolerant,0,10,2,5,1,1,1,less IT energy for its work
+56,w0419,time_sensitive,0,5,1,5,1,0,0,kept
+57,w0214,time_sensitive,0,9,1,4,2,1,1,less IT energy for its work
+58,w0673,delay_tolerant,0,10,2,5,1,1,1,less IT energy for its work
+59,w0100,delay_tolerant,0,7,1,5,1,1,0,original server full at the chosen start
+60,w0501,delay_tolerant,0,3,1,7,1,1,0,faster server; less IT energy for its work; cooler server
+61,w0456,delay_tolerant,0,2,2,5,1,1,1,faster server; less IT energy for its work
+62,w0457,delay_tolerant,0,9,1,5,1,1,0,less IT energy for its work
+63,w0629,delay_tolerant,0,1,1,5,1,1,0,faster server; less IT energy for its work
+64,w0195,delay_tolerant,0,4,2,4,2,0,0,kept
+65,w0088,time_sensitive,0,3,1,5,1,1,0,faster server; less IT energy for its work
+66,w0472,delay_tolerant,0,3,1,7,1,1,0,faster server; less IT energy for its work; cooler server
+67,w0551,delay_tolerant,0,2,2,3,1,1,1,less IT energy for its work
+68,w0089,time_sensitive,0,6,2,5,1,1,1,less IT energy for its work
+69,w0414,delay_tolerant,0,7,1,3,1,1,0,original server full at the chosen start; less IT energy for its work
+70,w0403,delay_tolerant,0,7,1,4,2,1,1,less IT energy for its work; cooler server
+71,w0543,delay_tolerant,0,7,1,3,1,1,0,original server full at the chosen start; less IT energy for its work
+72,w0302,delay_tolerant,0,7,1,3,1,1,0,original server full at the chosen start; less IT energy for its work
+73,w0384,delay_tolerant,0,7,1,3,1,1,0,original server full at the chosen start; less IT energy for its work
+74,w0594,delay_tolerant,0,7,1,7,1,0,0,kept
+75,w0410,time_sensitive,0,7,1,5,1,1,0,original server full at the chosen start
+76,w0694,delay_tolerant,0,10,2,3,1,1,1,less IT energy for its work
+77,w0216,time_sensitive,0,9,1,7,1,1,0,less IT energy for its work
+78,w0619,delay_tolerant,0,1,1,4,2,1,1,faster server; less IT energy for its work
+79,w0191,delay_tolerant,0,10,2,4,2,1,0,less IT energy for its work
+80,w0299,time_sensitive,0,10,2,7,1,1,1,less IT energy for its work
+81,w0473,delay_tolerant,0,6,2,4,2,1,0,less IT energy for its work
+82,w0106,delay_tolerant,0,3,1,4,2,1,1,original server full at the chosen start; faster server; less IT energy for its work; cooler server
+83,w0156,time_sensitive,0,2,2,7,1,1,1,faster server; less IT energy for its work
+84,w0260,delay_tolerant,0,6,2,4,2,1,0,less IT energy for its work
+85,w0660,delay_tolerant,0,2,2,4,2,1,0,faster server; less IT energy for its work
+86,w0661,time_sensitive,0,4,2,4,2,0,0,kept
+87,w0192,delay_tolerant,0,10,2,4,2,1,0,less IT energy for its work
+88,w0348,time_sensitive,0,10,2,7,1,1,1,less IT energy for its work
+89,w0471,time_sensitive,0,10,2,3,1,1,1,less IT energy for its work
+90,w0245,delay_tolerant,0,7,1,7,1,0,0,kept
+91,w0531,delay_tolerant,0,8,2,4,2,1,0,less IT energy for its work
+92,w0577,delay_tolerant,0,9,1,7,1,1,0,less IT energy for its work
+93,w0265,delay_tolerant,0,2,2,7,1,1,1,faster server; less IT energy for its work
+94,w0489,delay_tolerant,0,3,1,7,1,1,0,faster server; less IT energy for its work; cooler server
+95,w0567,delay_tolerant,0,4,2,7,1,1,1,original server full at the chosen start
+96,w0662,delay_tolerant,0,9,1,7,1,1,0,less IT energy for its work
+97,w0021,delay_tolerant,0,4,2,4,2,0,0,kept
+98,w0132,time_sensitive,0,5,1,5,1,0,0,kept
+99,w0230,time_sensitive,0,6,2,7,1,1,1,less IT energy for its work
+100,w0585,delay_tolerant,0,7,1,7,1,0,0,kept
+101,w0055,delay_tolerant,0,10,2,4,2,1,0,less IT energy for its work
+102,w0231,time_sensitive,0,10,2,3,1,1,1,less IT energy for its work
+103,w0668,delay_tolerant,0,9,1,4,2,1,1,less IT energy for its work
+104,w0466,delay_tolerant,0,1,1,3,1,1,0,less IT energy for its work
+105,w0556,time_sensitive,0,10,2,6,2,1,0,less IT energy for its work
+106,w0691,time_sensitive,0,3,1,3,1,0,0,kept
+107,w0002,delay_tolerant,0,6,2,4,2,1,0,less IT energy for its work
+108,w0641,delay_tolerant,0,3,1,7,1,1,0,faster server; less IT energy for its work
+109,w0218,time_sensitive,0,1,1,4,2,1,1,faster server; less IT energy for its work
+110,w0653,delay_tolerant,0,1,1,3,1,1,0,less IT energy for its work
+111,w0676,delay_tolerant,0,10,2,4,2,1,0,less IT energy for its work
+112,w0677,delay_tolerant,0,4,2,4,2,0,0,kept
+113,w0014,delay_tolerant,0,5,1,4,2,1,1,less IT energy for its work; cooler server
+114,w0276,delay_tolerant,0,6,2,5,1,1,1,less IT energy for its work
+115,w0277,delay_tolerant,0,10,2,7,1,1,1,less IT energy for its work
+116,w0278,delay_tolerant,0,5,1,4,2,1,1,less IT energy for its work
+117,w0576,delay_tolerant,0,8,2,4,2,1,0,less IT energy for its work
+118,w0193,delay_tolerant,0,6,2,7,1,1,1,less IT energy for its work
+119,w0221,delay_tolerant,0,6,2,4,2,1,0,less IT energy for its work
+120,w0357,delay_tolerant,0,6,2,4,2,1,0,less IT energy for its work
+121,w0470,delay_tolerant,0,1,1,7,1,1,0,faster server; less IT energy for its work
+122,w0570,time_sensitive,0,9,1,7,1,1,0,less IT energy for its work
+123,w0205,delay_tolerant,0,6,2,4,2,1,0,less IT energy for its work
+124,w0547,delay_tolerant,0,6,2,7,1,1,1,less IT energy for its work
+125,w0116,delay_tolerant,0,9,1,4,2,1,1,less IT energy for its work
+126,w0280,time_sensitive,0,10,2,3,1,1,1,less IT energy for its work
+127,w0281,delay_tolerant,0,6,2,3,1,1,1,less IT energy for its work
+128,w0115,delay_tolerant,0,1,1,7,1,1,0,faster server; less IT energy for its work
+129,w0007,delay_tolerant,0,4,2,4,2,0,0,kept
+130,w0036,time_sensitive,0,10,2,3,1,1,1,less IT energy for its work
+131,w0298,delay_tolerant,0,10,2,3,1,1,1,less IT energy for its work
+132,w0003,delay_tolerant,0,6,2,3,1,1,1,less IT energy for its work
+133,w0194,time_sensitive,0,8,2,7,1,1,1,less IT energy for its work
+134,w0255,delay_tolerant,0,8,2,5,1,1,1,less IT energy for its work
+135,w0289,time_sensitive,0,5,1,3,1,1,0,original server full at the chosen start; less IT energy for its work; cooler server
+136,w0435,delay_tolerant,0,7,1,5,1,1,0,carbon trade-off across the fleet (no single local cause)
+137,w0454,delay_tolerant,0,6,2,4,2,1,0,less IT energy for its work
+138,w0545,delay_tolerant,0,1,1,7,1,1,0,faster server; less IT energy for its work
+139,w0546,time_sensitive,0,2,2,7,1,1,1,faster server; less IT energy for its work
+140,w0607,delay_tolerant,0,3,1,3,1,0,0,kept
+141,w0015,delay_tolerant,0,10,2,4,2,1,0,less IT energy for its work
+142,w0379,delay_tolerant,0,10,2,3,1,1,1,less IT energy for its work
+143,w0447,delay_tolerant,0,10,2,3,1,1,1,less IT energy for its work
+144,w0029,time_sensitive,0,4,2,7,1,1,1,original server full at the chosen start
+145,w0515,delay_tolerant,0,9,1,3,1,1,0,less IT energy for its work
+146,w0126,time_sensitive,0,5,1,7,1,1,0,original server full at the chosen start; less IT energy for its work; cooler server
+147,w0408,delay_tolerant,0,5,1,5,1,0,0,kept
+148,w0160,time_sensitive,0,7,1,7,1,0,0,kept
+149,w0568,delay_tolerant,0,7,1,4,2,1,1,less IT energy for its work; cooler server
+150,w0223,time_sensitive,0,7,1,3,1,1,0,original server full at the chosen start
+151,w0365,delay_tolerant,0,7,1,4,2,1,1,original server full at the chosen start; less IT energy for its work; cooler server
+152,w0448,delay_tolerant,0,7,1,5,1,1,0,carbon trade-off across the fleet (no single local cause)
+153,w0720,delay_tolerant,0,10,2,4,2,1,0,less IT energy for its work
+154,w0528,time_sensitive,0,5,1,7,1,1,0,less IT energy for its work; cooler server
+155,w0171,delay_tolerant,0,10,2,4,2,1,0,less IT energy for its work
+156,w0529,delay_tolerant,0,10,2,3,1,1,1,less IT energy for its work
+157,w0369,delay_tolerant,0,10,2,4,2,1,0,less IT energy for its work
+158,w0174,delay_tolerant,0,4,2,4,2,0,0,kept
+159,w0444,time_sensitive,0,6,2,3,1,1,1,less IT energy for its work
+160,w0445,delay_tolerant,0,4,2,4,2,0,0,kept
+161,w0446,delay_tolerant,0,7,1,3,1,1,0,original server full at the chosen start
+162,w0175,delay_tolerant,0,8,2,4,2,1,0,less IT energy for its work
+163,w0575,delay_tolerant,0,10,2,3,1,1,1,less IT energy for its work
+164,w0176,delay_tolerant,0,5,1,7,1,1,0,less IT energy for its work
+165,w0177,time_sensitive,0,5,1,7,1,1,0,less IT energy for its work
+166,w0178,delay_tolerant,0,5,1,4,2,1,1,less IT energy for its work; cooler server
+167,w0181,delay_tolerant,0,6,2,7,1,1,1,less IT energy for its work
+168,w0182,delay_tolerant,0,6,2,7,1,1,1,less IT energy for its work
+169,w0185,delay_tolerant,0,10,2,7,1,1,1,less IT energy for its work
+170,w0310,delay_tolerant,0,3,1,4,2,1,1,faster server; less IT energy for its work; cooler server
+171,w0416,time_sensitive,0,4,2,4,2,0,0,kept
+172,w0186,delay_tolerant,0,5,1,4,2,1,1,less IT energy for its work
+173,w0188,delay_tolerant,0,5,1,4,2,1,1,less IT energy for its work
+174,w0669,delay_tolerant,0,6,2,4,2,1,0,less IT energy for its work
+175,w0243,delay_tolerant,0,10,2,4,2,1,0,less IT energy for its work
+176,w0647,time_sensitive,0,3,1,4,2,1,1,faster server; less IT energy for its work; cooler server
+177,w0190,delay_tolerant,0,5,1,6,2,1,1,cooler server
+178,w0338,delay_tolerant,0,8,2,3,1,1,1,less IT energy for its work
+179,w0199,delay_tolerant,0,3,1,7,1,1,0,faster server; less IT energy for its work
+180,w0455,delay_tolerant,0,8,2,4,2,1,0,less IT energy for its work
+181,w0411,delay_tolerant,0,4,2,4,2,0,0,kept
+182,w0538,time_sensitive,0,9,1,4,2,1,1,less IT energy for its work
+183,w0557,delay_tolerant,0,8,2,4,2,1,0,less IT energy for its work
+184,w0449,time_sensitive,0,5,1,6,2,1,1,cooler server
+185,w0323,delay_tolerant,0,8,2,4,2,1,0,less IT energy for its work
+186,w0026,delay_tolerant,0,9,1,4,2,1,1,less IT energy for its work
+187,w0207,delay_tolerant,0,5,1,5,1,0,0,kept
+188,w0367,delay_tolerant,0,5,1,5,1,0,0,kept
+189,w0368,delay_tolerant,0,6,2,5,1,1,1,less IT energy for its work
+190,w0451,time_sensitive,0,2,2,7,1,1,1,faster server; less IT energy for its work
+191,w0224,delay_tolerant,0,1,1,7,1,1,0,faster server; less IT energy for its work
+192,w0644,delay_tolerant,0,2,2,5,1,1,1,faster server; less IT energy for its work
+193,w0225,time_sensitive,0,9,1,7,1,1,0,less IT energy for its work
+194,w0584,delay_tolerant,0,3,1,4,2,1,1,faster server; less IT energy for its work
+195,w0541,time_sensitive,0,8,2,5,1,1,1,less IT energy for its work
+196,w0539,delay_tolerant,0,9,1,4,2,1,1,less IT energy for its work
+197,w0034,delay_tolerant,0,7,1,4,2,1,1,original server full at the chosen start; less IT energy for its work; cooler server
+198,w0708,delay_tolerant,0,7,1,4,2,1,1,less IT energy for its work; cooler server
+199,w0388,delay_tolerant,0,3,1,4,2,1,1,faster server; less IT energy for its work
