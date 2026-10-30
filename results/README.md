@@ -7,12 +7,12 @@ Per-tick runs, R840 + C6320 fleet, solved on GitHub Actions with a 60 s cap per 
 6.4 Test 3b runs on the day's `_swing` scenario and is filed under the day's folder. The
 whole-day results of earlier releases are in `archive/results_2026-10-25_whole_day/`.
 
-**6 servers: re-run with cold plates on** (Actions run 40898903689, commit e4ffe45, after
-release 1.4.0): all 36 runs, light, normal and heavy, with cold plates on in every test, each
+**6 servers: release 1.5.0, re-run with cold plates on** (Actions run 40898903689,
+commit e4ffe45): all 36 runs, light, normal and heavy, with cold plates on in every test, each
 tick's warm start filled by the baseline rule, a tick with no schedule at the 60 s cap solved
 again up to 300 s in all, and each tick's solution polished. Their `summary.json` says
-`thermasched_version` 1.4.0 although the solver changed after 1.4.0 (a relabel or version
-bump is due at the next release). 35 finished and 1 is stuck; every check passed.
+`thermasched_version` 1.5.0 with `relabelled_from: 1.4.0` in its provenance: they were solved
+with the code of release 1.5.0 before its version number was set. 35 finished and 1 is stuck; every check passed.
 
 - Light day (`servers6_light`): 12 finished, 0-1 ticks at the cap, no tick extended.
   Carbon −13.0 to −13.4 % against the baseline (6.2 Test 2, CRAC fixed: −1.3 %; 6.4 Test 1,

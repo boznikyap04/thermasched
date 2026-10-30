@@ -14,9 +14,10 @@ run.
   section 4 shows which scenarios differ from before), then solve again. The site warns when
   a run was solved on a different scenario build than the one it holds.
 
-## Unreleased
+## 1.5.0 (2026-10-30)
 
-**Re-run:** solver. Runs of 1.4.0 with cold plates off are no longer any test's run.
+**Re-run:** solver. Runs of 1.4.0 with cold plates off are no longer any test's run, and the
+per-tick solver changed, so solve again the runs you want to compare with those of 1.5.0.
 
 - **Cold plates are on in every run.** The C6320s carry their cold plate in every test, not
   only in 6.2; until now the Base and every test of 6.1, 6.3 and 6.4 ran with cold plates off,
@@ -30,8 +31,8 @@ run.
   busiest ticks HiGHS could not complete it within 60 s (one 6-server heavy tick needed
   138 s), so the run stopped there. They are now placed by the baseline rule first (arrival
   order, earliest start with room, least loaded server first), and HiGHS chooses the cooling
-  for the placements. This uses only arrived workloads, so re-planning still has no foresight, and the solver may change any of it. `ticks.csv` gains
-  `warm_start_filled`. Each tick's solution is then polished: with every decision held, the
+  for the placements. This uses only arrived workloads, so re-planning still has no
+  foresight, and the solver may change any of it. `ticks.csv` gains `warm_start_filled`. Each tick's solution is then polished: with every decision held, the
   continuous values (CRAC heat, coolant temperature) are solved again to their cheapest, so a
   start HiGHS keeps within the gap carries no slack and the solver's carbon still equals the
   evaluator's.
@@ -39,16 +40,18 @@ run.
   limit is solved again, up to 300 s in all (`--tick-no-schedule-limit`); only after that is
   the run stuck. Ticks that have a schedule still stop at 60 s. `ticks.csv` gains `extended`,
   and `summary.json` `per_tick` gains `tick_no_schedule_limit_s` and `n_ticks_extended`.
-- **All runs are re-run** with these two changes and cold plates on: 36 per fleet, on the
-  6- and 10-server fleets, light, normal and heavy (72 runs, the 10-server heavy day
-  included).
-- **Results:** each day's 1.4.0 6.2 Base run (cold plates on, every other switch at its
-  default) is now its Base (`s2_base` renamed `base`); 6.2 Tests 1 and 2 stand. The runs of
-  6.1 Tests 1-2, 6.3 and 6.4 had cold plates off and wait for the re-run (`results/README.md`).
+- **All runs are re-run** with these two changes and cold plates on: 36 per fleet, light,
+  normal and heavy. The 6-server runs are in this release; the 10-server runs (the heavy day
+  included) follow.
+- **10-server results until their re-run:** each day's 1.4.0 6.2 Base run (cold plates on,
+  every other switch at its default) is now its Base (`s2_base` renamed `base`); 6.2 Tests 1
+  and 2 stand. The runs of 6.1 Tests 1-2, 6.3 and 6.4 had cold plates off, so the site shows
+  those tests as not run yet (`results/README.md`).
 - **6 servers re-run:** all 36 runs (light, normal, heavy) are re-solved with these changes
   and replace their 1.4.0 runs: 35 finish the day, and 6.3 Test 1 on the heavy day is stuck
   at tick 122 (no schedule within the cap). Every heavy-day run but that one now finishes,
-  where all of them were stuck in 1.4.0. The 10-server runs are still those of 1.4.0.
+  where all of them were stuck in 1.4.0. They were solved with the code of 1.5.0 before its
+  version number was set, so their `summary.json` says 1.5.0 with `relabelled_from: 1.4.0`.
 - The slowdown validation check picks a server without a cold plate (an R840), since a plate
   keeps its server below the throttling temperature.
 

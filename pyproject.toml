@@ -1,6 +1,6 @@
 [project]
 name = "thermasched"
-version = "1.4.0"
+version = "1.5.0"
 description = "ThermaSched: integrated thermal-aware workload scheduling and air-liquid cooling control for heterogeneous data centers"
 requires-python = ">=3.11"
 dependencies = [

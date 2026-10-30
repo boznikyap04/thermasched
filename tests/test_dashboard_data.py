@@ -661,7 +661,8 @@ def test_relabelled_run_says_so():
     summary = data.load_summary(BY_KEY[RELABELLED].path)
     text = data.provenance_caption(summary)
     assert "ThermaSched 1.4.0" in text and "labelled 1.3.0 when solved" in text
-    assert "labelled" not in data.provenance_caption(data.load_summary(BY_KEY[BASE].path))
+    text = data.provenance_caption(data.load_summary(BY_KEY[BASE].path))
+    assert "ThermaSched 1.5.0" in text and "labelled 1.4.0 when solved" in text
 
 
 # -- stuck runs and configurations not run -------------------------------------------------

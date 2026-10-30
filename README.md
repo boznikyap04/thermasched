@@ -74,9 +74,9 @@ raw data ──► notebooks/data_prep.ipynb ──► scenarios/ ──► sche
 ```
 
 The scenarios are already in the repository, so you can run the solver right away.
-`results/` holds the per-tick runs of release 1.4.0 (6 servers on all three days, 10 servers
-on the light and normal day; the 10-server heavy day is not run in this release), some of
-which stopped at a stuck tick: see [`results/README.md`](results/README.md). The earlier
+`results/` holds the per-tick runs: 6 servers on all three days from release 1.5.0, and
+10 servers on the light and normal day from release 1.4.0, waiting for their re-run (the
+10-server heavy day is not run yet), some of which stopped at a stuck tick: see [`results/README.md`](results/README.md). The earlier
 whole-day results are in `archive/results_2026-10-25_whole_day/`. The cleaning notebook is only needed to
 change the data. From the raw data it rebuilds the scenarios in the repository byte for
 byte, and checks that it did (fingerprints, its section 4).
