@@ -29,7 +29,8 @@ FULL_DAY = "servers6_light/base"             # a per-tick run with a full-day sc
 # deadlines vs. server capacity), kept as a fixture since its re-run finishes the day.
 STUCK_AT_CAP = "servers6_heavy/s3_t1_hmin_high"
 STUCK_INVALID = Path(__file__).parent / "fixtures" / "stuck_no_valid_schedule.json"
-RELABELLED = "servers10/base"                # a 1.4.0 run solved as 1.3.0
+RELABELLED = "servers6/base"                 # a 1.5.0 run solved as 1.4.0
+NOT_RELABELLED = "servers10/base"            # a 1.5.0 run solved as 1.5.0
 
 pytestmark = pytest.mark.skipif(not RUNS, reason="no run outputs under results/")
 
@@ -442,13 +443,16 @@ def test_chapter6_table_rows_and_columns():
             assert row["status"] not in data.NO_RUN
     status = table.set_index(["configuration", "section", "tag"])["status"]
     assert status["6 servers · normal day", "6.3", "Test 1"] == "time_limit"
-    # stuck at tick 169 (no schedule within the 60 s cap): a run with no optimized schedule
-    assert status["6 servers · normal day", "6.1", "Test 1"] == "no_solution"
-    assert status["6 servers · heavy day", "6.4", "Test 1"] == "infeasible"     # stuck, tick 68
+    assert status["6 servers · normal day", "6.4", "Test 1"] == "optimal"
+    # stuck at tick 119 (no schedule within the cap): a run with no optimized schedule
+    assert status["10 servers · heavy day", "6.1", "Test 1"] == "no_solution"
+    assert status["10 servers · heavy day", "6.4", "Test 1"] == "infeasible"    # stuck, tick 71
     # no run of the configuration at all: not run in this release
     assert status["2 servers · normal day", "6.1", "Test 1"] == data.NOT_IN_RELEASE
-    assert status["2 servers · normal day", "6.2", "Base"] == data.NOT_APPLICABLE
-    assert status["10 servers · heavy day", "6.1", "Base"] == data.NOT_IN_RELEASE
+    # 6.2's Base is the shared Base; its tests need a cold plate, which 2 servers lack
+    assert status["2 servers · normal day", "6.2", "Base"] == data.NOT_IN_RELEASE
+    assert status["2 servers · normal day", "6.2", "Test 1"] == data.NOT_APPLICABLE
+    assert status["2 servers · heavy day", "6.1", "Base"] == data.NOT_IN_RELEASE
 
 
 @needs_site_runs
@@ -462,9 +466,9 @@ def test_chapter6_base_row_matches_summary_and_schedule():
     assert row["E_crac_kWh"] == tot["E_crac_kWh"]
     assert row["E_IT_kWh"] == tot["E_IT_kWh"] and row["E_total_kWh"] == tot["E_total_kWh"]
     assert row["E_cp_Wh"] == pytest.approx(tot["E_cp_kWh"] * 1000)
-    assert row["carbon_kg"] == pytest.approx(27.979, abs=1e-3) == tot["carbon_kg"]
+    assert row["carbon_kg"] == pytest.approx(26.773, abs=1e-3) == tot["carbon_kg"]
     assert row["T_mean_C"] == met["mean_T_C"]
-    assert row["T_max_C"] == pytest.approx(75.55, abs=0.05) == met["hottest_T_C"]
+    assert row["T_max_C"] == pytest.approx(75.57, abs=0.05) == met["hottest_T_C"]
     assert row["n_moved_server"] == met["n_reassigned"]
     assert row["n_moved_zone"] == met["n_cross_zone"]
     assert row["n_late"] == met["n_late"] and row["n_throttled_servers"] == \
@@ -489,8 +493,8 @@ def test_chapter6_base_row_matches_summary_and_schedule():
     assert row["exec_mean_min"] == pytest.approx(sch["periods_run"].mean() * 5)
     assert row["util_mean_pct"] == pytest.approx(sp["utilization"].mean() * 100)
     assert row["H_mean_C"] == pytest.approx(sp["headroom_C"].mean())
-    # the hottest server passes T_dvfs (75 C) at 75.55 C, so it slows a little
-    assert row["DPF_min"] == sp["DPF"].min() == pytest.approx(0.9916, abs=1e-4)
+    # the hottest server passes T_dvfs (75 C) at 75.57 C, so it slows a little
+    assert row["DPF_min"] == sp["DPF"].min() == pytest.approx(0.9914, abs=1e-4)
     assert row["E_cooling_kWh"] == pytest.approx(row["E_crac_kWh"] + row["E_cp_Wh"] / 1000)
 
 
@@ -544,8 +548,8 @@ def test_chapter6_uses_the_newest_matching_run(tmp_path):
 @needs_site_runs
 def test_config_runs():
     groups = data.config_runs(RUNS)
-    # 10 servers on the heavy day is not run in release 1.4.0
-    assert list(groups) == ["servers10_light", "servers10",
+    # the 2-server fleet is not run in this release
+    assert list(groups) == ["servers10_light", "servers10", "servers10_heavy",
                             "servers6_light", "servers6", "servers6_heavy"]
     every = [r.key for refs in groups.values() for r in refs]
     assert sorted(every) == sorted(r.key for r in RUNS)            # each run once
@@ -657,12 +661,12 @@ def test_per_tick_run_in_the_chapter6_table(loaded):
 
 def test_relabelled_run_says_so():
     if RELABELLED not in BY_KEY:
-        pytest.skip("the 1.4.0 servers10 runs are not under results/")
-    summary = data.load_summary(BY_KEY[RELABELLED].path)
-    text = data.provenance_caption(summary)
-    assert "ThermaSched 1.4.0" in text and "labelled 1.3.0 when solved" in text
-    text = data.provenance_caption(data.load_summary(BY_KEY[BASE].path))
+        pytest.skip("the servers6 runs are not under results/")
+    text = data.provenance_caption(data.load_summary(BY_KEY[RELABELLED].path))
     assert "ThermaSched 1.5.0" in text and "labelled 1.4.0 when solved" in text
+    if NOT_RELABELLED in BY_KEY:
+        text = data.provenance_caption(data.load_summary(BY_KEY[NOT_RELABELLED].path))
+        assert "ThermaSched 1.5.0" in text and "labelled" not in text
 
 
 # -- stuck runs and configurations not run -------------------------------------------------
@@ -715,11 +719,11 @@ def test_a_configuration_without_runs_is_not_run_in_this_release():
     from scheduler import experiments as ex
     cat = data.catalogue(RUNS)
     in_release = data.configs_with_runs(cat)
-    assert "servers10_heavy" not in in_release and "servers6_heavy" in in_release
+    assert "servers2_heavy" not in in_release and "servers10_heavy" in in_release
     base = ex.TEST_BY_ID["base"]
-    heavy10 = ex.configuration("servers10", "heavy")
-    assert data.cell_status(heavy10, base, None, in_release=False) == data.NOT_IN_RELEASE
-    assert data.cell_status(heavy10, base, None) == data.NOT_RUN_YET
-    table = data.chapter6_table(RUNS, configs=["servers10_heavy"])
+    heavy2 = ex.configuration("servers2", "heavy")
+    assert data.cell_status(heavy2, base, None, in_release=False) == data.NOT_IN_RELEASE
+    assert data.cell_status(heavy2, base, None) == data.NOT_RUN_YET
+    table = data.chapter6_table(RUNS, configs=["servers2_heavy"])
     assert not data.has_result(table).any()
     assert set(table["status"]) <= {data.NOT_IN_RELEASE, data.NOT_APPLICABLE}

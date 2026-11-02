@@ -1,0 +1,605 @@
+i,workload_id,type,B_running,original_server,original_zone,final_server,final_zone,reassigned,cross_zone,reason
+1,w0345,delay_tolerant,0,1,1,1,1,0,0,kept
+2,w0345-r1,delay_tolerant,0,2,2,2,2,0,0,kept
+3,w0610,time_sensitive,0,3,1,3,1,0,0,kept
+4,w0330,delay_tolerant,0,4,2,4,2,0,0,kept
+5,w0605,time_sensitive,0,5,1,5,1,0,0,kept
+6,w0605-r1,time_sensitive,0,6,2,6,2,0,0,kept
+7,w0460,delay_tolerant,0,7,1,7,1,0,0,kept
+8,w0460-r1,delay_tolerant,0,8,2,8,2,0,0,kept
+9,w0092,delay_tolerant,0,9,1,9,1,0,0,kept
+10,w0092-r1,delay_tolerant,0,10,2,10,2,0,0,kept
+11,w0142,delay_tolerant,0,4,2,4,2,0,0,kept
+12,w0142-r1,delay_tolerant,0,9,1,9,1,0,0,kept
+13,w0542,delay_tolerant,0,10,2,10,2,0,0,kept
+14,w0542-r1,delay_tolerant,0,1,1,1,1,0,0,kept
+15,w0566,delay_tolerant,0,2,2,2,2,0,0,kept
+16,w0566-r1,delay_tolerant,0,5,1,5,1,0,0,kept
+17,w0005,delay_tolerant,0,6,2,6,2,0,0,kept
+18,w0005-r1,delay_tolerant,0,7,1,7,1,0,0,kept
+19,w0702,time_sensitive,0,8,2,8,2,0,0,kept
+20,w0702-r1,time_sensitive,0,4,2,4,2,0,0,kept
+21,w0704,delay_tolerant,0,6,2,6,2,0,0,kept
+22,w0589,delay_tolerant,0,6,2,6,2,0,0,kept
+23,w0589-r1,delay_tolerant,0,7,1,7,1,0,0,kept
+24,w0452,time_sensitive,0,5,1,5,1,0,0,kept
+25,w0452-r1,time_sensitive,0,2,2,2,2,0,0,kept
+26,w0371,delay_tolerant,0,5,1,5,1,0,0,kept
+27,w0371-r1,delay_tolerant,0,5,1,5,1,0,0,kept
+28,w0735,time_sensitive,0,6,2,6,2,0,0,kept
+29,w0735-r1,time_sensitive,0,7,1,7,1,0,0,kept
+30,w0154,time_sensitive,0,9,1,4,2,1,1,less IT energy for its work; zone with higher CRAC COP
+31,w0154-r1,time_sensitive,0,2,2,4,2,1,0,original server full at the chosen start; faster server; less IT energy for its work; cooler server
+32,w0249,delay_tolerant,0,10,2,10,2,0,0,kept
+33,w0249-r1,delay_tolerant,0,10,2,10,2,0,0,kept
+34,w0725,delay_tolerant,0,10,2,9,1,1,1,cooler server
+35,w0725-r1,delay_tolerant,0,3,1,10,2,1,1,faster server; cooler server
+36,w0101,time_sensitive,0,6,2,6,2,0,0,kept
+37,w0101-r1,time_sensitive,0,7,1,7,1,0,0,kept
+38,w0102,delay_tolerant,0,5,1,2,2,1,1,cooler server
+39,w0102-r1,delay_tolerant,0,8,2,3,1,1,1,less IT energy for its work
+40,w0248,time_sensitive,0,10,2,5,1,1,1,less IT energy for its work; zone with higher CRAC COP
+41,w0427,time_sensitive,0,3,1,1,1,1,0,cooler server
+42,w0427-r1,time_sensitive,0,1,1,8,2,1,1,faster server; cooler server
+43,w0396,delay_tolerant,0,3,1,5,1,1,0,faster server; less IT energy for its work; cooler server
+44,w0396-r1,delay_tolerant,0,6,2,5,1,1,1,less IT energy for its work
+45,w0407,delay_tolerant,0,7,1,4,2,1,1,original server full at the chosen start; less IT energy for its work; cooler server
+46,w0428,time_sensitive,0,1,1,4,2,1,1,original server full at the chosen start; faster server; less IT energy for its work; cooler server; zone with higher CRAC COP
+47,w0428-r1,time_sensitive,0,4,2,4,2,0,0,kept
+48,w0286,delay_tolerant,0,7,1,6,2,1,1,carbon trade-off across the fleet (no single local cause)
+49,w0286-r1,delay_tolerant,0,3,1,7,1,1,0,faster server; less IT energy for its work; cooler server
+50,w0397,delay_tolerant,0,5,1,9,1,1,0,faster server; cooler server
+51,w0397-r1,delay_tolerant,0,8,2,10,2,1,0,less IT energy for its work
+52,w0398,delay_tolerant,0,6,2,1,1,1,1,less IT energy for its work; cooler server
+53,w0398-r1,delay_tolerant,0,7,1,3,1,1,0,carbon trade-off across the fleet (no single local cause)
+54,w0548,delay_tolerant,0,9,1,8,2,1,1,carbon trade-off across the fleet (no single local cause)
+55,w0548-r1,delay_tolerant,0,10,2,6,2,1,0,less IT energy for its work
+56,w0727,delay_tolerant,0,1,1,7,1,1,0,faster server; less IT energy for its work; cooler server
+57,w0727-r1,delay_tolerant,0,2,2,9,1,1,1,faster server; less IT energy for its work; cooler server
+58,w0364,delay_tolerant,0,3,1,10,2,1,1,faster server; cooler server
+59,w0364-r1,delay_tolerant,0,5,1,1,1,1,0,original server full at the chosen start; cooler server
+60,w0462,delay_tolerant,0,8,2,3,1,1,1,less IT energy for its work
+61,w0462-r1,delay_tolerant,0,4,2,5,1,1,1,carbon trade-off across the fleet (no single local cause)
+62,w0035,delay_tolerant,0,1,1,7,1,1,0,faster server; cooler server
+63,w0035-r1,delay_tolerant,0,1,1,9,1,1,0,faster server; cooler server
+64,w0219,delay_tolerant,0,6,2,1,1,1,1,less IT energy for its work; cooler server
+65,w0219-r1,delay_tolerant,0,7,1,2,2,1,1,original server full at the chosen start; cooler server
+66,w0360,time_sensitive,0,1,1,3,1,1,0,original server full at the chosen start; less IT energy for its work
+67,w0360-r1,time_sensitive,0,2,2,5,1,1,1,original server full at the chosen start; faster server; less IT energy for its work
+68,w0268,time_sensitive,0,8,2,7,1,1,1,less IT energy for its work
+69,w0429,delay_tolerant,0,3,1,2,2,1,1,cooler server
+70,w0461,time_sensitive,0,5,1,2,2,1,1,cooler server
+71,w0461-r1,time_sensitive,0,7,1,3,1,1,0,carbon trade-off across the fleet (no single local cause)
+72,w0558,delay_tolerant,0,8,2,3,1,1,1,less IT energy for its work
+73,w0697,time_sensitive,0,4,2,9,1,1,1,original server full at the chosen start; faster server; cooler server
+74,w0698,time_sensitive,0,3,1,7,1,1,0,faster server; less IT energy for its work; cooler server
+75,w0698-r1,time_sensitive,0,5,1,10,2,1,1,faster server; cooler server
+76,w0103,time_sensitive,0,6,2,9,1,1,1,faster server; cooler server
+77,w0103-r1,time_sensitive,0,7,1,1,1,1,0,original server full at the chosen start
+78,w0236,time_sensitive,0,4,2,2,2,1,0,carbon trade-off across the fleet (no single local cause)
+79,w0236-r1,time_sensitive,0,3,1,5,1,1,0,faster server; less IT energy for its work; cooler server
+80,w0507,delay_tolerant,0,4,2,6,2,1,0,original server full at the chosen start
+81,w0507-r1,delay_tolerant,0,5,1,8,2,1,1,original server full at the chosen start; faster server; cooler server
+82,w0220,delay_tolerant,0,8,2,7,1,1,1,less IT energy for its work
+83,w0220-r1,delay_tolerant,0,8,2,2,2,1,0,carbon trade-off across the fleet (no single local cause)
+84,w0244,delay_tolerant,0,1,1,5,1,1,0,faster server; less IT energy for its work
+85,w0244-r1,delay_tolerant,0,8,2,7,1,1,1,less IT energy for its work
+86,w0733,time_sensitive,0,3,1,10,2,1,1,original server full at the chosen start; faster server; cooler server
+87,w0733-r1,time_sensitive,0,1,1,2,2,1,1,original server full at the chosen start; cooler server
+88,w0095,delay_tolerant,0,8,2,3,1,1,1,less IT energy for its work
+89,w0095-r1,delay_tolerant,0,2,2,3,1,1,1,less IT energy for its work
+90,w0524,delay_tolerant,0,6,2,8,2,1,0,faster server; cooler server
+91,w0573,delay_tolerant,0,8,2,5,1,1,1,less IT energy for its work
+92,w0573-r1,delay_tolerant,0,3,1,7,1,1,0,original server full at the chosen start; faster server; less IT energy for its work; cooler server
+93,w0251,delay_tolerant,0,4,2,2,2,1,0,original server full at the chosen start
+94,w0251-r1,delay_tolerant,0,1,1,10,2,1,1,faster server; cooler server
+95,w0056,time_sensitive,0,3,1,7,1,1,0,faster server; less IT energy for its work; cooler server
+96,w0056-r1,time_sensitive,0,5,1,7,1,1,0,original server full at the chosen start; less IT energy for its work; cooler server
+97,w0252,time_sensitive,0,8,2,7,1,1,1,less IT energy for its work
+98,w0352,delay_tolerant,0,9,1,4,2,1,1,less IT energy for its work; zone with higher CRAC COP
+99,w0352-r1,delay_tolerant,0,10,2,4,2,1,0,less IT energy for its work
+100,w0353,time_sensitive,0,2,2,7,1,1,1,faster server; less IT energy for its work
+101,w0363,delay_tolerant,0,7,1,10,2,1,1,original server full at the chosen start; faster server; cooler server
+102,w0363-r1,delay_tolerant,0,4,2,10,2,1,0,original server full at the chosen start; faster server; cooler server
+103,w0630,delay_tolerant,0,1,1,6,2,1,1,original server full at the chosen start; faster server; less IT energy for its work
+104,w0630-r1,delay_tolerant,0,3,1,6,2,1,1,faster server; less IT energy for its work; cooler server
+105,w0158,time_sensitive,0,9,1,3,1,1,0,less IT energy for its work
+106,w0734,delay_tolerant,0,10,2,6,2,1,0,less IT energy for its work
+107,w0734-r1,delay_tolerant,0,9,1,3,1,1,0,less IT energy for its work
+108,w0125,delay_tolerant,0,6,2,8,2,1,0,faster server; cooler server
+109,w0125-r1,delay_tolerant,0,6,2,9,1,1,1,faster server; cooler server
+110,w0467,delay_tolerant,0,6,2,3,1,1,1,less IT energy for its work
+111,w0468,delay_tolerant,0,6,2,6,2,0,0,kept
+112,w0468-r1,delay_tolerant,0,7,1,8,2,1,1,original server full at the chosen start; faster server; cooler server
+113,w0469,delay_tolerant,0,10,2,9,1,1,1,cooler server
+114,w0469-r1,delay_tolerant,0,2,2,3,1,1,1,less IT energy for its work
+115,w0019,delay_tolerant,0,9,1,1,1,1,0,less IT energy for its work
+116,w0019-r1,delay_tolerant,0,6,2,1,1,1,1,original server full at the chosen start; less IT energy for its work
+117,w0390,time_sensitive,0,7,1,1,1,1,0,original server full at the chosen start
+118,w0390-r1,time_sensitive,0,8,2,9,1,1,1,less IT energy for its work
+119,w0020,time_sensitive,0,9,1,7,1,1,0,less IT energy for its work
+120,w0020-r1,time_sensitive,0,10,2,7,1,1,1,less IT energy for its work
+121,w0354,time_sensitive,0,1,1,4,2,1,1,original server full at the chosen start; faster server; less IT energy for its work; cooler server; zone with higher CRAC COP
+122,w0354-r1,time_sensitive,0,2,2,4,2,1,0,original server full at the chosen start; faster server; less IT energy for its work; cooler server
+123,w0693,delay_tolerant,0,5,1,5,1,0,0,kept
+124,w0693-r1,delay_tolerant,0,6,2,5,1,1,1,original server full at the chosen start; less IT energy for its work; zone with higher CRAC COP
+125,w0104,time_sensitive,0,1,1,6,2,1,1,original server full at the chosen start; faster server
+126,w0104-r1,time_sensitive,0,3,1,8,2,1,1,original server full at the chosen start; faster server; cooler server
+127,w0412,time_sensitive,0,9,1,2,2,1,1,carbon trade-off across the fleet (no single local cause)
+128,w0412-r1,time_sensitive,0,10,2,1,1,1,1,less IT energy for its work; zone with higher CRAC COP
+129,w0212,time_sensitive,0,2,2,9,1,1,1,original server full at the chosen start; faster server; less IT energy for its work; cooler server
+130,w0212-r1,time_sensitive,0,7,1,9,1,1,0,original server full at the chosen start; faster server; cooler server
+131,w0549,delay_tolerant,0,8,2,8,2,0,0,kept
+132,w0549-r1,delay_tolerant,0,2,2,9,1,1,1,faster server; less IT energy for its work; cooler server
+133,w0555,time_sensitive,0,6,2,3,1,1,1,less IT energy for its work
+134,w0555-r1,time_sensitive,0,7,1,6,2,1,1,original server full at the chosen start
+135,w0737,delay_tolerant,0,1,1,8,2,1,1,faster server; cooler server
+136,w0213,delay_tolerant,0,3,1,1,1,1,0,cooler server
+137,w0522,time_sensitive,0,8,2,1,1,1,1,less IT energy for its work
+138,w0522-r1,time_sensitive,0,2,2,2,2,0,0,kept
+139,w0147,delay_tolerant,0,3,1,9,1,1,0,original server full at the chosen start; faster server; cooler server
+140,w0147-r1,delay_tolerant,0,5,1,10,2,1,1,original server full at the chosen start; faster server; cooler server; zone with higher CRAC COP
+141,w0314,time_sensitive,0,6,2,3,1,1,1,less IT energy for its work
+142,w0409,delay_tolerant,0,7,1,6,2,1,1,original server full at the chosen start
+143,w0441,time_sensitive,0,6,2,3,1,1,1,less IT energy for its work
+144,w0441-r1,time_sensitive,0,7,1,6,2,1,1,original server full at the chosen start
+145,w0453,time_sensitive,0,6,2,8,2,1,0,faster server; cooler server
+146,w0453-r1,time_sensitive,0,7,1,3,1,1,0,original server full at the chosen start
+147,w0700,time_sensitive,0,4,2,6,2,1,0,original server full at the chosen start
+148,w0701,delay_tolerant,0,9,1,8,2,1,1,cooler server
+149,w0701-r1,delay_tolerant,0,10,2,1,1,1,1,less IT energy for its work; zone with higher CRAC COP
+150,w0587,delay_tolerant,0,7,1,9,1,1,0,original server full at the chosen start; faster server; cooler server
+151,w0587-r1,delay_tolerant,0,4,2,3,1,1,1,original server full at the chosen start
+152,w0261,delay_tolerant,0,4,2,6,2,1,0,original server full at the chosen start
+153,w0400,delay_tolerant,0,7,1,3,1,1,0,original server full at the chosen start
+154,w0400-r1,delay_tolerant,0,4,2,6,2,1,0,original server full at the chosen start
+155,w0500,delay_tolerant,0,9,1,10,2,1,1,less IT energy for its work; zone with higher CRAC COP
+156,w0500-r1,delay_tolerant,0,10,2,3,1,1,1,less IT energy for its work
+157,w0665,delay_tolerant,0,1,1,6,2,1,1,faster server; less IT energy for its work
+158,w0665-r1,delay_tolerant,0,6,2,8,2,1,0,faster server; cooler server
+159,w0262,delay_tolerant,0,1,1,3,1,1,0,original server full at the chosen start; less IT energy for its work
+160,w0262-r1,delay_tolerant,0,7,1,2,2,1,1,original server full at the chosen start; cooler server
+161,w0290,delay_tolerant,0,4,2,9,1,1,1,original server full at the chosen start; faster server; cooler server; zone with higher CRAC COP
+162,w0290-r1,delay_tolerant,0,9,1,3,1,1,0,less IT energy for its work
+163,w0477,delay_tolerant,0,10,2,2,2,1,0,less IT energy for its work
+164,w0477-r1,delay_tolerant,0,1,1,9,1,1,0,original server full at the chosen start; faster server; cooler server
+165,w0617,delay_tolerant,0,3,1,10,2,1,1,original server full at the chosen start; faster server; cooler server; zone with higher CRAC COP
+166,w0008,delay_tolerant,0,7,1,3,1,1,0,original server full at the chosen start
+167,w0008-r1,delay_tolerant,0,4,2,7,1,1,1,original server full at the chosen start; zone with higher CRAC COP
+168,w0155,delay_tolerant,0,5,1,7,1,1,0,original server full at the chosen start; less IT energy for its work; cooler server
+169,w0419,time_sensitive,0,6,2,7,1,1,1,original server full at the chosen start; less IT energy for its work; cooler server; zone with higher CRAC COP
+170,w0419-r1,time_sensitive,0,7,1,7,1,0,0,kept
+171,w0098,delay_tolerant,0,8,2,1,1,1,1,less IT energy for its work
+172,w0098-r1,delay_tolerant,0,8,2,1,1,1,1,less IT energy for its work
+173,w0214,time_sensitive,0,8,2,7,1,1,1,less IT energy for its work
+174,w0214-r1,time_sensitive,0,8,2,4,2,1,0,less IT energy for its work
+175,w0633,delay_tolerant,0,8,2,6,2,1,0,less IT energy for its work
+176,w0672,delay_tolerant,0,4,2,1,1,1,1,original server full at the chosen start; zone with higher CRAC COP
+177,w0673,delay_tolerant,0,9,1,7,1,1,0,less IT energy for its work
+178,w0673-r1,delay_tolerant,0,2,2,3,1,1,1,original server full at the chosen start; less IT energy for its work
+179,w0674,time_sensitive,0,5,1,1,1,1,0,cooler server
+180,w0674-r1,time_sensitive,0,8,2,1,1,1,1,less IT energy for its work
+181,w0100,delay_tolerant,0,1,1,8,2,1,1,original server full at the chosen start; faster server; cooler server
+182,w0100-r1,delay_tolerant,0,10,2,9,1,1,1,cooler server
+183,w0501,delay_tolerant,0,1,1,6,2,1,1,original server full at the chosen start; faster server; less IT energy for its work
+184,w0501-r1,delay_tolerant,0,1,1,8,2,1,1,original server full at the chosen start; faster server; cooler server
+185,w0456,delay_tolerant,0,2,2,7,1,1,1,faster server; less IT energy for its work
+186,w0456-r1,delay_tolerant,0,1,1,7,1,1,0,faster server; less IT energy for its work
+187,w0457,delay_tolerant,0,2,2,6,2,1,0,original server full at the chosen start; faster server; less IT energy for its work
+188,w0457-r1,delay_tolerant,0,3,1,6,2,1,1,original server full at the chosen start; faster server
+189,w0458,delay_tolerant,0,5,1,6,2,1,1,original server full at the chosen start
+190,w0458-r1,delay_tolerant,0,6,2,6,2,0,0,kept
+191,w0502,time_sensitive,0,4,2,1,1,1,1,original server full at the chosen start
+192,w0628,delay_tolerant,0,9,1,5,1,1,0,less IT energy for its work
+193,w0392,delay_tolerant,0,10,2,4,2,1,0,less IT energy for its work
+194,w0392-r1,delay_tolerant,0,6,2,6,2,0,0,kept
+195,w0621,time_sensitive,0,7,1,3,1,1,0,original server full at the chosen start
+196,w0621-r1,time_sensitive,0,8,2,3,1,1,1,less IT energy for its work
+197,w0629,delay_tolerant,0,9,1,4,2,1,1,less IT energy for its work; zone with higher CRAC COP
+198,w0629-r1,delay_tolerant,0,10,2,10,2,0,0,kept
+199,w0195,delay_tolerant,0,3,1,8,2,1,1,faster server; cooler server
+200,w0195-r1,delay_tolerant,0,5,1,2,2,1,1,cooler server
+201,w0611,delay_tolerant,0,3,1,8,2,1,1,faster server; cooler server
+202,w0611-r1,delay_tolerant,0,4,2,9,1,1,1,original server full at the chosen start; faster server; cooler server
+203,w0088,time_sensitive,0,6,2,2,2,1,0,original server full at the chosen start; cooler server
+204,w0088-r1,time_sensitive,0,3,1,8,2,1,1,original server full at the chosen start; faster server; cooler server; zone with higher CRAC COP
+205,w0561,delay_tolerant,0,4,2,2,2,1,0,original server full at the chosen start
+206,w0561-r1,delay_tolerant,0,6,2,8,2,1,0,faster server; cooler server
+207,w0472,delay_tolerant,0,1,1,1,1,0,0,kept
+208,w0472-r1,delay_tolerant,0,4,2,1,1,1,1,original server full at the chosen start; zone with higher CRAC COP
+209,w0551,delay_tolerant,0,9,1,1,1,1,0,less IT energy for its work
+210,w0551-r1,delay_tolerant,0,7,1,3,1,1,0,original server full at the chosen start; less IT energy for its work
+211,w0089,time_sensitive,0,3,1,8,2,1,1,faster server; cooler server; zone with higher CRAC COP
+212,w0089-r1,time_sensitive,0,3,1,9,1,1,0,faster server; cooler server
+213,w0414,delay_tolerant,0,8,2,8,2,0,0,kept
+214,w0414-r1,delay_tolerant,0,10,2,9,1,1,1,cooler server
+215,w0402,time_sensitive,0,10,2,8,2,1,0,cooler server
+216,w0403,delay_tolerant,0,10,2,8,2,1,0,cooler server
+217,w0403-r1,delay_tolerant,0,6,2,9,1,1,1,faster server; cooler server
+218,w0616,time_sensitive,0,7,1,8,2,1,1,original server full at the chosen start; faster server; cooler server
+219,w0616-r1,time_sensitive,0,10,2,10,2,0,0,kept
+220,w0543,delay_tolerant,0,1,1,1,1,0,0,kept
+221,w0543-r1,delay_tolerant,0,5,1,1,1,1,0,less IT energy for its work
+222,w0111,delay_tolerant,0,1,1,9,1,1,0,original server full at the chosen start; faster server; cooler server
+223,w0302,delay_tolerant,0,5,1,8,2,1,1,faster server; cooler server
+224,w0302-r1,delay_tolerant,0,7,1,2,2,1,1,original server full at the chosen start; cooler server
+225,w0384,delay_tolerant,0,4,2,8,2,1,0,original server full at the chosen start; faster server; cooler server
+226,w0384-r1,delay_tolerant,0,5,1,2,2,1,1,cooler server
+227,w0594,delay_tolerant,0,6,2,9,1,1,1,faster server; cooler server
+228,w0594-r1,delay_tolerant,0,9,1,10,2,1,1,less IT energy for its work
+229,w0253,time_sensitive,0,5,1,7,1,1,0,original server full at the chosen start; less IT energy for its work; cooler server
+230,w0410,time_sensitive,0,5,1,10,2,1,1,original server full at the chosen start; faster server; cooler server
+231,w0410-r1,time_sensitive,0,7,1,10,2,1,1,original server full at the chosen start; faster server; cooler server
+232,w0729,time_sensitive,0,4,2,5,1,1,1,original server full at the chosen start
+233,w0729-r1,time_sensitive,0,10,2,7,1,1,1,less IT energy for its work
+234,w0200,delay_tolerant,0,8,2,8,2,0,0,kept
+235,w0694,delay_tolerant,0,4,2,8,2,1,0,original server full at the chosen start; faster server; cooler server
+236,w0694-r1,delay_tolerant,0,8,2,2,2,1,0,carbon trade-off across the fleet (no single local cause)
+237,w0216,time_sensitive,0,4,2,8,2,1,0,original server full at the chosen start; faster server; cooler server
+238,w0216-r1,time_sensitive,0,3,1,6,2,1,1,original server full at the chosen start; faster server; zone with higher CRAC COP
+239,w0619,delay_tolerant,0,4,2,1,1,1,1,original server full at the chosen start
+240,w0619-r1,delay_tolerant,0,4,2,5,1,1,1,original server full at the chosen start; zone with higher CRAC COP
+241,w0333,delay_tolerant,0,8,2,7,1,1,1,less IT energy for its work
+242,w0333-r1,delay_tolerant,0,8,2,7,1,1,1,less IT energy for its work
+243,w0191,delay_tolerant,0,4,2,8,2,1,0,original server full at the chosen start; faster server; cooler server
+244,w0191-r1,delay_tolerant,0,4,2,8,2,1,0,original server full at the chosen start; faster server; cooler server
+245,w0299,time_sensitive,0,10,2,8,2,1,0,cooler server
+246,w0299-r1,time_sensitive,0,6,2,3,1,1,1,less IT energy for its work; cooler server
+247,w0473,delay_tolerant,0,7,1,2,2,1,1,original server full at the chosen start; cooler server; zone with higher CRAC COP
+248,w0473-r1,delay_tolerant,0,4,2,9,1,1,1,original server full at the chosen start; faster server; cooler server
+249,w0106,delay_tolerant,0,5,1,9,1,1,0,original server full at the chosen start; faster server; cooler server
+250,w0106-r1,delay_tolerant,0,3,1,9,1,1,0,original server full at the chosen start; faster server; cooler server
+251,w0156,time_sensitive,0,8,2,9,1,1,1,less IT energy for its work
+252,w0156-r1,time_sensitive,0,9,1,6,2,1,1,less IT energy for its work; zone with higher CRAC COP
+253,w0640,delay_tolerant,0,1,1,4,2,1,1,faster server; less IT energy for its work; cooler server; zone with higher CRAC COP
+254,w0640-r1,delay_tolerant,0,1,1,4,2,1,1,faster server; less IT energy for its work; cooler server; zone with higher CRAC COP
+255,w0386,delay_tolerant,0,9,1,8,2,1,1,cooler server; zone with higher CRAC COP
+256,w0386-r1,delay_tolerant,0,10,2,1,1,1,1,less IT energy for its work
+257,w0259,time_sensitive,0,8,2,9,1,1,1,less IT energy for its work; zone with higher CRAC COP
+258,w0260,delay_tolerant,0,7,1,2,2,1,1,original server full at the chosen start; cooler server
+259,w0260-r1,delay_tolerant,0,4,2,9,1,1,1,original server full at the chosen start; faster server; cooler server; zone with higher CRAC COP
+260,w0660,delay_tolerant,0,8,2,8,2,0,0,kept
+261,w0660-r1,delay_tolerant,0,1,1,6,2,1,1,original server full at the chosen start; faster server
+262,w0661,time_sensitive,0,5,1,8,2,1,1,original server full at the chosen start; faster server; cooler server
+263,w0661-r1,time_sensitive,0,8,2,3,1,1,1,less IT energy for its work; zone with higher CRAC COP
+264,w0667,delay_tolerant,0,1,1,5,1,1,0,original server full at the chosen start; faster server; less IT energy for its work; cooler server
+265,w0192,delay_tolerant,0,8,2,8,2,0,0,kept
+266,w0192-r1,delay_tolerant,0,6,2,8,2,1,0,original server full at the chosen start; faster server; cooler server
+267,w0348,time_sensitive,0,4,2,6,2,1,0,original server full at the chosen start
+268,w0348-r1,time_sensitive,0,8,2,8,2,0,0,kept
+269,w0471,time_sensitive,0,10,2,3,1,1,1,less IT energy for its work; zone with higher CRAC COP
+270,w0471-r1,time_sensitive,0,9,1,8,2,1,1,cooler server
+271,w0245,delay_tolerant,0,10,2,7,1,1,1,less IT energy for its work; zone with higher CRAC COP
+272,w0245-r1,delay_tolerant,0,2,2,7,1,1,1,original server full at the chosen start; faster server; less IT energy for its work; zone with higher CRAC COP
+273,w0531,delay_tolerant,0,4,2,1,1,1,1,original server full at the chosen start; zone with higher CRAC COP
+274,w0531-r1,delay_tolerant,0,6,2,1,1,1,1,original server full at the chosen start; less IT energy for its work; cooler server; zone with higher CRAC COP
+275,w0577,delay_tolerant,0,8,2,4,2,1,0,less IT energy for its work
+276,w0577-r1,delay_tolerant,0,3,1,6,2,1,1,original server full at the chosen start; faster server
+277,w0265,delay_tolerant,0,8,2,6,2,1,0,less IT energy for its work
+278,w0265-r1,delay_tolerant,0,9,1,4,2,1,1,less IT energy for its work; zone with higher CRAC COP
+279,w0489,delay_tolerant,0,3,1,3,1,0,0,kept
+280,w0489-r1,delay_tolerant,0,5,1,1,1,1,0,original server full at the chosen start; cooler server
+281,w0567,delay_tolerant,0,10,2,7,1,1,1,less IT energy for its work; zone with higher CRAC COP
+282,w0567-r1,delay_tolerant,0,2,2,4,2,1,0,faster server; less IT energy for its work
+283,w0662,delay_tolerant,0,3,1,7,1,1,0,original server full at the chosen start; faster server; less IT energy for its work; cooler server
+284,w0662-r1,delay_tolerant,0,7,1,4,2,1,1,less IT energy for its work; cooler server; zone with higher CRAC COP
+285,w0021,delay_tolerant,0,4,2,8,2,1,0,original server full at the chosen start; faster server; cooler server
+286,w0021-r1,delay_tolerant,0,4,2,2,2,1,0,original server full at the chosen start
+287,w0066,time_sensitive,0,4,2,6,2,1,0,original server full at the chosen start
+288,w0132,time_sensitive,0,5,1,8,2,1,1,original server full at the chosen start; faster server; cooler server
+289,w0132-r1,time_sensitive,0,4,2,2,2,1,0,original server full at the chosen start
+290,w0230,time_sensitive,0,10,2,3,1,1,1,less IT energy for its work; zone with higher CRAC COP
+291,w0230-r1,time_sensitive,0,1,1,6,2,1,1,original server full at the chosen start; faster server; less IT energy for its work
+292,w0525,time_sensitive,0,2,2,8,2,1,0,original server full at the chosen start; faster server; cooler server
+293,w0525-r1,time_sensitive,0,3,1,9,1,1,0,original server full at the chosen start; faster server; cooler server
+294,w0532,time_sensitive,0,5,1,3,1,1,0,original server full at the chosen start; cooler server
+295,w0532-r1,time_sensitive,0,7,1,5,1,1,0,original server full at the chosen start
+296,w0585,delay_tolerant,0,10,2,6,2,1,0,less IT energy for its work
+297,w0585-r1,delay_tolerant,0,8,2,8,2,0,0,kept
+298,w0055,delay_tolerant,0,4,2,2,2,1,0,original server full at the chosen start
+299,w0055-r1,delay_tolerant,0,6,2,9,1,1,1,original server full at the chosen start; faster server; cooler server
+300,w0231,time_sensitive,0,4,2,1,1,1,1,original server full at the chosen start; zone with higher CRAC COP
+301,w0231-r1,time_sensitive,0,6,2,3,1,1,1,original server full at the chosen start; less IT energy for its work; cooler server; zone with higher CRAC COP
+302,w0668,delay_tolerant,0,9,1,5,1,1,0,less IT energy for its work
+303,w0668-r1,delay_tolerant,0,10,2,1,1,1,1,less IT energy for its work
+304,w0466,delay_tolerant,0,9,1,9,1,0,0,kept
+305,w0466-r1,delay_tolerant,0,10,2,8,2,1,0,cooler server
+306,w0556,time_sensitive,0,8,2,3,1,1,1,less IT energy for its work; zone with higher CRAC COP
+307,w0556-r1,time_sensitive,0,9,1,2,2,1,1,carbon trade-off across the fleet (no single local cause)
+308,w0620,time_sensitive,0,10,2,10,2,0,0,kept
+309,w0620-r1,time_sensitive,0,8,2,9,1,1,1,less IT energy for its work; zone with higher CRAC COP
+310,w0691,time_sensitive,0,4,2,3,1,1,1,original server full at the chosen start; zone with higher CRAC COP
+311,w0691-r1,time_sensitive,0,6,2,3,1,1,1,original server full at the chosen start; less IT energy for its work; cooler server; zone with higher CRAC COP
+312,w0002,delay_tolerant,0,2,2,1,1,1,1,original server full at the chosen start; less IT energy for its work; zone with higher CRAC COP
+313,w0002-r1,delay_tolerant,0,2,2,2,2,0,0,kept
+314,w0201,delay_tolerant,0,2,2,2,2,0,0,kept
+315,w0201-r1,delay_tolerant,0,2,2,2,2,0,0,kept
+316,w0641,delay_tolerant,0,9,1,8,2,1,1,cooler server; zone with higher CRAC COP
+317,w0641-r1,delay_tolerant,0,10,2,10,2,0,0,kept
+318,w0203,delay_tolerant,0,6,2,2,2,1,0,original server full at the chosen start; cooler server
+319,w0523,delay_tolerant,0,2,2,2,2,0,0,kept
+320,w0523-r1,delay_tolerant,0,5,1,8,2,1,1,original server full at the chosen start; faster server; cooler server
+321,w0218,time_sensitive,0,4,2,4,2,0,0,kept
+322,w0218-r1,time_sensitive,0,4,2,4,2,0,0,kept
+323,w0653,delay_tolerant,0,6,2,1,1,1,1,less IT energy for its work; cooler server; zone with higher CRAC COP
+324,w0653-r1,delay_tolerant,0,4,2,1,1,1,1,original server full at the chosen start; zone with higher CRAC COP
+325,w0027,time_sensitive,0,6,2,2,2,1,0,original server full at the chosen start; cooler server
+326,w0254,time_sensitive,0,1,1,9,1,1,0,original server full at the chosen start; faster server; cooler server
+327,w0574,delay_tolerant,0,1,1,9,1,1,0,original server full at the chosen start; faster server; cooler server
+328,w0574-r1,delay_tolerant,0,3,1,2,2,1,1,original server full at the chosen start; cooler server; zone with higher CRAC COP
+329,w0675,time_sensitive,0,6,2,8,2,1,0,original server full at the chosen start; faster server; cooler server
+330,w0675-r1,time_sensitive,0,1,1,9,1,1,0,original server full at the chosen start; faster server; cooler server
+331,w0676,delay_tolerant,0,9,1,8,2,1,1,cooler server
+332,w0676-r1,delay_tolerant,0,8,2,9,1,1,1,less IT energy for its work; zone with higher CRAC COP
+333,w0677,delay_tolerant,0,9,1,8,2,1,1,cooler server
+334,w0677-r1,delay_tolerant,0,10,2,9,1,1,1,cooler server; zone with higher CRAC COP
+335,w0014,delay_tolerant,0,4,2,2,2,1,0,original server full at the chosen start
+336,w0014-r1,delay_tolerant,0,2,2,3,1,1,1,original server full at the chosen start; less IT energy for its work
+337,w0276,delay_tolerant,0,5,1,6,2,1,1,original server full at the chosen start
+338,w0276-r1,delay_tolerant,0,3,1,2,2,1,1,original server full at the chosen start; cooler server
+339,w0277,delay_tolerant,0,4,2,3,1,1,1,original server full at the chosen start; zone with higher CRAC COP
+340,w0277-r1,delay_tolerant,0,8,2,6,2,1,0,less IT energy for its work
+341,w0278,delay_tolerant,0,8,2,9,1,1,1,less IT energy for its work
+342,w0278-r1,delay_tolerant,0,8,2,9,1,1,1,less IT energy for its work
+343,w0576,delay_tolerant,0,8,2,9,1,1,1,less IT energy for its work; zone with higher CRAC COP
+344,w0576-r1,delay_tolerant,0,9,1,8,2,1,1,cooler server
+345,w0193,delay_tolerant,0,4,2,5,1,1,1,original server full at the chosen start
+346,w0193-r1,delay_tolerant,0,6,2,5,1,1,1,original server full at the chosen start; less IT energy for its work; cooler server
+347,w0221,delay_tolerant,0,4,2,5,1,1,1,original server full at the chosen start
+348,w0221-r1,delay_tolerant,0,6,2,5,1,1,1,original server full at the chosen start; less IT energy for its work; cooler server
+349,w0357,delay_tolerant,0,4,2,6,2,1,0,original server full at the chosen start
+350,w0357-r1,delay_tolerant,0,6,2,9,1,1,1,original server full at the chosen start; faster server; cooler server
+351,w0470,delay_tolerant,0,4,2,8,2,1,0,original server full at the chosen start; faster server; cooler server
+352,w0470-r1,delay_tolerant,0,5,1,9,1,1,0,original server full at the chosen start; faster server; cooler server
+353,w0318,delay_tolerant,0,6,2,4,2,1,0,less IT energy for its work; cooler server
+354,w0318-r1,delay_tolerant,0,7,1,4,2,1,1,original server full at the chosen start; less IT energy for its work; cooler server; zone with higher CRAC COP
+355,w0355,delay_tolerant,0,6,2,5,1,1,1,less IT energy for its work
+356,w0570,time_sensitive,0,7,1,10,2,1,1,original server full at the chosen start; faster server; cooler server; zone with higher CRAC COP
+357,w0570-r1,time_sensitive,0,6,2,4,2,1,0,original server full at the chosen start; less IT energy for its work; cooler server
+358,w0205,delay_tolerant,0,5,1,5,1,0,0,kept
+359,w0205-r1,delay_tolerant,0,5,1,5,1,0,0,kept
+360,w0433,delay_tolerant,0,5,1,1,1,1,0,original server full at the chosen start; cooler server
+361,w0433-r1,delay_tolerant,0,3,1,1,1,1,0,cooler server
+362,w0547,delay_tolerant,0,7,1,7,1,0,0,kept
+363,w0547-r1,delay_tolerant,0,5,1,7,1,1,0,less IT energy for its work
+364,w0028,delay_tolerant,0,2,2,2,2,0,0,kept
+365,w0116,delay_tolerant,0,10,2,2,2,1,0,carbon trade-off across the fleet (no single local cause)
+366,w0116-r1,delay_tolerant,0,9,1,6,2,1,1,less IT energy for its work; zone with higher CRAC COP
+367,w0280,time_sensitive,0,8,2,2,2,1,0,less IT energy for its work
+368,w0280-r1,time_sensitive,0,10,2,3,1,1,1,less IT energy for its work
+369,w0281,delay_tolerant,0,8,2,8,2,0,0,kept
+370,w0281-r1,delay_tolerant,0,10,2,8,2,1,0,cooler server
+371,w0336,delay_tolerant,0,2,2,5,1,1,1,original server full at the chosen start; faster server; less IT energy for its work
+372,w0115,delay_tolerant,0,3,1,1,1,1,0,original server full at the chosen start; cooler server
+373,w0115-r1,delay_tolerant,0,5,1,1,1,1,0,original server full at the chosen start; cooler server
+374,w0438,delay_tolerant,0,9,1,10,2,1,1,less IT energy for its work; zone with higher CRAC COP
+375,w0583,time_sensitive,0,10,2,8,2,1,0,cooler server
+376,w0583-r1,time_sensitive,0,8,2,9,1,1,1,less IT energy for its work
+377,w0007,delay_tolerant,0,6,2,7,1,1,1,less IT energy for its work; cooler server
+378,w0007-r1,delay_tolerant,0,7,1,7,1,0,0,kept
+379,w0006,delay_tolerant,0,6,2,2,2,1,0,original server full at the chosen start; cooler server
+380,w0036,time_sensitive,0,2,2,6,2,1,0,original server full at the chosen start; faster server; less IT energy for its work
+381,w0036-r1,time_sensitive,0,3,1,3,1,0,0,kept
+382,w0058,delay_tolerant,0,7,1,6,2,1,1,original server full at the chosen start; zone with higher CRAC COP
+383,w0206,time_sensitive,0,2,2,2,2,0,0,kept
+384,w0298,delay_tolerant,0,10,2,3,1,1,1,less IT energy for its work; zone with higher CRAC COP
+385,w0298-r1,delay_tolerant,0,8,2,2,2,1,0,carbon trade-off across the fleet (no single local cause)
+386,w0003,delay_tolerant,0,2,2,6,2,1,0,original server full at the chosen start; faster server; less IT energy for its work
+387,w0003-r1,delay_tolerant,0,3,1,6,2,1,1,original server full at the chosen start; faster server
+388,w0194,time_sensitive,0,4,2,5,1,1,1,original server full at the chosen start
+389,w0194-r1,time_sensitive,0,6,2,1,1,1,1,original server full at the chosen start; less IT energy for its work
+390,w0255,delay_tolerant,0,10,2,8,2,1,0,cooler server
+391,w0255-r1,delay_tolerant,0,8,2,8,2,0,0,kept
+392,w0289,time_sensitive,0,10,2,10,2,0,0,kept
+393,w0289-r1,time_sensitive,0,9,1,8,2,1,1,cooler server
+394,w0377,time_sensitive,0,1,1,3,1,1,0,original server full at the chosen start; less IT energy for its work
+395,w0377-r1,time_sensitive,0,2,2,5,1,1,1,original server full at the chosen start; faster server; less IT energy for its work
+396,w0141,time_sensitive,0,4,2,6,2,1,0,original server full at the chosen start
+397,w0434,delay_tolerant,0,6,2,6,2,0,0,kept
+398,w0434-r1,delay_tolerant,0,2,2,6,2,1,0,original server full at the chosen start; faster server; less IT energy for its work
+399,w0435,delay_tolerant,0,8,2,10,2,1,0,less IT energy for its work
+400,w0435-r1,delay_tolerant,0,10,2,8,2,1,0,cooler server
+401,w0454,delay_tolerant,0,3,1,5,1,1,0,original server full at the chosen start; faster server; less IT energy for its work
+402,w0454-r1,delay_tolerant,0,4,2,6,2,1,0,original server full at the chosen start
+403,w0545,delay_tolerant,0,6,2,5,1,1,1,original server full at the chosen start; less IT energy for its work; cooler server
+404,w0545-r1,delay_tolerant,0,2,2,1,1,1,1,original server full at the chosen start; less IT energy for its work
+405,w0546,time_sensitive,0,3,1,3,1,0,0,kept
+406,w0546-r1,time_sensitive,0,6,2,5,1,1,1,original server full at the chosen start; less IT energy for its work; cooler server
+407,w0553,delay_tolerant,0,2,2,6,2,1,0,original server full at the chosen start; faster server; less IT energy for its work
+408,w0553-r1,delay_tolerant,0,3,1,9,1,1,0,original server full at the chosen start; faster server; cooler server
+409,w0607,delay_tolerant,0,9,1,9,1,0,0,kept
+410,w0607-r1,delay_tolerant,0,9,1,10,2,1,1,less IT energy for its work; cooler server
+411,w0015,delay_tolerant,0,4,2,7,1,1,1,original server full at the chosen start
+412,w0015-r1,delay_tolerant,0,5,1,7,1,1,0,less IT energy for its work; cooler server
+413,w0159,delay_tolerant,0,8,2,3,1,1,1,less IT energy for its work
+414,w0378,time_sensitive,0,8,2,7,1,1,1,less IT energy for its work
+415,w0378-r1,time_sensitive,0,10,2,7,1,1,1,less IT energy for its work
+416,w0379,delay_tolerant,0,9,1,1,1,1,0,less IT energy for its work
+417,w0379-r1,delay_tolerant,0,9,1,1,1,1,0,less IT energy for its work
+418,w0447,delay_tolerant,0,8,2,3,1,1,1,less IT energy for its work
+419,w0447-r1,delay_tolerant,0,10,2,3,1,1,1,less IT energy for its work
+420,w0029,time_sensitive,0,9,1,2,2,1,1,zone with higher CRAC COP
+421,w0029-r1,time_sensitive,0,10,2,3,1,1,1,less IT energy for its work
+422,w0515,delay_tolerant,0,9,1,2,2,1,1,less IT energy for its work; zone with higher CRAC COP
+423,w0515-r1,delay_tolerant,0,10,2,3,1,1,1,less IT energy for its work
+424,w0126,time_sensitive,0,6,2,6,2,0,0,kept
+425,w0126-r1,time_sensitive,0,7,1,4,2,1,1,original server full at the chosen start; less IT energy for its work; cooler server
+426,w0408,delay_tolerant,0,6,2,6,2,0,0,kept
+427,w0408-r1,delay_tolerant,0,7,1,10,2,1,1,original server full at the chosen start; faster server; cooler server; zone with higher CRAC COP
+428,w0160,time_sensitive,0,7,1,7,1,0,0,kept
+429,w0160-r1,time_sensitive,0,5,1,1,1,1,0,original server full at the chosen start; cooler server
+430,w0568,delay_tolerant,0,7,1,4,2,1,1,original server full at the chosen start; less IT energy for its work; cooler server; zone with higher CRAC COP
+431,w0568-r1,delay_tolerant,0,5,1,4,2,1,1,less IT energy for its work; cooler server; zone with higher CRAC COP
+432,w0223,time_sensitive,0,6,2,10,2,1,0,faster server; cooler server
+433,w0223-r1,time_sensitive,0,7,1,10,2,1,1,original server full at the chosen start; faster server; cooler server; zone with higher CRAC COP
+434,w0283,delay_tolerant,0,6,2,10,2,1,0,original server full at the chosen start; faster server; cooler server
+435,w0365,delay_tolerant,0,7,1,6,2,1,1,original server full at the chosen start; zone with higher CRAC COP
+436,w0365-r1,delay_tolerant,0,5,1,10,2,1,1,original server full at the chosen start; faster server; cooler server; zone with higher CRAC COP
+437,w0448,delay_tolerant,0,2,2,6,2,1,0,original server full at the chosen start; faster server; less IT energy for its work
+438,w0448-r1,delay_tolerant,0,3,1,10,2,1,1,original server full at the chosen start; faster server; cooler server
+439,w0436,delay_tolerant,0,5,1,2,2,1,1,original server full at the chosen start; cooler server; zone with higher CRAC COP
+440,w0464,delay_tolerant,0,6,2,6,2,0,0,kept
+441,w0527,time_sensitive,0,7,1,2,2,1,1,original server full at the chosen start; cooler server
+442,w0527-r1,time_sensitive,0,3,1,10,2,1,1,original server full at the chosen start; faster server; cooler server
+443,w0720,delay_tolerant,0,5,1,10,2,1,1,original server full at the chosen start; faster server; cooler server; zone with higher CRAC COP
+444,w0720-r1,delay_tolerant,0,6,2,10,2,1,0,original server full at the chosen start; faster server; cooler server
+445,w0721,delay_tolerant,0,7,1,10,2,1,1,original server full at the chosen start; faster server; cooler server; zone with higher CRAC COP
+446,w0722,delay_tolerant,0,4,2,3,1,1,1,original server full at the chosen start
+447,w0528,time_sensitive,0,1,1,1,1,0,0,kept
+448,w0528-r1,time_sensitive,0,2,2,6,2,1,0,faster server; less IT energy for its work
+449,w0639,delay_tolerant,0,3,1,2,2,1,1,cooler server
+450,w0639-r1,delay_tolerant,0,6,2,3,1,1,1,less IT energy for its work; cooler server; zone with higher CRAC COP
+451,w0663,delay_tolerant,0,10,2,8,2,1,0,cooler server
+452,w0171,delay_tolerant,0,7,1,4,2,1,1,original server full at the chosen start; less IT energy for its work; cooler server; zone with higher CRAC COP
+453,w0171-r1,delay_tolerant,0,7,1,4,2,1,1,original server full at the chosen start; less IT energy for its work; cooler server; zone with higher CRAC COP
+454,w0497,delay_tolerant,0,4,2,4,2,0,0,kept
+455,w0497-r1,delay_tolerant,0,5,1,4,2,1,1,original server full at the chosen start; less IT energy for its work; cooler server; zone with higher CRAC COP
+456,w0529,delay_tolerant,0,7,1,7,1,0,0,kept
+457,w0529-r1,delay_tolerant,0,1,1,7,1,1,0,faster server; less IT energy for its work
+458,w0166,delay_tolerant,0,3,1,4,2,1,1,faster server; less IT energy for its work; cooler server; zone with higher CRAC COP
+459,w0166-r1,delay_tolerant,0,3,1,4,2,1,1,faster server; less IT energy for its work; cooler server; zone with higher CRAC COP
+460,w0369,delay_tolerant,0,2,2,7,1,1,1,faster server; less IT energy for its work
+461,w0369-r1,delay_tolerant,0,3,1,3,1,0,0,kept
+462,w0033,time_sensitive,0,2,2,2,2,0,0,kept
+463,w0172,delay_tolerant,0,3,1,3,1,0,0,kept
+464,w0172-r1,delay_tolerant,0,1,1,2,2,1,1,original server full at the chosen start; cooler server; zone with higher CRAC COP
+465,w0173,delay_tolerant,0,3,1,3,1,0,0,kept
+466,w0415,delay_tolerant,0,7,1,6,2,1,1,original server full at the chosen start
+467,w0174,delay_tolerant,0,6,2,4,2,1,0,less IT energy for its work; cooler server
+468,w0174-r1,delay_tolerant,0,1,1,7,1,1,0,faster server; less IT energy for its work; cooler server
+469,w0444,time_sensitive,0,9,1,1,1,1,0,less IT energy for its work
+470,w0444-r1,time_sensitive,0,10,2,1,1,1,1,less IT energy for its work
+471,w0445,delay_tolerant,0,8,2,3,1,1,1,less IT energy for its work
+472,w0445-r1,delay_tolerant,0,9,1,1,1,1,0,less IT energy for its work
+473,w0446,delay_tolerant,0,10,2,7,1,1,1,less IT energy for its work
+474,w0446-r1,delay_tolerant,0,8,2,7,1,1,1,less IT energy for its work
+475,w0695,delay_tolerant,0,9,1,7,1,1,0,less IT energy for its work
+476,w0695-r1,delay_tolerant,0,10,2,7,1,1,1,less IT energy for its work
+477,w0175,delay_tolerant,0,3,1,8,2,1,1,faster server; cooler server; zone with higher CRAC COP
+478,w0175-r1,delay_tolerant,0,6,2,2,2,1,0,cooler server
+479,w0575,delay_tolerant,0,3,1,8,2,1,1,faster server; cooler server; zone with higher CRAC COP
+480,w0575-r1,delay_tolerant,0,5,1,2,2,1,1,cooler server; zone with higher CRAC COP
+481,w0176,delay_tolerant,0,6,2,4,2,1,0,less IT energy for its work
+482,w0176-r1,delay_tolerant,0,7,1,4,2,1,1,original server full at the chosen start; less IT energy for its work; cooler server; zone with higher CRAC COP
+483,w0177,time_sensitive,0,6,2,5,1,1,1,less IT energy for its work
+484,w0177-r1,time_sensitive,0,7,1,5,1,1,0,original server full at the chosen start; cooler server
+485,w0285,delay_tolerant,0,6,2,7,1,1,1,less IT energy for its work; cooler server
+486,w0285-r1,delay_tolerant,0,7,1,7,1,0,0,kept
+487,w0178,delay_tolerant,0,3,1,4,2,1,1,faster server; less IT energy for its work; cooler server
+488,w0178-r1,delay_tolerant,0,4,2,4,2,0,0,kept
+489,w0179,time_sensitive,0,5,1,7,1,1,0,less IT energy for its work
+490,w0180,time_sensitive,0,4,2,6,2,1,0,original server full at the chosen start
+491,w0180-r1,time_sensitive,0,4,2,5,1,1,1,original server full at the chosen start
+492,w0181,delay_tolerant,0,7,1,7,1,0,0,kept
+493,w0181-r1,delay_tolerant,0,3,1,7,1,1,0,faster server; less IT energy for its work
+494,w0182,delay_tolerant,0,7,1,4,2,1,1,original server full at the chosen start; less IT energy for its work; cooler server; zone with higher CRAC COP
+495,w0182-r1,delay_tolerant,0,3,1,4,2,1,1,faster server; less IT energy for its work; zone with higher CRAC COP
+496,w0183,delay_tolerant,0,6,2,7,1,1,1,less IT energy for its work; cooler server
+497,w0183-r1,delay_tolerant,0,7,1,7,1,0,0,kept
+498,w0635,delay_tolerant,0,8,2,3,1,1,1,less IT energy for its work
+499,w0635-r1,delay_tolerant,0,10,2,7,1,1,1,less IT energy for its work
+500,w0185,delay_tolerant,0,3,1,2,2,1,1,cooler server; zone with higher CRAC COP
+501,w0185-r1,delay_tolerant,0,3,1,8,2,1,1,faster server; cooler server; zone with higher CRAC COP
+502,w0310,delay_tolerant,0,6,2,1,1,1,1,cooler server
+503,w0310-r1,delay_tolerant,0,2,2,2,2,0,0,kept
+504,w0337,delay_tolerant,0,3,1,3,1,0,0,kept
+505,w0337-r1,delay_tolerant,0,5,1,8,2,1,1,faster server; cooler server; zone with higher CRAC COP
+506,w0416,time_sensitive,0,6,2,1,1,1,1,less IT energy for its work
+507,w0416-r1,time_sensitive,0,7,1,2,2,1,1,original server full at the chosen start; cooler server; zone with higher CRAC COP
+508,w0121,delay_tolerant,0,2,2,1,1,1,1,less IT energy for its work
+509,w0150,delay_tolerant,0,2,2,6,2,1,0,faster server; less IT energy for its work
+510,w0186,delay_tolerant,0,3,1,1,1,1,0,cooler server
+511,w0186-r1,delay_tolerant,0,1,1,1,1,0,0,kept
+512,w0188,delay_tolerant,0,3,1,6,2,1,1,faster server; zone with higher CRAC COP
+513,w0188-r1,delay_tolerant,0,1,1,1,1,0,0,kept
+514,w0189,delay_tolerant,0,2,2,3,1,1,1,less IT energy for its work
+515,w0120,time_sensitive,0,3,1,1,1,1,0,carbon trade-off across the fleet (no single local cause)
+516,w0120-r1,time_sensitive,0,6,2,1,1,1,1,less IT energy for its work
+517,w0311,time_sensitive,0,1,1,8,2,1,1,faster server; cooler server; zone with higher CRAC COP
+518,w0669,delay_tolerant,0,9,1,2,2,1,1,zone with higher CRAC COP
+519,w0669-r1,delay_tolerant,0,9,1,3,1,1,0,less IT energy for its work
+520,w0243,delay_tolerant,0,1,1,7,1,1,0,faster server; less IT energy for its work; cooler server
+521,w0243-r1,delay_tolerant,0,2,2,7,1,1,1,faster server; less IT energy for its work
+522,w0645,time_sensitive,0,1,1,1,1,0,0,kept
+523,w0645-r1,time_sensitive,0,2,2,1,1,1,1,less IT energy for its work
+524,w0647,time_sensitive,0,4,2,1,1,1,1,original server full at the chosen start
+525,w0647-r1,time_sensitive,0,5,1,1,1,1,0,less IT energy for its work
+526,w0190,delay_tolerant,0,7,1,6,2,1,1,original server full at the chosen start; zone with higher CRAC COP
+527,w0190-r1,delay_tolerant,0,2,2,10,2,1,0,faster server; less IT energy for its work; cooler server
+528,w0338,delay_tolerant,0,6,2,3,1,1,1,less IT energy for its work; cooler server
+529,w0338-r1,delay_tolerant,0,5,1,3,1,1,0,less IT energy for its work
+530,w0199,delay_tolerant,0,2,2,4,2,1,0,faster server; less IT energy for its work
+531,w0199-r1,delay_tolerant,0,7,1,4,2,1,1,original server full at the chosen start; less IT energy for its work; cooler server; zone with higher CRAC COP
+532,w0032,time_sensitive,0,4,2,7,1,1,1,original server full at the chosen start
+533,w0455,delay_tolerant,0,9,1,7,1,1,0,less IT energy for its work
+534,w0455-r1,delay_tolerant,0,9,1,4,2,1,1,less IT energy for its work; zone with higher CRAC COP
+535,w0488,delay_tolerant,0,2,2,7,1,1,1,faster server; less IT energy for its work
+536,w0488-r1,delay_tolerant,0,3,1,4,2,1,1,faster server; less IT energy for its work; cooler server
+537,w0411,delay_tolerant,0,5,1,6,2,1,1,original server full at the chosen start; cooler server; zone with higher CRAC COP
+538,w0411-r1,delay_tolerant,0,9,1,1,1,1,0,less IT energy for its work
+539,w0234,delay_tolerant,0,4,2,4,2,0,0,kept
+540,w0627,delay_tolerant,0,4,2,5,1,1,1,original server full at the chosen start
+541,w0627-r1,delay_tolerant,0,7,1,5,1,1,0,original server full at the chosen start; cooler server
+542,w0538,time_sensitive,0,4,2,5,1,1,1,original server full at the chosen start
+543,w0538-r1,time_sensitive,0,6,2,5,1,1,1,less IT energy for its work; cooler server
+544,w0609,delay_tolerant,0,1,1,2,2,1,1,cooler server; zone with higher CRAC COP
+545,w0609-r1,delay_tolerant,0,7,1,10,2,1,1,original server full at the chosen start; faster server; cooler server; zone with higher CRAC COP
+546,w0657,delay_tolerant,0,10,2,7,1,1,1,less IT energy for its work
+547,w0658,delay_tolerant,0,9,1,2,2,1,1,zone with higher CRAC COP
+548,w0659,time_sensitive,0,5,1,10,2,1,1,original server full at the chosen start; faster server; cooler server; zone with higher CRAC COP
+549,w0235,time_sensitive,0,3,1,2,2,1,1,cooler server; zone with higher CRAC COP
+550,w0235-r1,time_sensitive,0,9,1,2,2,1,1,zone with higher CRAC COP
+551,w0557,delay_tolerant,0,3,1,4,2,1,1,faster server; less IT energy for its work; zone with higher CRAC COP
+552,w0557-r1,delay_tolerant,0,9,1,4,2,1,1,less IT energy for its work; zone with higher CRAC COP
+553,w0418,time_sensitive,0,2,2,3,1,1,1,less IT energy for its work
+554,w0449,time_sensitive,0,8,2,7,1,1,1,less IT energy for its work
+555,w0449-r1,time_sensitive,0,8,2,7,1,1,1,less IT energy for its work
+556,w0323,delay_tolerant,0,2,2,7,1,1,1,faster server; less IT energy for its work
+557,w0323-r1,delay_tolerant,0,3,1,4,2,1,1,faster server; less IT energy for its work; cooler server; zone with higher CRAC COP
+558,w0026,delay_tolerant,0,8,2,9,1,1,1,less IT energy for its work
+559,w0026-r1,delay_tolerant,0,3,1,3,1,0,0,kept
+560,w0295,delay_tolerant,0,8,2,5,1,1,1,less IT energy for its work
+561,w0295-r1,delay_tolerant,0,8,2,5,1,1,1,less IT energy for its work
+562,w0207,delay_tolerant,0,8,2,5,1,1,1,less IT energy for its work
+563,w0207-r1,delay_tolerant,0,8,2,5,1,1,1,less IT energy for its work
+564,w0367,delay_tolerant,0,8,2,5,1,1,1,less IT energy for its work
+565,w0367-r1,delay_tolerant,0,4,2,5,1,1,1,original server full at the chosen start
+566,w0368,delay_tolerant,0,8,2,5,1,1,1,less IT energy for its work
+567,w0368-r1,delay_tolerant,0,4,2,5,1,1,1,original server full at the chosen start
+568,w0554,delay_tolerant,0,10,2,5,1,1,1,less IT energy for its work
+569,w0554-r1,delay_tolerant,0,4,2,5,1,1,1,original server full at the chosen start
+570,w0520,delay_tolerant,0,8,2,8,2,0,0,kept
+571,w0450,delay_tolerant,0,2,2,9,1,1,1,faster server; less IT energy for its work; cooler server
+572,w0450-r1,delay_tolerant,0,1,1,9,1,1,0,faster server; cooler server
+573,w0451,time_sensitive,0,2,2,3,1,1,1,less IT energy for its work
+574,w0451-r1,time_sensitive,0,4,2,8,2,1,0,original server full at the chosen start; faster server; cooler server
+575,w0224,delay_tolerant,0,2,2,9,1,1,1,faster server; less IT energy for its work; cooler server
+576,w0224-r1,delay_tolerant,0,3,1,3,1,0,0,kept
+577,w0644,delay_tolerant,0,2,2,8,2,1,0,faster server; less IT energy for its work; cooler server
+578,w0644-r1,delay_tolerant,0,3,1,9,1,1,0,faster server; cooler server
+579,w0109,delay_tolerant,0,7,1,1,1,1,0,original server full at the chosen start; less IT energy for its work; cooler server
+580,w0228,delay_tolerant,0,1,1,10,2,1,1,faster server; less IT energy for its work; cooler server
+581,w0651,delay_tolerant,0,4,2,3,1,1,1,original server full at the chosen start
+582,w0651-r1,delay_tolerant,0,5,1,3,1,1,0,original server full at the chosen start; cooler server
+583,w0690,delay_tolerant,0,6,2,4,2,1,0,less IT energy for its work; cooler server
+584,w0690-r1,delay_tolerant,0,8,2,4,2,1,0,less IT energy for its work
+585,w0225,time_sensitive,0,8,2,5,1,1,1,less IT energy for its work
+586,w0225-r1,time_sensitive,0,10,2,5,1,1,1,less IT energy for its work
+587,w0226,time_sensitive,0,8,2,3,1,1,1,less IT energy for its work
+588,w0226-r1,time_sensitive,0,10,2,3,1,1,1,less IT energy for its work
+589,w0322,delay_tolerant,0,6,2,7,1,1,1,less IT energy for its work
+590,w0322-r1,delay_tolerant,0,7,1,7,1,0,0,kept
+591,w0584,delay_tolerant,0,6,2,9,1,1,1,faster server; cooler server
+592,w0584-r1,delay_tolerant,0,8,2,9,1,1,1,less IT energy for its work
+593,w0541,time_sensitive,0,10,2,8,2,1,0,cooler server
+594,w0541-r1,time_sensitive,0,10,2,9,1,1,1,cooler server
+595,w0421,time_sensitive,0,10,2,2,2,1,0,carbon trade-off across the fleet (no single local cause)
+596,w0539,delay_tolerant,0,10,2,8,2,1,0,cooler server
+597,w0539-r1,delay_tolerant,0,6,2,9,1,1,1,faster server; cooler server
+598,w0034,delay_tolerant,0,3,1,5,1,1,0,faster server; less IT energy for its work; cooler server
+599,w0034-r1,delay_tolerant,0,8,2,5,1,1,1,less IT energy for its work
+600,w0708,delay_tolerant,0,8,2,8,2,0,0,kept
+601,w0708-r1,delay_tolerant,0,10,2,8,2,1,0,cooler server
+602,w0422,delay_tolerant,0,3,1,10,2,1,1,faster server; cooler server
+603,w0388,delay_tolerant,0,1,1,6,2,1,1,faster server; cooler server
+604,w0388-r1,delay_tolerant,0,6,2,8,2,1,0,faster server; cooler server

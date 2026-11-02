@@ -43,17 +43,20 @@ def test_overview():
     assert at.dataframe
     assert any(data.cold_plate_server_text() in c.value for c in at.caption)
     assert not any("MHz" in c.value for c in at.caption)
-    # 10 servers on the heavy day has no run in this release, and says so
-    assert any("Not run in this release: 10 servers · heavy day" in c.value for c in at.caption)
+    # the 2-server fleet has no run in this release, and says so
+    assert any("Not run in this release: 2 servers (every load level)" in c.value for c in at.caption)
     grid = at.dataframe[0].value.set_index("Test")
-    assert (grid["10 · heavy"] == "–").all()
+    assert grid["2 · heavy"].isin(["–", "n/a"]).all()
+    assert not grid["10 · heavy"].isin(["–", "·"]).any()
     # stuck runs say at which tick, and why, in the grid and in a note
     assert grid.loc["6.3 · Test 1 · High safety margin, 19 °C", "6 · heavy"] == \
         "⛔ stuck at tick 122, no schedule in cap"
     assert grid.loc["Base (every section)", "6 · heavy"].startswith("⏱ 29 at cap")
     assert grid.loc["6.4 · Test 1 · No reassignment (r_is = 0)", "6 · heavy"] == "✅ every tick"
+    assert grid.loc["6.4 · Test 1 · No reassignment (r_is = 0)", "10 · heavy"] == \
+        "⛔ stuck at tick 71, no valid schedule"
     note = next(i.value for i in at.info if "Stuck runs" in i.value)
-    assert "1 on 6 servers · heavy day" in note
+    assert "5 on 10 servers · heavy day, 1 on 6 servers · heavy day" in note
 
 
 @pytest.mark.parametrize("config,level", [(c, lv) for c in CONFIGS + ["across"]
@@ -276,11 +279,14 @@ def test_section_page_with_stuck_runs():
 @pytest.mark.parametrize("key", [s.key for s in ex.SECTIONS])
 def test_a_configuration_not_run_in_this_release(key):
     at = _section(key)
-    at.session_state["config"] = "servers10"
+    at.session_state["config"] = "servers2"
     at.session_state["level"] = "heavy"
     at.run()
     _ok(at)
-    assert "10 servers · heavy day is not run in this release" in at.info[0].value
-    at = _charts("servers10", key, "Base", level="heavy")
+    if key == "6.2":                        # no cold plate on 2 servers: 6.2 does not apply
+        assert "does not apply" in at.info[0].value
+    else:
+        assert "2 servers · heavy day is not run in this release" in at.info[0].value
+    at = _charts("servers2", key, "Base", level="heavy")
     _ok(at)
     assert "not run in this release" in at.info[0].value

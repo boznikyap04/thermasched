@@ -35,27 +35,30 @@ with the code of release 1.5.0 before its version number was set. 35 finished an
 `partial_schedule.csv` (the workloads started before that tick), with no `optimized/` folder.
 They are reported as they are, not re-run.
 
-**10 servers: release 1.4.0, waiting for the re-run.** Solved with the code of 1.4.0 before
-its version number was set, so their `summary.json` says 1.4.0 with `relabelled_from: 1.3.0`
-in its provenance. Only the Base and 6.2 count: of these runs, only the 6.2 runs had cold
-plates on. Each day's 6.2 Base, with every other switch at its default, is that day's Base
-(its folder `s2_base` was renamed `base`, `renamed_from` in its provenance); 6.2 Tests 1 and
-2 stand. The other folders (6.1 Tests 1-2, 6.3, 6.4) hold runs with cold plates off until
-they are re-run; the site shows those tests as not run yet. The counts below are of the
-1.4.0 batch as it was solved, before the rename. The 1.4.0 6-server batch (Actions run
-40693621559: 39 runs, 20 finished, 19 stuck) is replaced by the re-run above.
+**10 servers: release 1.5.0, re-run with cold plates on** (Actions run 41441956166, release
+1.5.0 code): all 36 runs, light, normal and heavy, solved as the 6-server runs above. Their
+`summary.json` says `thermasched_version` 1.5.0, with no relabel: the release's version was
+already set. 31 finished and 5 are stuck, all on the heavy day; every check passed. No run
+crashed: the HiGHS segmentation faults of the 1.4.0 batch did not come back.
 
-- **10 servers** (Actions runs 40754754068, 40754820788, 40754837540, 40754856946): 26 runs,
-  11 finished, 12 stuck, 3 crashed. All twelve stuck runs found no schedule for the tick
-  within the 60 s cap.
-  - Light day (`servers10_light`): 9 finished; stuck: the Base, 6.2 Test 2 and 6.3 Test 1
-    (all at tick 125); crashed: 6.4 Test 3a (tick 112).
-  - Normal day (`servers10`): 6.4 Test 1 and 6.4 Test 2 finished; stuck: the Base (tick 131),
-    6.1 Test 1 (131), 6.1 Test 2 (71), 6.2 Base (55), 6.2 Test 1 (55), 6.3 Test 1 (71),
-    6.3 Test 2 (55), 6.3 Test 3 (55), 6.4 Test 3b (144); crashed: 6.2 Test 2 (tick 107) and
-    6.4 Test 3a (tick 58).
-  - The three crashed runs have no folder here. The solver process died with a segmentation
-    fault (exit code 139) on the GitHub runner; resumed from their checkpoints (Actions runs
-    40821776650 and 40821779530) they crashed again at the same tick, which solves on macOS,
-    so the fault is in HiGHS 1.15.1 on the Linux runner, not in the model.
-- **10 servers, heavy day:** not run in this release.
+- Light day (`servers10_light`): 12 finished, 0-6 ticks at the cap, no tick extended.
+  Carbon −12.6 to −13.2 % against the baseline (6.2 Test 2, CRAC fixed: −0.9 %; 6.4 Test 1,
+  no moves: −12.1 %).
+- Normal day (`servers10`): 12 finished, 0-25 ticks at the cap, 5 ticks extended (6.1 Test 2:
+  1, 6.2 Test 1: 1, 6.4 Test 3b: 3). Carbon −12.7 to −13.3 % (6.2 Test 2: −1.2 %; 6.4 Test 1:
+  −12.3 %).
+- Heavy day (`servers10_heavy`): 7 finished, 10-53 ticks at the cap, 15 ticks extended;
+  carbon −12.1 to −13.3 % (6.2 Test 2: −1.2 %). Stuck:
+  - with no schedule within the 60 s cap, nor in 300 s in all: 6.1 Test 1 (regrouped zones)
+    at tick 119, 6.3 Test 3 (H_min 5 °C) at tick 139, 6.4 Test 2 (moves chosen without
+    temperature) at tick 145 and 6.4 Test 3b (deeper carbon swing) at tick 119;
+  - with no valid schedule: 6.4 Test 1 (no moves) at tick 71, where relaxing deadlines and
+    allowed waiting, server capacity or priority alone gives a schedule.
+- A few ticks stopped at the cap with almost no bound, so their gap is meaningless (the
+  schedule is valid and its carbon checked): 6.2 Test 2 on the normal day (tick 96, gap
+  2,448,986 %) and heavy day (ticks 84 and 87, up to 366,024 %).
+
+The 1.4.0 10-server batch (Actions runs 40754754068, 40754820788, 40754837540, 40754856946:
+26 runs, 11 finished, 12 stuck, 3 crashed, cold plates off outside 6.2, no heavy day) and the
+1.4.0 6-server batch (Actions run 40693621559: 39 runs, 20 finished, 19 stuck) are replaced by
+the re-runs above.

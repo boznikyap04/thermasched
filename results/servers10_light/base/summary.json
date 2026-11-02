@@ -24,16 +24,12 @@
   },
   "provenance": {
     "schema_version": 1,
-    "thermasched_version": "1.4.0",
-    "relabelled_from": "1.3.0",
-    "relabel_note": "solved with the code of release 1.4.0 (commit below) before its version number was set",
-    "renamed_from": "s2_base",
-    "rename_note": "6.2 Base: cold plates on, every other switch at its default, so the Base once cold plates became the default",
+    "thermasched_version": "1.5.0",
     "made_with": "command line",
-    "created_utc": "2026-10-28T20:58:10Z",
-    "git_commit": "5812f4b",
+    "created_utc": "2026-11-02T13:00:13Z",
+    "git_commit": "9eb4943",
     "scenario_fingerprint": "14dff89fca5e",
-    "scenario_built_with": "1.3.0",
+    "scenario_built_with": "1.5.0",
     "highspy": "1.15.1",
     "python": "3.12.3"
   },
@@ -63,20 +59,23 @@
     "ci_flat": false,
     "fan_power": false,
     "per_tick": true,
-    "tick_time_limit_s": 60.0
+    "tick_time_limit_s": 60.0,
+    "tick_no_schedule_limit_s": 300.0
   },
   "mode": "per_tick",
   "per_tick": {
     "outcome": "done",
     "n_ticks": 288,
     "tick_time_limit_s": 60.0,
-    "n_ticks_optimal": 237,
-    "n_ticks_time_limit": 51,
+    "tick_no_schedule_limit_s": 300.0,
+    "n_ticks_extended": 0,
+    "n_ticks_optimal": 285,
+    "n_ticks_time_limit": 3,
     "n_ticks_no_bound": 0,
-    "total_solve_s": 5246.005989661999,
+    "total_solve_s": 3136.140750518999,
     "slowest_tick": 110,
-    "slowest_tick_solve_s": 70.80110699300008,
-    "max_mip_gap": 0.17120712385802433,
+    "slowest_tick_solve_s": 70.14225634600007,
+    "max_mip_gap": 0.16328598877529324,
     "resumed_from_tick": null,
     "stuck": null,
     "ticks_file": "ticks.csv"
@@ -231,67 +230,67 @@
     "valid": true,
     "violations": [],
     "metrics": {
-      "carbon_kg": 39.85620673662785,
-      "E_IT_kWh": 56.87615845052083,
-      "E_crac_kWh": 7.3360504481236735,
-      "E_cp_kWh": 6.921731152889952e-05,
-      "Q_cp_kWh": 16.991519374162042,
+      "carbon_kg": 40.13609632901934,
+      "E_IT_kWh": 57.333058739583336,
+      "E_crac_kWh": 7.324080127894213,
+      "E_cp_kWh": 6.598433855927558e-05,
+      "Q_cp_kWh": 17.513499900248075,
       "E_fan_kWh": 0.0,
-      "E_total_kWh": 64.21227811595604,
+      "E_total_kWh": 64.6572048518161,
       "n_late": 0,
       "n_noncompliant": 0,
-      "mean_wait_RT": 2.685185185185185,
-      "max_wait_RT": 34.0,
-      "mean_wait_DT": 21.46896551724138,
+      "mean_wait_RT": 1.0,
+      "max_wait_RT": 27.0,
+      "mean_wait_DT": 7.248275862068965,
       "max_wait_DT": 96.0,
       "n_priority_violations": 0,
-      "hottest_T_C": 75.06209381931502,
-      "mean_T_C": 54.35200396011482,
-      "min_headroom_C": 14.937906180684976,
-      "mean_headroom_C": 35.64799603988519,
-      "periods_above_dvfs": 4,
+      "hottest_T_C": 68.18334633645829,
+      "mean_T_C": 54.2379959865946,
+      "min_headroom_C": 21.816653663541715,
+      "mean_headroom_C": 35.7620040134054,
+      "periods_above_dvfs": 0,
       "periods_above_cap": 0,
-      "n_throttled_servers": 2,
-      "n_reassigned": 182,
-      "n_cross_zone": 101,
+      "n_throttled_servers": 0,
+      "n_reassigned": 168,
+      "n_cross_zone": 103,
       "hottest_server": 3,
-      "hottest_period": 123,
+      "hottest_period": 121,
       "n_unplaced": 0,
-      "min_DPF": 0.9990611414519568
+      "min_DPF": 1.0
     },
     "totals": {
-      "E_IT_kWh": 56.87615845052083,
-      "E_crac_kWh": 7.3360504481236735,
-      "E_cp_kWh": 6.921731152889952e-05,
+      "E_IT_kWh": 57.333058739583336,
+      "E_crac_kWh": 7.324080127894213,
+      "E_cp_kWh": 6.598433855927558e-05,
       "E_fan_kWh": 0.0,
-      "Q_cp_kWh": 16.991519374162042,
-      "E_total_kWh": 64.21227811595604,
-      "carbon_g": 39856.20673662785,
-      "carbon_kg": 39.85620673662785,
+      "Q_cp_kWh": 17.513499900248075,
+      "E_total_kWh": 64.6572048518161,
+      "carbon_g": 40136.09632901934,
+      "carbon_kg": 40.13609632901934,
       "n_workloads": 199,
       "n_unplaced": 0,
       "n_late": 0,
       "n_wait_exceeded": 0,
       "n_work_short": 0,
       "n_noncompliant": 0,
-      "mean_wait_RT": 2.685185185185185,
-      "max_wait_RT": 34.0,
-      "mean_wait_DT": 21.46896551724138,
+      "mean_wait_RT": 1.0,
+      "max_wait_RT": 27.0,
+      "mean_wait_DT": 7.248275862068965,
       "max_wait_DT": 96.0,
-      "hottest_T_C": 75.06209381931502,
+      "hottest_T_C": 68.18334633645829,
       "hottest_server": 3,
-      "hottest_period": 123,
-      "min_headroom_C": 14.937906180684976,
-      "periods_above_dvfs": 4,
+      "hottest_period": 121,
+      "min_headroom_C": 21.816653663541715,
+      "periods_above_dvfs": 0,
       "periods_above_cap": 0,
-      "min_DPF": 0.9990611414519568,
-      "n_throttled_servers": 2,
-      "mean_T_C": 54.35200396011482,
-      "mean_headroom_C": 35.64799603988519,
+      "min_DPF": 1.0,
+      "n_throttled_servers": 0,
+      "mean_T_C": 54.2379959865946,
+      "mean_headroom_C": 35.7620040134054,
       "n_priority_violations": 0,
       "E_crac_by_zone_kWh": [
-        3.852687530870802,
-        3.4833629172528715
+        3.7099887350966414,
+        3.6140913927975724
       ]
     },
     "compliance_flags": {
@@ -314,33 +313,33 @@
   "comparison": {
     "carbon_kg": {
       "baseline": 46.03746367993373,
-      "optimized": 39.85620673662785,
-      "diff": -6.181256943305883,
-      "pct": -13.426580113708775
+      "optimized": 40.13609632901934,
+      "diff": -5.901367350914391,
+      "pct": -12.818619618019076
     },
     "E_IT_kWh": {
       "baseline": 57.77866095052083,
-      "optimized": 56.87615845052083,
-      "diff": -0.9025024999999971,
-      "pct": -1.5619996814617452
+      "optimized": 57.333058739583336,
+      "diff": -0.4456022109374942,
+      "pct": -0.7712228071867031
     },
     "E_crac_kWh": {
       "baseline": 16.246670820240123,
-      "optimized": 7.3360504481236735,
-      "diff": -8.91062037211645,
-      "pct": -54.845823311786354
+      "optimized": 7.324080127894213,
+      "diff": -8.92259069234591,
+      "pct": -54.91950191561791
     },
     "E_cp_kWh": {
       "baseline": 6.94144440270473e-05,
-      "optimized": 6.921731152889952e-05,
-      "diff": -1.9713249814778705e-07,
-      "pct": -0.2839934842249467
+      "optimized": 6.598433855927558e-05,
+      "diff": -3.4301054677717224e-06,
+      "pct": -4.9414866255144005
     },
     "Q_cp_kWh": {
       "baseline": 14.309068503886357,
-      "optimized": 16.991519374162042,
-      "diff": 2.6824508702756855,
-      "pct": 18.74650938701656
+      "optimized": 17.513499900248075,
+      "diff": 3.204431396361718,
+      "pct": 22.394409499761576
     },
     "E_fan_kWh": {
       "baseline": 0.0,
@@ -350,9 +349,9 @@
     },
     "E_total_kWh": {
       "baseline": 74.02540118520498,
-      "optimized": 64.21227811595604,
-      "diff": -9.813123069248945,
-      "pct": -13.256426729383584
+      "optimized": 64.6572048518161,
+      "diff": -9.36819633338888,
+      "pct": -12.655380698242329
     },
     "n_late": {
       "baseline": 0,
@@ -368,20 +367,20 @@
     },
     "mean_wait_RT": {
       "baseline": 0.0,
-      "optimized": 2.685185185185185,
-      "diff": 2.685185185185185,
+      "optimized": 1.0,
+      "diff": 1.0,
       "pct": null
     },
     "max_wait_RT": {
       "baseline": 0.0,
-      "optimized": 34.0,
-      "diff": 34.0,
+      "optimized": 27.0,
+      "diff": 27.0,
       "pct": null
     },
     "mean_wait_DT": {
       "baseline": 0.0,
-      "optimized": 21.46896551724138,
-      "diff": 21.46896551724138,
+      "optimized": 7.248275862068965,
+      "diff": 7.248275862068965,
       "pct": null
     },
     "max_wait_DT": {
@@ -398,32 +397,32 @@
     },
     "hottest_T_C": {
       "baseline": 65.79048835776,
-      "optimized": 75.06209381931502,
-      "diff": 9.271605461555026,
-      "pct": 14.092622950505032
+      "optimized": 68.18334633645829,
+      "diff": 2.392857978698288,
+      "pct": 3.6370880326746353
     },
     "mean_T_C": {
       "baseline": 47.07387690978634,
-      "optimized": 54.35200396011482,
-      "diff": 7.278127050328479,
-      "pct": 15.46107422653222
+      "optimized": 54.2379959865946,
+      "diff": 7.164119076808255,
+      "pct": 15.218884755419163
     },
     "min_headroom_C": {
       "baseline": 24.209511642240003,
-      "optimized": 14.937906180684976,
-      "diff": -9.271605461555026,
-      "pct": -38.29736674810994
+      "optimized": 21.816653663541715,
+      "diff": -2.392857978698288,
+      "pct": -9.883958065983057
     },
     "mean_headroom_C": {
       "baseline": 42.926123090213665,
-      "optimized": 35.64799603988519,
-      "diff": -7.278127050328472,
-      "pct": -16.955006710092917
+      "optimized": 35.7620040134054,
+      "diff": -7.164119076808262,
+      "pct": -16.689415584426595
     },
     "periods_above_dvfs": {
       "baseline": 0,
-      "optimized": 4,
-      "diff": 4,
+      "optimized": 0,
+      "diff": 0,
       "pct": null
     },
     "periods_above_cap": {
@@ -434,33 +433,33 @@
     },
     "n_throttled_servers": {
       "baseline": 0,
-      "optimized": 2,
-      "diff": 2,
+      "optimized": 0,
+      "diff": 0,
       "pct": null
     },
     "n_reassigned": {
       "baseline": 0,
-      "optimized": 182,
-      "diff": 182,
+      "optimized": 168,
+      "diff": 168,
       "pct": null
     },
     "n_cross_zone": {
       "baseline": 0,
-      "optimized": 101,
-      "diff": 101,
+      "optimized": 103,
+      "diff": 103,
       "pct": null
     }
   },
   "solver": {
     "status": "time_limit",
-    "solver_status_text": "per tick: 237 of 288 optimal, 51 at the tick time limit",
-    "solve_time_s": 5246.005989661999,
-    "mip_gap": 0.17120712385802433,
-    "objective_g": 39856.206736629414,
+    "solver_status_text": "per tick: 285 of 288 optimal, 3 at the tick time limit",
+    "solve_time_s": 3136.140750518999,
+    "mip_gap": 0.16328598877529324,
+    "objective_g": 40136.09632901934,
     "best_bound_g": null,
-    "n_variables": 61729,
-    "n_binaries": 32402,
-    "n_constraints": 99005,
+    "n_variables": 52084,
+    "n_binaries": 24273,
+    "n_constraints": 73286,
     "relaxed": [],
     "has_schedule": true,
     "notes": [
@@ -482,7 +481,8 @@
       "Availability (11): every server is available in every period (AV = 1).",
       "Cold plates: 3 on 3 server(s). Each picks one of the flow settings [0.1, 0.15, 0.2, 0.25, 0.3] L/min per period (one-hot), so its resistance and the cubic pump power of Eq. (48) are lookups. T_prev - coolant is split into d_j <= d_max*b_j, so Q_cp <= n*sum G_j*d_j is linear (G_j = min(1/R_j, flow_j*c_pw)); Q_cp <= P_IT and Q_cp <= n*0.3 kW. T_prev is the previous period's temperature, and d_j >= 0 keeps the coolant at or below it.",
       "Per-tick re-planning: the model above is solved once per tick over a window from the tick to the end of the horizon, holding only the workloads that have arrived; running workloads keep their server and start and count only the work they have left; T0 is each server's temperature at the end of the previous tick (Eq. 30), and the supply temperatures of the previous ticks bound the ramps (35)-(36). Only the tick's own decisions are kept.",
-      "288 ticks: 237 solved to the gap, 51 stopped at the tick time limit (slowest 70.8 s, tick 110). The objective is the sum of each tick's own carbon for its period; the gap shown is the largest of any tick."
+      "Each tick starts from the previous tick's plan, with the workloads that arrived since placed by the baseline rule (arrival order, earliest start with room for cores and memory, least loaded server first); the solver may change any of it. A tick with no schedule at the tick time limit is solved again until the no-schedule limit.",
+      "288 ticks: 285 solved to the gap, 3 stopped at the tick time limit (slowest 70.1 s, tick 110). The objective is the sum of each tick's own carbon for its period; the gap shown is the largest of any tick."
     ]
   },
   "infeasibility": null,
@@ -492,9 +492,9 @@
     },
     "optimizer_objective_equals_evaluator_carbon": {
       "passed": true,
-      "optimizer_objective_g": 39856.206736629414,
-      "evaluator_carbon_g": 39856.20673662785,
-      "relative_difference": 3.924936704053717e-14
+      "optimizer_objective_g": 40136.09632901934,
+      "evaluator_carbon_g": 40136.09632901934,
+      "relative_difference": 0.0
     },
     "optimized_schedule_valid_under_evaluator": {
       "passed": true,
