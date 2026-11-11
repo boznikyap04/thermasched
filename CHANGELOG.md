@@ -14,6 +14,37 @@ run.
   section 4 shows which scenarios differ from before), then solve again. The site warns when
   a run was solved on a different scenario build than the one it holds.
 
+## 1.5.2 (2026-11-11)
+
+**Re-run:** nothing. The two new settings are off unless a run asks for them, so every earlier
+run solves exactly as before and stays valid. Replace the notebooks to get the settings and the
+6.5 runs.
+
+- **Section 6.5, an ablation:** two stripped-down models are compared with the Base, which is
+  the full model (Model C), to show what flexible start times and temperature-dependent speed
+  contribute.
+  - Model A (`s5_t1_no_wait`): every workload starts in its arrival period, so none waits;
+    the model still chooses the server. Its planner takes no thermal slowdown (DPF = 1).
+  - Model B (`s5_t2_no_dpf`): start times are flexible, as in the Base; its planner takes no
+    thermal slowdown.
+- **Two run settings:** `start_at_arrival` (`--start-at-arrival`) and `planner_dpf`
+  (`--no-planner-dpf` turns it off). With `planner_dpf` off only the planner ignores the
+  slowdown: the played-out day and the evaluator keep it, so a workload can run slower than
+  planned. Per tick only. Such a run stops as stuck when a running workload can no longer
+  meet its deadline, or when work is left after the last tick.
+- **6 servers, 6.5 runs:** both models on the light, normal and heavy day, six runs. Five
+  finish the day with every check passed and no missed deadline. Against the Base, Model A
+  emits −0.1 %, +1.2 % and +1.2 % carbon (light, normal, heavy) and Model B +0.2 % and
+  +0.06 % (light, normal). Model B on the heavy day is stuck at tick 226: two running
+  workloads ran slower than their plan and cannot meet their deadline. The runs were solved
+  on a Mac, not on GitHub Actions, with the code of this release before its version number
+  was set, so their `summary.json` says 1.5.1 (`results/README.md`).
+- **Site:** a 6.5 page with the Base, Model A and Model B side by side. New measures: server
+  periods above the 75 °C slowdown onset and above the thermal cap. New per-server figure:
+  workloads run. A run with work left after the last tick is described as such.
+- A fleet's run list has 42 runs. The 10-server fleet has no 6.5 runs; the site shows them as
+  *not run yet*.
+
 ## 1.5.1 (2026-11-03)
 
 **Re-run:** nothing. The solver, the scenarios and the notebooks are those of 1.5.0; only the

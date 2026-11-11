@@ -720,8 +720,9 @@ def test_stuck_run_in_the_chapter6_table():
     stuck = table[data.is_stuck(table)]
     assert data.has_result(stuck).all()                     # a stuck run is a result
     heavy = stuck[stuck["configuration"] == "6 servers · heavy day"]
-    # with cold plates on, only 6.3 Test 1 on the heavy day of 6 servers gets stuck
-    assert list(heavy["run"].unique()) == ["s3_t1_hmin_high"]
+    # with cold plates on, 6.3 Test 1 on the heavy day of 6 servers gets stuck at the cap; so
+    # does 6.5 Model B, whose planner takes no slowdown, when two workloads fall behind
+    assert sorted(heavy["run"].unique()) == ["s3_t1_hmin_high", "s5_t2_no_dpf"]
 
 
 def test_a_configuration_without_runs_is_not_run_in_this_release():

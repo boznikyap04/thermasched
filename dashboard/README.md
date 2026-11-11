@@ -99,7 +99,7 @@ model (Model C). Its measures are carbon; electricity, total and by component; a
 longest completion time, waiting and execution time; missed deadlines; the highest
 temperature, the server periods above the 75 °C slowdown onset and above the thermal cap,
 and the lowest DPF. Its per-server table opens on the workloads each server ran. A test
-without a run (6.5 before its batch, and on 10 servers until it is run there) shows as
+without a run (6.5 on 10 servers, until it is run there) shows as
 *not run yet*, with "–" for its measures.
 
 Every comparison is with the Base test of the same scenario and configuration, shared by
@@ -122,7 +122,7 @@ one: it keeps `summary.json`, `ticks.csv` and `partial_schedule.csv` (the worklo
 before the stuck tick), but has no full-day schedule. The overview and the scenario pages show
 it as stuck at its tick, with blank measures and no bars or per-server figures; *Test charts*
 says at which tick (and local time) and why it stopped, what it keeps, and charts the solve
-time of every tick up to it. A configuration with no run at all (in release 1.5.1, the 2-server
+time of every tick up to it. A configuration with no run at all (in release 1.5.2, the 2-server
 fleet) shows as *not run in this release*.
 
 Most charts are interactive. Hover for values, drag to zoom, and double-click to reset.

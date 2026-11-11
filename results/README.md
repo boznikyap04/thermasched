@@ -3,11 +3,29 @@
 Solver outputs, one folder per run: `results/<configuration>/<test id>/summary.json`, with
 `baseline/` and `optimized/` next to it. The site reads every run under this folder.
 
-Per-tick runs, R840 + C6320 fleet, solved on GitHub Actions with a 60 s cap per tick.
+Per-tick runs, R840 + C6320 fleet, solved on GitHub Actions with a 60 s cap per tick (the
+6.5 runs were solved on a Mac, see below).
 6.4 Test 3b runs on the day's `_swing` scenario and is filed under the day's folder. The
 whole-day results of earlier releases are in `archive/results_2026-10-25_whole_day/`.
-6.5 (ablation: `s5_t1_no_wait`, Model A, and `s5_t2_no_dpf`, Model B; its Base is `base`)
-has no runs yet; the site shows its models as *not run yet*.
+
+**6 servers, 6.5 (ablation): release 1.5.2** (commit 12a8e6f): Model A (`s5_t1_no_wait`) and
+Model B (`s5_t2_no_dpf`) on the light, normal and heavy day, six runs; their Base is `base`
+of the 1.5.0 re-run below. They were solved on a Mac (Apple M4, four runs at a time, then
+two), not on GitHub Actions, with the same 60 s cap per tick. A tick that stops at the cap
+keeps the best schedule found by then, which depends on the machine, so the capped ticks of
+these runs and of their Base were solved on different hardware. Their `summary.json` says
+`thermasched_version` 1.5.1: they were solved with the code of release 1.5.2 before its
+version number was set. Five finished and 1 is stuck; every check passed and no finished run
+misses a deadline. The 10-server fleet has no 6.5 runs; the site shows them as *not run yet*.
+
+- Model A, every workload started on arrival: 3 finished, every tick solved to the gap, none
+  at the cap. Carbon −13.2 % (light), −12.9 % (normal) and −12.3 % (heavy) against the
+  baseline; against the Base −0.1 %, +1.2 % and +1.2 %.
+- Model B, flexible starts: light day finished with no tick at the cap, carbon −13.0 %
+  against the baseline (+0.2 % against the Base); normal day finished with 4 ticks at the
+  cap, −14.0 % (+0.06 %). The heavy day is stuck at tick 226 (12 earlier ticks at the cap):
+  two running workloads (`w0644`, `w0644-r1`) ran slower than their plan, which takes no
+  slowdown, and have more work left than fits before their deadline.
 
 **6 servers: release 1.5.0, re-run with cold plates on** (Actions run 40898903689,
 commit e4ffe45): all 36 runs, light, normal and heavy, with cold plates on in every test, each

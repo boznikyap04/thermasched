@@ -64,8 +64,15 @@ def test_overview():
     assert grid.loc["6.4 · Test 1 · No reassignment (r_is = 0)", "6 · heavy"] == "✅ every tick"
     assert grid.loc["6.4 · Test 1 · No reassignment (r_is = 0)", "10 · heavy"] == \
         "⛔ stuck at tick 71, no valid schedule"
+    # 6.5 Model B plans without the slowdown: on the heavy day two running workloads fall
+    # behind their plan and cannot meet their deadline
+    assert grid.loc["6.5 · Model B · Flexible starts, planner without slowdown", "6 · heavy"] == \
+        "⛔ stuck at tick 226, no valid schedule"
+    assert grid.loc["6.5 · Model A · Starts on arrival, planner without slowdown", "6 · heavy"] == \
+        "✅ every tick"
     note = next(i.value for i in at.info if "Stuck runs" in i.value)
-    assert "5 on 10 servers · heavy day, 1 on 6 servers · heavy day" in note
+    assert "5 on 10 servers · heavy day, 2 on 6 servers · heavy day" in note
+    assert "6 servers · heavy day 6.5 Model B (tick 226) has no valid schedule (deadlines)" in note
 
 
 @pytest.mark.parametrize("config,level", [(c, lv) for c in CONFIGS + ["across"]
