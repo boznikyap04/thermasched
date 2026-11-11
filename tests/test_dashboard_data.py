@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import csv
 import json
 from pathlib import Path
 
@@ -10,6 +11,7 @@ import pandas as pd
 import pytest
 
 from dashboard import data
+from scheduler.pertick import run_per_tick
 
 # The runs on the site, and the runs taken off it on 2026-10-25 (small, infeasible and older
 # runs the loader tests use).
@@ -540,7 +542,9 @@ def test_chapter6_uses_the_newest_matching_run(tmp_path):
     assert used.name == "new" and [r.name for r in found] == ["old", "new"]
     assert cat[("servers6", "s1_t1_zones")] == (None, [])
     table = data.chapter6_table(runs, configs=["servers6"])
-    assert table.loc[table["tag"] == "Base", "run"].tolist() == ["new"] * 4
+    from scheduler import experiments as ex
+    # the Base is the reference of every section (6.1 to 6.5): one row each, one run
+    assert table.loc[table["tag"] == "Base", "run"].tolist() == ["new"] * len(ex.SECTIONS)
     groups = data.config_runs(runs)
     assert [r.name for r in groups["servers6"]] == ["new", "old"]   # used first, then older
 
@@ -554,7 +558,12 @@ def test_config_runs():
     every = [r.key for refs in groups.values() for r in refs]
     assert sorted(every) == sorted(r.key for r in RUNS)            # each run once
     from scheduler import experiments as ex
-    assert [r.name for r in groups["servers10"]] == [t.id for t in ex.TESTS]   # in test order
+    # the run of each test that has one, in test order; a test without a run (6.5 on 10
+    # servers) is left out, and every test of 6.1 to 6.4 has its run
+    cat = data.catalogue(RUNS)
+    ran = [t.id for t in ex.TESTS if cat[("servers10", t.id)][0] is not None]
+    assert [r.name for r in groups["servers10"]] == ran
+    assert set(ran) >= {tid for s in ex.SECTIONS if s.key != "6.5" for _, tid in s.tests}
     mixed = data.config_runs(RUNS + [r for r in ARCHIVED if r.scenario == "archive-small"])
     assert data.OTHER in mixed
 
@@ -727,3 +736,90 @@ def test_a_configuration_without_runs_is_not_run_in_this_release():
     table = data.chapter6_table(RUNS, configs=["servers2_heavy"])
     assert not data.has_result(table).any()
     assert set(table["status"]) <= {data.NOT_IN_RELEASE, data.NOT_APPLICABLE}
+
+
+# -- section 6.5: the ablation -------------------------------------------------------------
+
+def test_every_section_has_its_measures_and_per_server_figure():
+    from scheduler import experiments as ex
+    for section in ex.SECTIONS:
+        measures = data.SECTION_MEASURES[section.key]
+        assert set(measures) <= set(data.CHAPTER6_METRICS), section.key
+        assert data.SECTION_SERVER_STATS[section.key] in data.SERVER_STATS, section.key
+    # 6.5 answers: carbon; electricity, total and by component; completion, waiting and
+    # execution time; late workloads; temperature, time above 75 degC and the cap, and DPF
+    assert set(data.SECTION_MEASURES["6.5"]) >= {
+        "carbon_kg", "E_total_kWh", "E_IT_kWh", "E_crac_kWh", "E_cp_Wh",
+        "turnaround_mean_min", "turnaround_max_min", "wait_mean_min", "n_late", "pct_late",
+        "T_max_C", "n_periods_above_dvfs", "n_periods_above_cap", "DPF_min"}
+    assert data.SECTION_SERVER_STATS["6.5"] == "n_workloads"     # how the work is spread
+
+
+@needs_site_runs
+def test_periods_above_the_limits_come_from_the_evaluator():
+    ref = BY_KEY[BASE]
+    summary = data.load_summary(ref.path)
+    row = data.chapter6_row(ref, summary)
+    met = summary["optimized"]["metrics"]
+    assert row["n_periods_above_dvfs"] == met["periods_above_dvfs"] > 0
+    assert row["n_periods_above_cap"] == met["periods_above_cap"] == 0
+    # by hand: server periods above 75 degC
+    sp = pd.read_csv(ref.path / "optimized" / "server_period.csv")
+    assert row["n_periods_above_dvfs"] == int((sp["temperature_C"] > 75.0 + 1e-9).sum())
+
+
+@needs_site_runs
+def test_workloads_run_per_server(loaded):
+    run = loaded(BASE)
+    stats = data.server_stats(run)
+    sch = pd.read_csv(run.ref.path / "optimized" / "schedule.csv")
+    counts = sch[sch["placed"] == 1]["server"].value_counts()
+    assert stats["n_workloads"].sum() == (sch["placed"] == 1).sum() == run.summary["scenario"]["I"]
+    assert (stats.set_index("s")["n_workloads"] == stats["s"].map(counts).fillna(0)
+            .set_axis(stats["s"])).all()
+    assert list(stats.columns) == [*data.server_columns(run.servers), *data.SERVER_STATS]
+
+
+def _stuck_summary(T: int, tmp_path) -> dict:
+    """The summary.json fields the site reads of a per-tick run with the planner without
+    slowdown (6.5) on the one-server scenario of the per-tick tests: with a 4-period day the
+    work is left after the last tick, with 5 tick 5 has no valid schedule."""
+    from scheduler.pertick import per_tick_block
+    from scheduler.types import RunSettings
+    from tests.test_pertick import _hot_scenario
+    st = RunSettings(scenario="hot", supply_temp_mode="fixed", fixed_supply_temp_C=20.0,
+                     per_tick=True, planner_dpf=False, mip_rel_gap=1e-9)
+    out = run_per_tick(_hot_scenario(T, 1.95), {1: 1}, st, tmp_path / f"T{T}")
+    ticks = list(csv.DictReader((tmp_path / f"T{T}" / "ticks.csv").read_text().splitlines()))
+    return {"mode": "per_tick", "per_tick": per_tick_block(out, st), "scenario": {"T": T},
+            "solver": {"status": out.stuck["status"]}, "has_optimized_schedule": False,
+            "ticks_csv": ticks}
+
+
+def test_stuck_after_the_last_tick(tmp_path):
+    """The planner without slowdown left work after the last tick: every tick had a schedule
+    (ticks.csv keeps the last tick's normal status), and the site says the run stopped after
+    it, not at a tick with no schedule."""
+    after = _stuck_summary(4, tmp_path)
+    stuck, ticks = data.stuck_info(after), data.per_tick_info(after)
+    assert stuck["tick"] == 4 and after["ticks_csv"][-1]["status"] in ("optimal", "time_limit")
+    assert data.stuck_after_last_tick(stuck, ticks)
+    reason = data.stuck_reason(stuck, 60.0, True)
+    assert reason == "work left after the last tick (deadlines)"
+    assert data.solver_short(after["solver"], ticks) == f"Stuck at tick 4: {reason}"
+    text = data.stuck_sentence(after)
+    assert text.startswith("Stuck after the last tick, 4 of 4: every tick had a schedule")
+    assert "All 4 ticks were solved" in text and "before it" not in text
+    assert "['w1']" in text                                  # workload ids, not indices
+
+    # a tick inside the day with no schedule for the running workload: stuck at that tick
+    midday = _stuck_summary(5, tmp_path)
+    stuck, ticks = data.stuck_info(midday), data.per_tick_info(midday)
+    assert stuck["tick"] == 5 and midday["ticks_csv"][-1]["status"] not in ("optimal",
+                                                                            "time_limit")
+    assert not data.stuck_after_last_tick(stuck, ticks)
+    assert data.solver_short(midday["solver"], ticks) == \
+        "Stuck at tick 5: no valid schedule (deadlines)"
+    text = data.stuck_sentence(midday)
+    assert "no valid schedule exists for it: running workload" in text
+    assert "The 4 ticks before it were solved" in text

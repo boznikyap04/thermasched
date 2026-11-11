@@ -6,6 +6,8 @@ Solver outputs, one folder per run: `results/<configuration>/<test id>/summary.j
 Per-tick runs, R840 + C6320 fleet, solved on GitHub Actions with a 60 s cap per tick.
 6.4 Test 3b runs on the day's `_swing` scenario and is filed under the day's folder. The
 whole-day results of earlier releases are in `archive/results_2026-10-25_whole_day/`.
+6.5 (ablation: `s5_t1_no_wait`, Model A, and `s5_t2_no_dpf`, Model B; its Base is `base`)
+has no runs yet; the site shows its models as *not run yet*.
 
 **6 servers: release 1.5.0, re-run with cold plates on** (Actions run 40898903689,
 commit e4ffe45): all 36 runs, light, normal and heavy, with cold plates on in every test, each

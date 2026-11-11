@@ -16,6 +16,7 @@ FORMATS = {
     "E_crac_zone1_kWh": "%.3f", "E_crac_zone2_kWh": "%.3f", "E_crac_kWh": "%.3f",
     "E_IT_kWh": "%.3f", "E_cp_Wh": "%.3f", "E_cooling_kWh": "%.3f", "E_total_kWh": "%.3f",
     "carbon_kg": "%.3f", "T_mean_C": "%.1f", "T_max_C": "%.1f", "H_mean_C": "%.1f",
+    "n_periods_above_dvfs": "%d", "n_periods_above_cap": "%d",
     "n_moved_server": "%d", "n_moved_zone": "%d", "n_late": "%d", "pct_late": "%.2f",
     "n_throttled_servers": "%d", "DPF_min": "%.3f", "n_unplaced": "%d",
     "mip_gap": "percent", "solve_time_s": "%.0f", "time_limit_s": "%d",
@@ -31,8 +32,9 @@ NOTES = (
     "Cold-plate pump electricity is in Wh because it is tiny. Waiting time is start minus "
     "arrival; execution time is completion minus start; completion time runs from arrival to "
     "the end of the last period; all three leave out unplaced workloads. Average headroom, "
-    "utilization and lowest DPF are over every server and period. The temperatures are the "
-    "model's predicted server temperatures (T_pred).")
+    "utilization and lowest DPF are over every server and period. A server period is one "
+    "server in one 5-minute period. The temperatures are the model's predicted server "
+    "temperatures (T_pred).")
 
 
 def fmt_value(key: str, v) -> str:
@@ -123,6 +125,7 @@ def stuck_notice(table: pd.DataFrame, where: str = "", each: bool = False) -> No
     if stuck.empty:
         return
     over_cap = stuck["stuck_reason"].str.startswith("no schedule within")
+    work_left = stuck["stuck_reason"].str.startswith(data.WORK_LEFT)
     if each:
         runs = "; ".join(f"**{r.tag}** at tick {int(r.stuck_tick)} ({r.stuck_reason})"
                          for r in stuck.itertuples())
@@ -143,7 +146,11 @@ def stuck_notice(table: pd.DataFrame, where: str = "", each: bool = False) -> No
             "the ticks before it (a partial schedule) but has no full-day schedule, so its "
             "measures are blank. *No schedule within the cap* means the solver ran out of time "
             "for that tick and a schedule may exist; *no valid schedule* means none exists "
-            "within the limits named. Each test's *Test charts* page shows where it stopped.",
+            "within the limits named. "
+            + ("*Work left after the last tick* means every tick had a schedule, but the "
+               "planner took no thermal slowdown (6.5), so workloads ran slower than planned "
+               "and were not done in time. " if work_left.any() else "")
+            + "Each test's *Test charts* page shows where it stopped.",
             icon=":material/block:")
 
 
@@ -157,7 +164,9 @@ def _status_grid(table: pd.DataFrame) -> pd.DataFrame:
             icon = {data.NOT_RUN_YET: "·", data.NOT_APPLICABLE: "n/a",
                     data.NOT_IN_RELEASE: "–"}[r.status]
         elif ticks is not None and ticks.get("stuck"):
-            short = ("no schedule in cap" if str(r.stuck_reason).startswith("no schedule within")
+            reason = str(r.stuck_reason)
+            short = ("no schedule in cap" if reason.startswith("no schedule within")
+                     else data.WORK_LEFT if reason.startswith(data.WORK_LEFT)
                      else "no valid schedule")
             icon = f"⛔ stuck at tick {ticks['stuck']['tick']}, {short}"
         elif ticks is not None and r.status in ("optimal", "time_limit"):
@@ -210,7 +219,8 @@ def render() -> None:
     n_stuck = len(table[data.is_stuck(table)].drop_duplicates(["configuration", "run"]))
     left_out = _not_in_release(cat)
     st.caption(
-        f"Every configuration goes through the tests of the four Chapter 6 scenarios. A "
+        f"Every configuration goes through the tests of the Chapter 6 scenarios "
+        f"({ex.SECTIONS[0].key} to {ex.SECTIONS[-1].key}). A "
         f"configuration is a server count (10, 6 or 2 servers) on a load level: "
         + ", ".join(f"a {lv.label.lower()} ({lv.target:.0%})" for lv in ex.LEVELS)
         + ", the share of the fleet's cores or memory, whichever fills first, that the day's "
@@ -230,7 +240,8 @@ def render() -> None:
                "per-tick cap (how many, and the worst tick's MIP gap). Runs planned for the "
                "whole day at once: ✅ proven best · ⏱ stopped at the time limit (with its MIP "
                "gap). ⛔ stuck: the run stopped at that tick, with no schedule found within the "
-               "per-tick cap (one may exist) or no valid schedule, and has no full-day result. "
+               "per-tick cap (one may exist), no valid schedule, or work left after the last "
+               "tick, and has no full-day result. "
                "❌ no valid schedule · **·** not run yet · **–** not run in this release · "
                "**n/a** not applicable: 6.1 Test 1 needs two "
                "servers of the same tier, 6.2 needs a server with a cold plate "

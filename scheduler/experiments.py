@@ -156,6 +156,11 @@ TESTS: tuple[Test, ...] = (
     Test("s4_t3a_ci_flat", "Flat carbon intensity", (("ci_amplitude", 0.0),)),
     Test("s4_t3b_ci_swing", "Deeper daily carbon swing (amplitude 0.50)",
          (("ci_amplitude", 0.5),)),
+    # 6.5 ablation; Model C is the Base itself
+    Test("s5_t1_no_wait", "Starts on arrival, planner without slowdown",
+         (("start_at_arrival", True), ("planner_dpf", False))),
+    Test("s5_t2_no_dpf", "Flexible starts, planner without slowdown",
+         (("planner_dpf", False),)),
 )
 TEST_BY_ID = {t.id: t for t in TESTS}
 
@@ -210,6 +215,19 @@ SECTIONS: tuple[Section, ...] = (
             "chooses servers without temperature, then applies every safety limit. Test 3 "
             "changes the shape of carbon intensity over the day: flat (3a) or a deeper swing "
             "(3b). Scaling it up or down by a constant would leave the schedule unchanged."),
+    Section("6.5", "Ablation: what flexible timing and temperature-dependent speed contribute",
+            "How much do the model's flexible start times and its temperature-dependent speed "
+            "add to the results?",
+            "Compare stripped-down models with the full model to show what each part "
+            "contributes.",
+            (("Base", "base"), ("Model A", "s5_t1_no_wait"), ("Model B", "s5_t2_no_dpf")),
+            "The Base is the full model (Model C). Model A starts every workload when it "
+            "arrives and plans as if servers never slow down when hot; it still chooses the "
+            "server. Model B keeps the flexible start times but also plans without the "
+            "slowdown. Cooling, the temperature cap, priority and carbon are as in the Base. "
+            "The day is played out with the real slowdown, so a workload in A or B can do less "
+            "work than planned; if it can then no longer meet its deadline, the run stops at "
+            "that tick."),
 )
 SECTION_BY_KEY = {s.key: s for s in SECTIONS}
 

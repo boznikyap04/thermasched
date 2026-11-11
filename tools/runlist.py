@@ -1,15 +1,16 @@
 """The per-tick batch runs, from the experiment list in scheduler/experiments.py.
 
-    uv run python tools/runlist.py                    # the 36 runs, one per line
-    uv run python tools/runlist.py --fleet servers10  # the 36 runs of the 10-server fleet
+    uv run python tools/runlist.py                    # the 42 runs, one per line
+    uv run python tools/runlist.py --fleet servers10  # the 42 runs of the 10-server fleet
     uv run python tools/runlist.py --sections 6.1,6.2 # 15 runs (6.1 and 6.2)
+    uv run python tools/runlist.py --sections 6.5     # 9 runs: 6.5's Base, Model A and Model B
     uv run python tools/runlist.py --format json      # the same, with every field
     uv run python tools/runlist.py --format matrix    # {"include": [...]} for the Actions matrix
     uv run python tools/runlist.py --only servers6_heavy__base --format matrix
     uv run python tools/runlist.py --timing --format matrix   # the same: the timing run only
 
 The runs (docs/PLAN.md §3): a fleet (servers6, or ``--fleet servers10``) on the light, normal
-and heavy day, every test of sections 6.1 to 6.4 that applies to the fleet (the first batch
+and heavy day, every test of sections 6.1 to 6.5 that applies to the fleet (the first batch
 was 6.1 and 6.2 on servers6), each as one per-tick run in
 ``<results-dir>/<scenario>/<test id>/``. 6.4 Test 3a (flat carbon) runs with ``--ci-flat``;
 6.4 Test 3b (deeper carbon swing) runs on the configuration's ``_swing`` scenario, so its
@@ -37,7 +38,7 @@ from scheduler.experiments import (  # noqa: E402
 
 FLEET = "servers6"
 LEVEL_KEYS = tuple(lv.key for lv in LEVELS)            # light, normal, heavy
-SECTIONS = ("6.1", "6.2", "6.3", "6.4")
+SECTIONS = ("6.1", "6.2", "6.3", "6.4", "6.5")
 # The run of the timing confirmation (docs/PLAN.md §5 item 3): heavy day, 6.1 Base.
 TIMING_RUN = "servers6_heavy__base"
 
@@ -63,6 +64,8 @@ _FLAGS = {
     "supply_temp_mode": lambda v: ["--supply-temp-mode", v],
     "H_min_C": lambda v: ["--h-min", f"{v:g}"],
     "placement": lambda v: ["--thermal-blind"] if v == "thermal_blind" else [],
+    "start_at_arrival": lambda v: ["--start-at-arrival"] if v else [],
+    "planner_dpf": lambda v: [] if v else ["--no-planner-dpf"],         # on by default
     # Only the flat profile is a flag; the swing is a scenario (see _scenario_for).
     "ci_amplitude": lambda v: ["--ci-flat"] if v == 0 else _no_flag("ci_amplitude", v),
 }

@@ -2,8 +2,8 @@
 
     uv run streamlit run dashboard/app.py
 
-Reads the run outputs under results/<configuration>/<run>/ and shows the four Chapter 6
-scenarios (6.1 to 6.4) for 10, 6 and 2 servers, the charts and key results of each test
+Reads the run outputs under results/<configuration>/<run>/ and shows the five Chapter 6
+scenarios (6.1 to 6.5) for 10, 6 and 2 servers, the charts and key results of each test
 against its Base, and every output CSV as it is. Read-only.
 """
 

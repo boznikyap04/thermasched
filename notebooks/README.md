@@ -227,10 +227,11 @@ unattended, on Colab or a laptop.
 
 - **The list:** `RUNS` in the first code cell, one entry per run: a label and the switches that
   differ from their defaults (the fields of `RunSettings`, as in `solver.ipynb`). It comes set
-  to the first set of thesis runs: the six tests of 6.1 and 6.2 (the switches of
+  to the thesis set: every test of 6.1 to 6.5 (the switches of
   [section 5 of the solver guide](../scheduler/README.md#5-thesis-scenarios-ch-6)) on
-  `servers6_light`, `servers6` and `servers6_heavy`, labelled as on the site, each with a
-  1800 s time limit: 18 runs and up to nine hours.
+  `servers6_light`, `servers6` and `servers6_heavy`, labelled as on the site: 42 runs, each
+  re-planned every period by default (up to about five hours each at 60 s per tick). The two
+  6.5 models plan without the thermal slowdown and always run per tick.
   `DEFAULTS` applies switches to every run, for example a longer time limit.
 - **Plan first:** section 1 validates every entry, checks that its scenario exists and that no
   two entries are the same run, and prints the plan with an upper bound on the time, before

@@ -167,6 +167,8 @@ One period is 5 minutes. Scenarios built in `notebooks/solver.ipynb` (see
 | `--baseline-cp-flow` / `--baseline-cp-coolant` | `0.30` L/min / `20` °C | the baseline's fixed cold-plate settings |
 | `--cp-mode` | `optimize` | `fixed` holds the optimized run's cold plates at `--fixed-cp-flow` / `--fixed-cp-coolant` (default: the baseline's), for S2 T2 |
 | `--no-priority` | off | drop the priority rules, Eq. (56)-(57) (see below) |
+| `--start-at-arrival` | off | every workload starts in its arrival period (latest start A_i instead of A_i + AD_i); the server is still chosen. Run name `_nowait`. For 6.5 Model A |
+| `--no-planner-dpf` | off | per tick only: the planner assumes no thermal slowdown (DPF = 1, no loss or tail columns) but keeps the thermal cap; the played-out day and the evaluator keep the real DPF, so a workload can carry work into the next tick and, if it can no longer meet its deadline, the run stops at a stuck tick. Run name `_nodpf`. For 6.5 Models A and B |
 | `--zone-map 1,1,1,2,2,2` | `servers.csv` | zone of each server in order, for S1 T1 (regrouped zones) |
 | `--carbon-file PATH` | `carbon.csv` | another carbon-intensity profile (columns `t`, `CI_t_g_per_kWh`), for S4 T3 |
 | `--ci-flat` | off | carbon intensity held at the scenario's mean, for S4 T3 |
@@ -216,6 +218,7 @@ level (`--scenario servers6_light`, `servers6`, `servers6_heavy`, and the same f
 | S2 base / T1 / T2 | default, the shared base (both optimized) / `--cp-mode fixed` (CRAC optimized) / `--supply-temp-mode fixed` (cold plates optimized). Cold plates are on in every run; airflow is not modelled |
 | S3 | `--h-min <value>` |
 | S4 base / T1 / T2 / T3 | default / `--reassignment none` / `--thermal-blind` / `--ci-flat` or `--carbon-file <csv>` |
+| 6.5 base (Model C) / Model A / Model B | default / `--start-at-arrival --no-planner-dpf` / `--no-planner-dpf`, per tick |
 
 Since 1.1.0 every Chapter 6 run is solved with `--time-limit 1800`
 (`logs/runs/v1.1.0/runlist.txt`). With `--thermal-blind`, if no schedule on the servers chosen

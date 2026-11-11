@@ -668,3 +668,86 @@ def test_two_plates_take_more_heat():
     assert one.model_values["Q_cp_W"][0, 0] == pytest.approx(300.0)
     assert two.model_values["Q_cp_W"][0, 0] == pytest.approx(500.0)
     assert two.objective_g < one.objective_g
+
+
+# ---------------------------------------------------------------------------
+# Ablation switches (section 6.5): start at arrival, planner without slowdown
+# ---------------------------------------------------------------------------
+
+def test_ablation_switches_default_to_the_full_model():
+    d = RunSettings()
+    assert d.start_at_arrival is False and d.planner_dpf is True
+    # the derated instance below has loss columns and a tail by default
+    from scheduler.optimize import _build
+    sc = scenario([work(1, 2, 9, 3, 4, 4)], [server(1, R=0.145, alpha=0.0)], [100.0] * 8)
+    built = _build(sc, {1: 1}, settings(), (), False)
+    assert built.derating and built.win[(1, 1)].n_max > built.win[(1, 1)].n_min
+
+
+def test_start_at_arrival_starts_every_workload_in_its_arrival_period():
+    """The hand instance: the full model delays w1 and w2 to the cheap hour 3; with no
+    waiting they start at their arrival (period 1) and only the server is chosen."""
+    from scheduler.optimize import _build
+    sc = hand_scenario()
+    st = settings(start_at_arrival=True)
+    built = _build(sc, {1: 1, 2: 1, 3: 1}, st, (), False)
+    for (i, s), wd in built.win.items():
+        assert wd.a == wd.b == sc.workloads[i - 1].A
+    res = solve(sc, {1: 1, 2: 1, 3: 1}, st)
+    assert res.status == STATUS_OPTIMAL
+    for i, (s, start, end) in placements(res).items():
+        assert start == sc.workloads[i - 1].A
+    assert res.objective_g > HAND_EXPECTED_G
+    ev = evaluate_or_skip(sc, res, st)
+    assert ev.valid and (ev.wait_periods == 0).all()
+    assert ev.total_carbon_g == pytest.approx(res.objective_g, rel=1e-6)
+    # deadline relaxation (the diagnosis) also frees the start
+    relaxed = _build(sc, {1: 1, 2: 1, 3: 1}, st, (RELAX_DEADLINES,), False)
+    assert relaxed.win[(1, 1)].b > relaxed.win[(1, 1)].a
+
+
+def test_start_at_arrival_leaves_no_priority_row():
+    from scheduler.optimize import _build
+    sc = scenario([work(1, 1, 5, 3, 4, 1), work(2, 2, 5, 2, 2, 2)], [server(1)],
+                  [1000.0, 1000.0, 1.0, 1.0])
+    assert _build(sc, {1: 1, 2: 1}, settings(), (), False).n_priority_rows > 0
+    assert _build(sc, {1: 1, 2: 1}, settings(start_at_arrival=True), (), False).n_priority_rows == 0
+    res = solve(sc, {1: 1, 2: 1}, settings(start_at_arrival=True))
+    assert placements(res) == {1: (1, 1, 2), 2: (1, 2, 4)}
+
+
+def test_planner_without_slowdown_has_no_dpf_columns_but_keeps_the_cap():
+    """The derated instance of test_derating_lengthens_run (R = 0.145, 78 degC under load,
+    real DPF 0.9546): planning with DPF = 1 runs it n_min = 4 periods, which the evaluator,
+    with the real DPF, finds short of work."""
+    from scheduler.optimize import _build
+    sc = scenario([work(1, 2, 9, 3, 4, 4)], [server(1, R=0.145, alpha=0.0, T0=30.0)],
+                  [100, 90, 80, 70, 60, 50, 40, 30])
+    st = settings(planner_dpf=False, per_tick=True)
+    built = _build(sc, {1: 1}, st, (), False)
+    assert not built.derating and built.dpf_cap == 1.0
+    assert all(wd.n_max == wd.n_min for wd in built.win.values())
+    assert all(not e for e in built.E.values())
+    cap = st.thermal_cap_C(sc)
+    assert all(built.lp.ub[c_] == cap for row in built.Tcol for c_ in row)
+    res = solve(sc, {1: 1}, st)
+    assert res.status == STATUS_OPTIMAL
+    s, start, end = placements(res)[1]
+    assert end - start == 4
+    assert res.model_values["T_C"][0, start - 1] == pytest.approx(78.0, abs=1e-6)
+    assert np.all(res.model_values["DPF"] == 1.0)
+    ev = evaluate_or_skip(sc, res, st)
+    assert not ev.compliance["workloads_ok"] and ev.compliance["thermal_cap_ok"]
+    assert ev.total_carbon_g == pytest.approx(res.objective_g, rel=1e-6)
+    # the cap still binds: the instance with a server too hot even idle stays infeasible
+    hot = scenario([work(1, 1, 4, 2, 1, 1)], [server(1, a=70.0, R=0.01, alpha=0.0)], [100.0] * 3)
+    assert solve(hot, {1: 1}, st).status == STATUS_INFEASIBLE
+    assert diagnose_infeasibility(hot, {1: 1}, st, time_limit_s=20) == \
+        feasible_only_when(RELAX_THERMAL)
+
+
+def test_planner_without_slowdown_needs_per_tick():
+    with pytest.raises(ValueError, match="per_tick"):
+        RunSettings(planner_dpf=False).validate()
+    RunSettings(planner_dpf=False, per_tick=True).validate()
+    RunSettings(start_at_arrival=True).validate()      # correct in a whole-day run too

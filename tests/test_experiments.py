@@ -69,7 +69,17 @@ def test_sections_list_known_tests_with_the_reference_first():
         assert all(tid in ex.TEST_BY_ID for _, tid in section.tests)
     used = {tid for s in ex.SECTIONS for _, tid in s.tests}
     assert used == set(ex.TEST_BY_ID)
-    assert [s.key for s, _ in ex.sections_of("base")] == ["6.1", "6.2", "6.3", "6.4"]
+    assert [s.key for s, _ in ex.sections_of("base")] == ["6.1", "6.2", "6.3", "6.4", "6.5"]
+
+
+def test_section_6_5_compares_the_base_with_models_a_and_b():
+    section = ex.SECTION_BY_KEY["6.5"]
+    assert section.tests == (("Base", "base"), ("Model A", "s5_t1_no_wait"),
+                             ("Model B", "s5_t2_no_dpf"))
+    assert "Model C" in section.note
+    assert dict(ex.TEST_BY_ID["s5_t1_no_wait"].switches) == {"start_at_arrival": True,
+                                                             "planner_dpf": False}
+    assert dict(ex.TEST_BY_ID["s5_t2_no_dpf"].switches) == {"planner_dpf": False}
 
 
 def test_not_applicable_tests():
@@ -95,6 +105,11 @@ def test_matching_by_settings():
     assert _ids({"cold_plates": False, "reassignment": "none"}, "servers6") == []
     assert _ids({"H_min_C": 19}, "thesis10") == ["s3_t1_hmin_high"]
     assert _ids({"placement": "thermal_blind"}, "servers6") == ["s4_t2_blind"]
+    assert _ids({"start_at_arrival": True, "planner_dpf": False}, "servers6") == ["s5_t1_no_wait"]
+    assert _ids({"planner_dpf": False, "per_tick": True}, "servers6") == ["s5_t2_no_dpf"]
+    assert _ids({"start_at_arrival": True}, "servers6") == []
+    # Runs saved before the 6.5 switches existed lack them: they hold the defaults.
+    assert _ids({"start_at_arrival": False, "planner_dpf": True}, "servers6") == ["base"]
     # Names, time limits and gaps never decide a test.
     assert _ids({"run_name": "x", "time_limit_s": 60, "mip_rel_gap": 0.1}, "thesis10") == ["base"]
     # Two switches at once: no test.
