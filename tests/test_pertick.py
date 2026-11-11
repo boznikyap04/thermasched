@@ -327,3 +327,78 @@ def test_per_tick_run_names_and_test_matching():
     st = RunSettings(per_tick=True, tick_time_limit_s=20.0).as_dict()
     assert [t.id for t in ex.identify(st, "servers6")[1]] == ["base"]
 
+
+
+# ---------------------------------------------------------------------------
+# Ablation switches (section 6.5)
+# ---------------------------------------------------------------------------
+
+def test_model_a_starts_every_workload_on_arrival_per_tick(tmp_path):
+    """6.5 Model A on small: no workload waits, the planner takes DPF = 1, and the run passes
+    every check (small stays below T_dvfs, so the real DPF is 1 too)."""
+    argv = ARGS + ["--start-at-arrival", "--no-planner-dpf", "--results-dir", str(tmp_path)]
+    st = parse_args(argv)[0]
+    assert st.run_name == "least_loaded_base18_free_optimize_nowait_nodpf_pertick"
+    assert main(argv) == 0
+    folder = tmp_path / "small" / st.run_name
+    summary = json.loads((folder / "summary.json").read_text())
+    assert all(c["passed"] for c in summary["checks"].values())
+    with open(folder / "optimized" / "schedule.csv") as fh:
+        rows = list(csv.DictReader(fh))
+    assert len(rows) == 158 and all(float(r["wait"]) == 0 for r in rows)
+    assert all(r["start"] == r["arrival"] for r in rows)
+
+
+def _hot_scenario(T: int, periods: float) -> Scenario:
+    """One 4-core server that runs at 78 degC under full load (supply 20 + R 0.145 * 400 W,
+    alpha 0), so the real DPF is 1 - 0.378 * 3 / 25 = 0.9546. One workload, A = 1, D = 5, of
+    ``periods`` full-speed periods; carbon is cheap from period 3."""
+    c = Constants(R_dvfs=0.378, F_throttle=0.662, T_max_server_C=90.0, H_min_C=10.0,
+                  T_dvfs_C=75.0, T_throttle_C=100.0, Q_crac_kW=116.0,
+                  COP_coeffs=(0.0068, 0.0008, 0.458), T_crac_min_C=18.0, T_crac_max_C=27.0,
+                  T_max_zone_C=32.0)
+    sv = Server(s=1, name="hot", zone=1, f_MHz=2000.0, C_cores=4, M_MB=1e6, P_idle_W=100.0,
+                P_max_W=400.0, T0_C=30.0, CT_cold_plate=0, th_a_C=0.0, th_R_C_per_W=0.145,
+                th_alpha=0.0, n_cold_plates=0)
+    from scheduler.types import Workload
+    w = Workload(i=1, workload_id="w1", flavor="x", A=1, D=5, AD=3, ET_base=2, RT=0, B=0,
+                 X0=None, C_req=4, M_req_MB=1.0, W_MHz_s=4 * 2000.0 * 3600.0 * periods)
+    return Scenario(name="hot", T=T, dt_seconds=3600.0, workloads=(w,), servers=(sv,),
+                    n_zones=1, CI_g_per_kWh=np.array([1000.0, 1000.0] + [1.0] * (T - 2)),
+                    constants=c)
+
+
+@pytest.mark.parametrize("T", [4, 5])
+def test_planner_without_slowdown_can_run_out_of_time(tmp_path, T):
+    """1.95 periods of work: planned with DPF = 1 it runs in periods 3-4, but at the real DPF
+    it still has work left after period 4, so it misses its deadline (end of period 4). With
+    a horizon of 4 periods that shows after the last tick; with 5, tick 5 has no start left
+    for it. The full model plans the slowdown and finishes in time."""
+    sc = _hot_scenario(T, 1.95)
+    st = RunSettings(scenario="hot", supply_temp_mode="fixed", fixed_supply_temp_C=20.0,
+                     per_tick=True, planner_dpf=False, mip_rel_gap=1e-9)
+    out = run_per_tick(sc, {1: 1}, st, tmp_path / "nodpf")
+    assert out.status == OUTCOME_STUCK and out.stuck["limits"] == [RELAX_DEADLINES]
+    assert out.stuck["tick"] == T and out.stuck["workloads"] == ["w1"]
+    assert "running workload" in out.stuck["detail"] and "DPF = 1" in out.stuck["detail"]
+    assert (tmp_path / "nodpf" / "partial_schedule.csv").is_file()
+    full = run_per_tick(sc, {1: 1}, dataclasses.replace(st, planner_dpf=True), tmp_path / "full")
+    assert full.status == OUTCOME_DONE
+    ev = evaluate(sc, full.schedule, full.supply_temp_C, st)
+    assert ev.valid
+
+
+def test_checkpoint_without_the_new_settings_resumes(tmp_path):
+    """A checkpoint saved before a setting existed holds its default and still resumes."""
+    from scheduler.pertick import STATE_FILE, _load_checkpoint
+    argv = ARGS + ["--results-dir", str(tmp_path), "--run-name", "x"]
+    assert main(argv + ["--wall-time-limit", "0"]) == 3
+    st, sc, _ = _setup(argv)
+    path = tmp_path / "small" / "x" / CHECKPOINT_DIR / STATE_FILE
+    data = json.loads(path.read_text())
+    for k in ("start_at_arrival", "planner_dpf"):
+        del data["settings"][k]
+    path.write_text(json.dumps(data))
+    assert _load_checkpoint(path.parent, st, sc).next_tick == 2
+    with pytest.raises(ValueError, match="planner_dpf"):
+        _load_checkpoint(path.parent, dataclasses.replace(st, planner_dpf=False), sc)

@@ -18,6 +18,10 @@ heat removed is linear in the temperature difference split across the settings. 
 (56)-(57) orders the start times ``ST[i]`` of workloads that share a server, and servers
 take no work in periods where AV = 0 (11). All limits are hard.
 
+Two ablation switches (section 6.5) strip the model down: ``start_at_arrival`` sets every
+latest start to the arrival A_i instead of A_i + AD_i (28), and ``planner_dpf`` off plans with
+DPF = 1 (no loss, tail or work-credit columns, n_max = n_min) while the thermal cap stays.
+
 Units: P_IT in W, Q_crac / P_crac / P_fan in kW, dt in seconds, energy in kWh, CI in
 g/kWh, carbon in g.
 """
@@ -290,7 +294,8 @@ def _build(scenario: Scenario, original_server: dict[int, int], settings: RunSet
            extras: WindowExtras | None = None):
     """``ignore_temperature`` leaves server temperature out: no temperature recursion, no
     thermal cap, DPF = 1. Pass 1 of the thermal-blind placement uses it to choose servers.
-    ``extras``: see WindowExtras."""
+    ``settings.planner_dpf`` off keeps the recursion and the cap but takes DPF = 1;
+    ``settings.start_at_arrival`` makes the latest start A_i. ``extras``: see WindowExtras."""
     extras = extras or WindowExtras()
     settings.validate()
     for fam in relax:
@@ -337,7 +342,9 @@ def _build(scenario: Scenario, original_server: dict[int, int], settings: RunSet
 
     # Highest temperature the T columns may take; the linear DPF bound holds up to T_throttle.
     cap_eff = c.T_throttle_C if relax_therm else cap
-    derating = cap_eff > c.T_dvfs_C + _EPS and not ignore_temperature   # DPF can fall below 1
+    # DPF can fall below 1; with planner_dpf off the planner takes DPF = 1 but keeps the cap
+    derating = (cap_eff > c.T_dvfs_C + _EPS and not ignore_temperature
+                and settings.planner_dpf)
     slope = c.R_dvfs / (c.T_throttle_C - c.T_dvfs_C)
     dpf_cap = min(1.0, 1.0 - slope * (cap_eff - c.T_dvfs_C)) if derating else 1.0
 
@@ -353,7 +360,9 @@ def _build(scenario: Scenario, original_server: dict[int, int], settings: RunSet
     empty_workloads: list[int] = []
     for w in scenario.workloads:
         D = T + 1 if relax_dead else min(w.D, T + 1)
-        last_start_by_wait = T + 1 if relax_dead else w.A + w.AD
+        # start_at_arrival: no waiting, the latest start is the arrival period itself
+        last_start_by_wait = (T + 1 if relax_dead else
+                              max(w.A, 1) if settings.start_at_arrival else w.A + w.AD)
         for s in allowed[w.i]:
             sv = servers[s - 1]
             per_full = w.C_req * sv.f_MHz * dt          # work of one full-speed period
@@ -736,6 +745,15 @@ def _model_notes(scenario: Scenario, settings: RunSettings, built: _Built) -> li
         "The wait limit (28) is applied to all workloads, which includes (25). Workloads with "
         "B_i = 1 keep their original server (29).",
     ]
+    if settings.start_at_arrival:
+        n.append("Start at arrival (ablation): every workload starts in its arrival period, so the "
+                 "latest start is A_i instead of A_i + AD_i (28); the server is still chosen. With "
+                 "no waiting, no priority row can bind.")
+    if not settings.planner_dpf:
+        n.append("Planner without slowdown (ablation): the model takes DPF = 1, so there are no loss, "
+                 "tail or work-credit columns and n_max = n_min; the thermal cap T <= T_max - H_min "
+                 "is kept. The played-out period and the evaluator use the real DPF, so a workload "
+                 "can deliver less work than planned and carry the rest into the next tick.")
     if settings.priority and RELAX_PRIORITY not in built.relax:
         n.append(
             f"Priority (56)-(57): O_ij = 1 for a time-sensitive i and a delay-tolerant j, and for the "
@@ -778,7 +796,8 @@ def _model_notes(scenario: Scenario, settings: RunSettings, built: _Built) -> li
                  "same Q_crac cap, no ramp).")
     if RELAX_THERMAL in built.relax:
         n.append("RELAX_THERMAL: the cap T <= T_max - H_min is replaced by T <= T_throttle, the limit "
-                 "of validity of the linear DPF bound, with DPF >= 0.")
+                 "of validity of the linear DPF bound, with DPF >= 0."
+                 + (" The planner still takes DPF = 1." if not settings.planner_dpf else ""))
     if RELAX_CAPACITY in built.relax:
         n.append("RELAX_CAPACITY: CPU and memory rows are dropped; P_IT is bounded by the cores of the "
                  "workloads that can run on the server.")
@@ -1009,7 +1028,9 @@ def _solve_impl(scenario: Scenario, original_server: dict[int, int], settings: R
         out.model_values["T_C"] = np.array([[x[c_] for c_ in row] for row in built.Tcol])
         Tm = out.model_values["T_C"]
         c = scenario.constants
-        out.model_values["DPF"] = np.clip(1.0 - built.slope * (Tm - c.T_dvfs_C), 0.0, 1.0)
+        # the DPF the planner used: 1 everywhere with planner_dpf off
+        out.model_values["DPF"] = (np.clip(1.0 - built.slope * (Tm - c.T_dvfs_C), 0.0, 1.0)
+                                   if settings.planner_dpf else np.ones_like(Tm))
         out.model_values["Q_crac_kW"] = np.array([[x[c_] for c_ in row] for row in built.Qcrac])
         out.model_values["P_IT_W"] = np.array([[x[c_] for c_ in row] for row in built.P_IT])
         out.model_values["Q_cp_W"] = np.array([[x[c_] for c_ in row] for row in built.Q_cp])

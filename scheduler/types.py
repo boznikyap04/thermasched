@@ -256,6 +256,11 @@ class RunSettings:
     fixed_cp_coolant_C: float | None = None    # None: use baseline_cp_coolant_C
     # priority, Eq. (56)-(57)
     priority: bool = True
+    # ablation (section 6.5): every workload starts in its arrival period (latest start A_i
+    # instead of A_i + AD_i); and the planner without the thermal slowdown (DPF = 1 in the
+    # model; the play-out and the evaluator keep the real DPF), per tick only
+    start_at_arrival: bool = False
+    planner_dpf: bool = True
     # scenario overrides (applied by io.apply_overrides)
     zone_map: tuple[int, ...] | None = None    # zone per server, replaces servers.csv
     carbon_file: str | None = None             # CSV with t, CI_t_g_per_kWh
@@ -293,6 +298,10 @@ class RunSettings:
             raise ValueError("tick_time_limit_s must be positive")
         if not self.tick_no_schedule_limit_s > 0:
             raise ValueError("tick_no_schedule_limit_s must be positive")
+        if not self.planner_dpf and not self.per_tick:
+            raise ValueError(
+                "planner_dpf off needs per_tick: a whole-day plan made without the slowdown "
+                "cannot carry the work it leaves undone into a later solve")
         if self.fan_power:
             raise NotDefinedYet(
                 "fan_power: not defined yet. The model document has no fan-power "

@@ -662,11 +662,31 @@ def stuck_info(summary: dict) -> dict | None:
     return ticks.get("stuck") or None
 
 
-def stuck_reason(stuck: dict, cap_s: float | None = None) -> str:
+def stuck_after_last_tick(stuck: dict | None, ticks: dict | None) -> bool:
+    """True when a per-tick run planned every tick, the stuck one too, and stopped because
+    work was left after the last tick. This happens when the planner takes no thermal
+    slowdown (section 6.5): the workloads ran slower than planned and missed their deadline
+    or the end of the day. That tick's row in ticks.csv keeps its normal status."""
+    if not stuck or not ticks or stuck.get("tick") is None:
+        return False
+    solved = int(ticks.get("n_ticks_optimal") or 0) + ticks_at_cap(ticks)
+    return solved >= int(stuck["tick"])
+
+
+WORK_LEFT = "work left after the last tick"
+
+
+def stuck_reason(stuck: dict, cap_s: float | None = None, after_last: bool = False) -> str:
     """Why a run stopped at its stuck tick, in a few words: 'no schedule within the 60 s cap'
-    (the solver ran out of time; a schedule may exist) or 'no valid schedule (deadlines vs.
-    server capacity)' (none exists, and relaxing any one of these alone would give one)."""
+    (the solver ran out of time; a schedule may exist), 'no valid schedule (deadlines vs.
+    server capacity)' (none exists, and relaxing any one of these alone would give one) or,
+    with ``after_last`` (see stuck_after_last_tick), 'work left after the last tick
+    (deadlines)'."""
     limits = list(stuck.get("limits") or [])
+    if after_last:
+        return f"{WORK_LEFT} (" + " vs. ".join(
+            STUCK_LIMIT_WORDS.get(x, x.replace("_", " "))
+            for x in limits or ["deadlines_and_waiting"]) + ")"
     if limits == [TICK_TIME_LIMIT]:
         return f"no schedule within the {cap_s:g} s cap" if cap_s else \
             "no schedule within the per-tick cap"
@@ -682,6 +702,17 @@ def stuck_sentence(summary: dict, clock: str | None = None) -> str:
     cap_s, cap = ticks.get("tick_time_limit_s"), ticks_at_cap(ticks)
     solved = int(ticks.get("n_ticks_optimal") or 0) + cap
     gap = ticks.get("max_mip_gap")
+    if stuck_after_last_tick(stuck, ticks):
+        running = (f" {stuck['n_running']} workloads were still running."
+                   if stuck.get("n_running") is not None else "")
+        kept = (f"All {solved} ticks were solved"
+                + (f" ({cap} at the cap, worst gap {gap * 100:.2f} %)" if cap and gap is not None
+                   else f" ({cap} at the cap)" if cap else "")
+                + " and are kept as a partial schedule")
+        return (f"Stuck after the last tick, {tick}" + (f" of {T}" if T else "")
+                + (f" ({clock})" if clock else "") + ": every tick had a schedule, but work was "
+                "left at the end: " + (stuck.get("detail") or stuck.get("limit_text") or "unknown")
+                + f".{running} {kept}. The run has no full-day schedule and no full-day results.")
     if list(stuck.get("limits") or []) == [TICK_TIME_LIMIT]:
         why = (f"the solver found no schedule for it within the {cap_s:g} s per-tick cap, so "
                "whether one exists is not known")
@@ -710,7 +741,8 @@ def solver_short(solver: dict, ticks: dict | None = None) -> str:
     if ticks is not None and ticks.get("stuck"):
         stuck = ticks["stuck"]
         return (f"Stuck at tick {stuck.get('tick')}: "
-                + (stuck.get("reason") or stuck_reason(stuck, ticks.get("tick_time_limit_s"))))
+                + (stuck.get("reason") or stuck_reason(stuck, ticks.get("tick_time_limit_s"),
+                                                       stuck_after_last_tick(stuck, ticks))))
     if ticks is not None and status in (STATUS_OPTIMAL, STATUS_TIME_LIMIT):
         n, cap = ticks.get("n_ticks"), ticks_at_cap(ticks)
         if not cap:
@@ -953,6 +985,8 @@ CHAPTER6_COLUMNS = {
     "carbon_kg": "Total carbon emissions (kg CO2)",
     "T_mean_C": "Average server temperature (°C)",
     "T_max_C": "Highest server temperature (°C)",
+    "n_periods_above_dvfs": "Server periods above the slowdown onset, 75 °C",
+    "n_periods_above_cap": "Server periods above the thermal cap",
     "H_mean_C": "Average thermal headroom (°C)",
     "n_moved_server": "Workloads moved to another server",
     "n_moved_zone": "Workloads moved to another zone",
@@ -988,6 +1022,10 @@ SECTION_MEASURES = {
             "carbon_kg"),
     "6.4": ("n_moved_server", "E_IT_kWh", "E_crac_kWh", "E_cp_Wh", "carbon_kg",
             "turnaround_mean_min", "wait_mean_min", "n_late", "T_mean_C", "T_max_C",
+            "DPF_min"),
+    "6.5": ("carbon_kg", "E_total_kWh", "E_IT_kWh", "E_crac_kWh", "E_cp_Wh",
+            "turnaround_mean_min", "turnaround_max_min", "wait_mean_min", "exec_mean_min",
+            "n_late", "pct_late", "T_max_C", "n_periods_above_dvfs", "n_periods_above_cap",
             "DPF_min"),
 }
 
@@ -1026,7 +1064,8 @@ def chapter6_row(ref: RunRef, summary: dict) -> dict:
         stuck = stuck_info(summary)
         if stuck is not None:
             row.update(stuck_tick=stuck.get("tick"),
-                       stuck_reason=stuck_reason(stuck, ticks.get("tick_time_limit_s")))
+                       stuck_reason=stuck_reason(stuck, ticks.get("tick_time_limit_s"),
+                                                 stuck_after_last_tick(stuck, ticks)))
     if not summary.get("has_optimized_schedule"):
         return row
     opt = summary.get("optimized") or {}
@@ -1048,6 +1087,8 @@ def chapter6_row(ref: RunRef, summary: dict) -> dict:
         n_late=met.get("n_late"),
         pct_late=(met.get("n_late") / n * 100.0) if n and met.get("n_late") is not None else None,
         n_throttled_servers=met.get("n_throttled_servers"),
+        n_periods_above_dvfs=met.get("periods_above_dvfs"),
+        n_periods_above_cap=met.get("periods_above_cap"),
     )
     dt = (summary.get("scenario") or {}).get("dt_seconds", 300.0)
     schedule = Path(ref.path) / "optimized" / "schedule.csv"
@@ -1073,6 +1114,7 @@ SERVER_STATS = {
     "DPF_min": "Lowest DPF",
     "periods_throttled": "Periods slowed (DPF < 1)",
     "E_IT_kWh": "IT electricity (kWh)",
+    "n_workloads": "Workloads run",
 }
 # The per-server figures each section shows first.
 SECTION_SERVER_STATS = {
@@ -1080,6 +1122,7 @@ SECTION_SERVER_STATS = {
     "6.2": "T_max_C",
     "6.3": "DPF_min",
     "6.4": "DPF_min",
+    "6.5": "n_workloads",
 }
 
 
@@ -1090,7 +1133,8 @@ def server_columns(servers: pd.DataFrame) -> list[str]:
 
 def server_stats(run: Run, variant: str = "optimized") -> pd.DataFrame:
     """One row per server (display order): s, name, zone, model (when known) and the
-    SERVER_STATS columns."""
+    SERVER_STATS columns. *Workloads run* counts the placed workloads of the variant's
+    schedule.csv on each server (0 for a server given none)."""
     sp = run.server_period
     sp = sp[sp["variant"] == variant] if not sp.empty else sp
     if sp.empty:
@@ -1108,7 +1152,14 @@ def server_stats(run: Run, variant: str = "optimized") -> pd.DataFrame:
         "periods_throttled": g["DPF"].apply(lambda d: int((d < 1 - 1e-9).sum())),
         "E_IT_kWh": g["P_IT_W"].sum() * run.dt_seconds / 3600 / 1000,
     }).reset_index()
-    return run.servers[server_columns(run.servers)].merge(out, on="s", how="left")
+    sch = run.schedule
+    sch = sch[sch["variant"] == variant] if not sch.empty else sch
+    if not sch.empty:
+        placed = sch[sch["placed"] == 1] if "placed" in sch else sch.dropna(subset=["server"])
+        counts = placed.groupby(placed["server"].astype(int)).size()
+        out["n_workloads"] = out["s"].map(counts).fillna(0).astype(int)
+    out = run.servers[server_columns(run.servers)].merge(out, on="s", how="left")
+    return out.reindex(columns=[*server_columns(run.servers), *SERVER_STATS])
 
 
 def reassignment_table(run: Run) -> pd.DataFrame:

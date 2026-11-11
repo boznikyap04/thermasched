@@ -9,6 +9,7 @@
     uv run python -m scheduler.run --scenario servers6 --ci-flat
     uv run python -m scheduler.run --scenario small --thermal-blind
     uv run python -m scheduler.run --scenario small --per-tick --tick-time-limit 30
+    uv run python -m scheduler.run --scenario small --per-tick --start-at-arrival --no-planner-dpf
 
 Both schedules are scored by the shared evaluator; only its numbers are compared.
 
@@ -96,6 +97,13 @@ def parse_args(argv=None) -> tuple[RunSettings, argparse.Namespace]:
                    help="coolant temperature when --cp-mode fixed, degC (default: the baseline's)")
     p.add_argument("--no-priority", action="store_true",
                    help="drop the priority rules (56)-(57) from the optimized run")
+    p.add_argument("--start-at-arrival", action="store_true",
+                   help="ablation: every workload starts in its arrival period (no waiting); "
+                        "the server is still chosen")
+    p.add_argument("--no-planner-dpf", action="store_true",
+                   help="ablation, per tick only: the planner assumes no thermal slowdown "
+                        "(DPF = 1) but keeps the thermal cap; the played-out day and the "
+                        "evaluator keep the real DPF")
     p.add_argument("--zone-map", default=None,
                    help="zone of each server in order, e.g. 1,1,1,2,2,2 (replaces servers.csv)")
     ci = p.add_mutually_exclusive_group()
@@ -140,7 +148,8 @@ def parse_args(argv=None) -> tuple[RunSettings, argparse.Namespace]:
         cold_plates=a.cold_plates, cold_plate_count=a.cold_plate_count,
         baseline_cp_flow_Lmin=a.baseline_cp_flow, baseline_cp_coolant_C=a.baseline_cp_coolant,
         cp_mode=a.cp_mode, fixed_cp_flow_Lmin=a.fixed_cp_flow, fixed_cp_coolant_C=a.fixed_cp_coolant,
-        priority=not a.no_priority, zone_map=zone_map, carbon_file=a.carbon_file,
+        priority=not a.no_priority, start_at_arrival=a.start_at_arrival,
+        planner_dpf=not a.no_planner_dpf, zone_map=zone_map, carbon_file=a.carbon_file,
         ci_flat=a.ci_flat, fan_power=a.fan_power, per_tick=a.per_tick,
         tick_time_limit_s=a.tick_time_limit, tick_no_schedule_limit_s=a.tick_no_schedule_limit,
     )
@@ -174,6 +183,8 @@ def default_run_name(settings: RunSettings) -> str:
       + ([] if not cp_fixed else
          ["cpfixed" if fixed_cp is None else f"cpfixed{fixed_cp[0]:g}-{fixed_cp[1]:g}"])
       + (["noprio"] if not st.priority else [])
+      + (["nowait"] if st.start_at_arrival else [])
+      + (["nodpf"] if not st.planner_dpf else [])
       + ([f"zones{''.join(map(str, st.zone_map))}"] if st.zone_map else [])
       + (["ciflat"] if st.ci_flat else [])
       + ([f"ci-{Path(st.carbon_file).stem}"] if st.carbon_file else [])

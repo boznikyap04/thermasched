@@ -80,12 +80,15 @@ def _stuck(run: data.Run, stuck: dict) -> None:
     clock = run.clock.set_index("t")["clock"].get(stuck.get("tick"))
     st.warning(f"**No full-day result.** {data.stuck_sentence(run.summary, clock)}",
                icon=":material/block:")
+    after = data.stuck_after_last_tick(stuck, data.per_tick_info(run.summary))
     path = run.ref.path / "partial_schedule.csv"
     if path.is_file():
         part = pd.read_csv(path)
         running = int(part["end"].isna().sum()) if "end" in part else 0
-        st.caption(f"Partial schedule: {len(part):,} workloads started before tick "
-                   f"{stuck.get('tick')}, {running:,} of them still running there "
+        where = ("during the day, {running:,} of them still running after the last tick" if after
+                 else "before tick {tick}, {running:,} of them still running there")
+        st.caption(f"Partial schedule: {len(part):,} workloads started "
+                   + where.format(running=running, tick=stuck.get("tick")) + " "
                    "(`partial_schedule.csv` on *Output files*). The key results, the "
                    "comparison with the Base and the charts need a full day, so this page "
                    "shows the solver's figures up to the stuck tick.")
@@ -128,12 +131,15 @@ def _per_tick(run: data.Run, sol: dict, ticks: dict) -> None:
     """The solver figures of a run re-planned at every tick, and its solve time per tick."""
     n, cap, limit = ticks.get("n_ticks"), data.ticks_at_cap(ticks), ticks.get("tick_time_limit_s")
     stuck = ticks.get("stuck") if ticks.get("outcome") == "stuck" else None
+    after = data.stuck_after_last_tick(stuck, ticks)
     if stuck:
         n = int(ticks.get("n_ticks_optimal") or 0) + cap       # the ticks solved before it
         c1, c2, c3, c4 = st.columns(4)
         T = (run.summary.get("scenario") or {}).get("T")
         c4.metric("Stuck at tick", f"{stuck.get('tick')}" + (f" of {T}" if T else ""),
-                  help=data.stuck_reason(stuck, limit).capitalize() + ".")
+                  help=data.stuck_reason(stuck, limit, after).capitalize() + "."
+                  + (" Every tick had a schedule; the run stopped after the last one."
+                     if after else ""))
     else:
         c1, c2, c3 = st.columns(3)
     c1.metric("Solve time, all ticks", state.fmt_num(sol.get("solve_time_s"), 0, "s"))
@@ -149,7 +155,9 @@ def _per_tick(run: data.Run, sol: dict, ticks: dict) -> None:
                    "workloads that have arrived and plans to the end of the day; only its own "
                    "period's decisions are kept. Hover a bar for its MIP gap and how many "
                    "workloads were waiting."
-                   + (" The last bar is the stuck tick." if stuck else ""))
+                   + (" Every tick had a schedule, so no bar marks the stop: the run stopped "
+                      "after the last one, with work left." if after
+                      else " The last bar is the stuck tick." if stuck else ""))
 
 
 def _solver(run: data.Run) -> None:
@@ -439,8 +447,10 @@ def render() -> None:
                        "nothing to compare with.")
         elif not base.has_optimized:
             base_stuck = data.stuck_info(base.summary)
-            why = (f"got stuck at tick {base_stuck.get('tick')} "
-                   f"({data.stuck_reason(base_stuck, base.settings.get('tick_time_limit_s'))})"
+            reason = data.stuck_reason(
+                base_stuck, base.settings.get("tick_time_limit_s"),
+                data.stuck_after_last_tick(base_stuck, data.per_tick_info(base.summary)))
+            why = (f"got stuck at tick {base_stuck.get('tick')} ({reason})"
                    if base_stuck else f"ended with status {base.solver.get('status')}")
             st.caption(f"The {section.key} Base {why} and has no full-day schedule, so there "
                        "is nothing to compare with.")

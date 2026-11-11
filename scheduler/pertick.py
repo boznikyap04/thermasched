@@ -21,7 +21,10 @@ time limit is solved again, up to the no-schedule limit in all. Period t is then
 same physics as the evaluator: the server temperatures, and for every running workload the work
 delivered at the DPF it actually ran at. A running workload ends once its work is done.
 
-A tick with no valid schedule stops the run and names the limit; nothing is relaxed. The state
+A tick with no valid schedule stops the run and names the limit; nothing is relaxed. With
+``planner_dpf`` off (section 6.5) the planner takes DPF = 1 while the play-out keeps the real
+DPF, so a running workload can be left with more work than fits before its deadline: the next
+tick is then stuck, and after the last tick that work left stops the run the same way. The state
 is saved after every tick in ``<run folder>/checkpoint/``, so a stopped run resumes where it
 stopped and gives the same schedule.
 """
@@ -165,8 +168,10 @@ def _load_checkpoint(folder: Path, settings: RunSettings, scenario: Scenario) ->
     if data.get("format") != CHECKPOINT_FORMAT:
         raise ValueError(f"{path}: checkpoint format {data.get('format')} is not "
                          f"{CHECKPOINT_FORMAT}; delete the folder to start again")
-    if data.get("settings") != _plain(settings.as_dict()):
-        theirs, ours = data.get("settings") or {}, _plain(settings.as_dict())
+    # a setting added since the checkpoint was saved had its default then
+    theirs = {**_plain(RunSettings().as_dict()), **(data.get("settings") or {})}
+    if theirs != _plain(settings.as_dict()):
+        ours = _plain(settings.as_dict())
         diff = sorted(k for k in set(theirs) | set(ours) if theirs.get(k) != ours.get(k))
         raise ValueError(f"{path}: the checkpoint was made with other settings ({', '.join(diff)}); "
                          "run the same command, or delete the folder to start again")
@@ -355,10 +360,16 @@ def _diagnose(tick: _Tick, settings: RunSettings, res: SolveResult | None, error
                           extras=replace(tick.extras, forbidden=None))
             who = [ids[k - 1] for k in built.empty_workloads]
             out["workloads"] = [tick_wid(tick, k) for k in built.empty_workloads]
+            run_set = set(tick.running)
             if not free.empty_workloads:
                 limits = [RELAX_PRIORITY]
                 detail = (f"workload(s) {who} may use no server: on every server they may use, "
                           "a lower-priority workload started while they waited")
+            elif not settings.planner_dpf and set(who) <= run_set:
+                limits = [RELAX_DEADLINES]
+                detail = (f"running workload(s) {who} have more work left than fits before "
+                          "their deadline: they ran slower (real DPF) than the planner, which "
+                          "takes DPF = 1, expected")
             else:
                 limits = [RELAX_DEADLINES]
                 detail = (f"workload(s) {who} have no server and start left that meets their "
@@ -653,6 +664,25 @@ def run_per_tick(scenario: Scenario, original: dict[int, int], settings: RunSett
 
     # every tick done
     missing = [w.i for w in scenario.workloads if w.i not in state.end]
+    if missing and not settings.planner_dpf and all(i in state.start for i in missing):
+        # The planner took DPF = 1, so the last tick's plan finished these workloads but at the
+        # real DPF they still had work left: they miss their deadline (or the horizon). Stuck
+        # at the last tick, as a later tick would be for a deadline inside the day.
+        who = [scenario.workloads[i - 1].workload_id for i in missing]
+        stuck = {"tick": T, "status": STATUS_INFEASIBLE,
+                 "solver_status_text": "work left after the last tick",
+                 "n_waiting": 0, "n_running": len(missing), "workloads": who,
+                 "limits": [RELAX_DEADLINES], "limit_text": LIMIT_TEXT[RELAX_DEADLINES],
+                 "detail": (f"running workload(s) {who} still had work left after the last "
+                            "tick: they ran slower (real DPF) than the planner, which takes "
+                            "DPF = 1, expected, so they finish after their deadline")}
+        _write_partial(run_dir / PARTIAL_FILE, scenario, state)
+        shutil.rmtree(ckpt, ignore_errors=True)
+        if not quiet:
+            print(f"After tick {T}: no valid schedule. Limit: {stuck['limit_text']}. "
+                  f"{stuck['detail']}")
+        return PerTickOutcome(status=OUTCOME_STUCK, ticks=list(state.ticks), stuck=stuck,
+                              resumed_from_tick=resumed, next_tick=T)
     if missing:
         raise RuntimeError(f"per-tick run ended with workloads not finished: {missing[:10]}")
     schedule = Schedule(tuple(Placement(w.i, state.server[w.i], state.start[w.i], state.end[w.i])

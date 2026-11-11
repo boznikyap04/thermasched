@@ -67,16 +67,15 @@ The project has three parts, each with its own guide:
 |---|---|---|
 | **Cleaning notebook** | turns the raw datasets into cleaned tables and ready-to-solve scenarios | [`notebooks/README.md`](notebooks/README.md) |
 | **Solver** | builds the baseline, solves the MILP with HiGHS, writes the comparison to `results/`; runs step by step in `notebooks/solver.ipynb`, or a list of runs in `notebooks/batch.ipynb` | [`scheduler/README.md`](scheduler/README.md) |
-| **Dashboard** | browser app with the Chapter 6 results (6.1 to 6.4) and every output CSV | [`dashboard/README.md`](dashboard/README.md) |
+| **Dashboard** | browser app with the Chapter 6 results (6.1 to 6.5) and every output CSV | [`dashboard/README.md`](dashboard/README.md) |
 
 ```
 raw data ──► notebooks/data_prep.ipynb ──► scenarios/ ──► scheduler (solver) ──► results/ ──► dashboard
 ```
 
 The scenarios are already in the repository, so you can run the solver right away.
-`results/` holds the per-tick runs: 6 servers on all three days from release 1.5.0, and
-10 servers on the light and normal day from release 1.4.0, waiting for their re-run (the
-10-server heavy day is not run yet), some of which stopped at a stuck tick: see [`results/README.md`](results/README.md). The earlier
+`results/` holds the per-tick runs of release 1.5.0, 6 and 10 servers on all three days, some
+of which stopped at a stuck tick: see [`results/README.md`](results/README.md). The earlier
 whole-day results are in `archive/results_2026-10-25_whole_day/`. The cleaning notebook is only needed to
 change the data. From the raw data it rebuilds the scenarios in the repository byte for
 byte, and checks that it did (fingerprints, its section 4).
@@ -221,7 +220,7 @@ Run every command from the repository root.
 │   ├── data.py, state.py      finding and loading runs
 │   ├── uploads.py             zip export of runs (used by the notebooks)
 │   ├── charts.py, theme.py    chart helpers and colours
-│   └── views/                 one file per page (chapter6 overview, section 6.1-6.4, files)
+│   └── views/                 one file per page (chapter6 overview, section 6.1-6.5, files)
 │
 ├── tests/                     automated tests (uv run pytest)
 ├── tools/sync_notebooks.py    copies the code, the version and the scenario fingerprints into the notebooks

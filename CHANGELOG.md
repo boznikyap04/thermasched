@@ -14,6 +14,19 @@ run.
   section 4 shows which scenarios differ from before), then solve again. The site warns when
   a run was solved on a different scenario build than the one it holds.
 
+## 1.5.1 (2026-11-03)
+
+**Re-run:** nothing. The solver, the scenarios and the notebooks are those of 1.5.0; only the
+results on the site are new.
+
+- **10 servers re-run with cold plates on:** all 36 runs (light, normal and heavy day), solved
+  with the code of 1.5.0, replace the 1.4.0 runs, so every 6.1, 6.3 and 6.4 test now has a
+  10-server run and the heavy day has its first. 31 finish the day; 5 heavy-day runs are stuck
+  (6.1 Test 1 and 6.4 Test 3b at tick 119, 6.3 Test 3 at tick 139 and 6.4 Test 2 at tick 145
+  with no schedule within the cap; 6.4 Test 1 at tick 71 with no valid schedule). None
+  crashed. Their `summary.json` says 1.5.0 (`results/README.md`).
+- The site shows only the 2-server fleet as not run in this release.
+
 ## 1.5.0 (2026-10-30)
 
 **Re-run:** solver. Runs of 1.4.0 with cold plates off are no longer any test's run, and the

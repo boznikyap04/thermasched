@@ -1,6 +1,6 @@
 # Dashboard: viewing results
 
-The dashboard (the "site") shows the four Chapter 6 scenarios, 6.1 to 6.4, for 10, 6 and 2
+The dashboard (the "site") shows the five Chapter 6 scenarios, 6.1 to 6.5, for 10, 6 and 2
 servers, each on a light, normal and heavy day (peak demand at 30, 60 and 85 % of the fleet's
 cores or memory, whichever fills first), from the runs saved under `results/`: the scenario pages, the charts
 and key results of each test against its Base, and every CSV those runs wrote. It only reads
@@ -85,13 +85,22 @@ view. *Test charts* keeps its scenario, test and topic the same way
 
 | Page | What it shows |
 |---|---|
-| **Chapter 6 › Overview** | which test has a run in each configuration (per-tick runs: ✅ every tick solved, ⏱ ticks stopped at the per-tick cap with the worst tick's gap, ⛔ stuck at a tick with no schedule; whole-day runs: ✅ proven best, ⏱ stopped at the time limit with its gap; · not run yet, – not run in this release, n/a not applicable), a note listing the stuck runs and why they stopped, and every result of every configuration in one table, downloadable as CSV |
-| **Chapter 6 › 6.1 to 6.4** | one page per scenario, with its question and goal. For a configuration: its servers (tier, model and frequency), the Base next to each test, one row per measure the scenario asks for (with the change against the Base on request), a chart, per-server figures (server model when the scenario names it; utilization, temperature, headroom, DPF, periods slowed) and, for 6.1 and 6.4, every workload's original and new server and zone. *Across configurations*: one measure for every configuration and test, as a table and a chart. Everything downloads as CSV |
+| **Chapter 6 › Overview** | which test has a run in each configuration (per-tick runs: ✅ every tick solved, ⏱ ticks stopped at the per-tick cap with the worst tick's gap, ⛔ stuck at a tick with no schedule or with work left after the last tick; whole-day runs: ✅ proven best, ⏱ stopped at the time limit with its gap; · not run yet, – not run in this release, n/a not applicable), a note listing the stuck runs and why they stopped, and every result of every configuration in one table, downloadable as CSV |
+| **Chapter 6 › 6.1 to 6.5** | one page per scenario, with its question and goal. For a configuration: its servers (tier, model and frequency), the Base next to each test, one row per measure the scenario asks for (with the change against the Base on request), a chart, per-server figures (server model when the scenario names it; utilization, temperature, headroom, DPF, periods slowed, workloads run) and, for 6.1 and 6.4, every workload's original and new server and zone. *Across configurations*: one measure for every configuration and test, as a table and a chart. Everything downloads as CSV |
 | **Test charts › Charts and key results** | one test of one configuration: pick the scenario, then the test (Base, Test 1, ...). It shows the run's settings, its key results (carbon, energy, hottest server, lowest headroom, missed deadlines, workloads moved) with their change against the Base of its scenario, the solver's outcome and the run's self-checks. Then one topic at a time: **Servers** (utilization, temperature, headroom, effective capability, IT power and DPF per server, and a temperature heatmap), **Cooling** (CRAC supply temperature and energy per zone; coolant and flow of the cold plates), **Energy and carbon** (energy by component, carbon and carbon intensity per period) and **Workloads** (a Gantt chart with filters). The Base's optimized schedule is drawn dashed; switch it off with *Base dashed*. When a test has the same schedule as the Base, the page says so |
 | **Outputs › Output files** | every CSV of a run, as the run wrote it: pick the configuration, the run (named by its test; the validation runs `v_…` and older solves of a test come after) and the file; a stuck run opens on its `partial_schedule.csv`. Each file downloads as it is. A warning shows if the run was solved on a different build of its scenario than the one in `scenarios/` |
 
 6.2 needs a server with a cold plate (a fast server: a C6320 at 2.6 GHz), so it does not
 apply to 2 servers. When several runs match one test, the newest is used.
+
+6.5 (ablation) puts Model A (starts on arrival, planner without the thermal slowdown) and
+Model B (flexible starts, planner without the slowdown) next to the Base, which is the full
+model (Model C). Its measures are carbon; electricity, total and by component; average and
+longest completion time, waiting and execution time; missed deadlines; the highest
+temperature, the server periods above the 75 °C slowdown onset and above the thermal cap,
+and the lowest DPF. Its per-server table opens on the workloads each server ran. A test
+without a run (6.5 before its batch, and on 10 servers until it is run there) shows as
+*not run yet*, with "–" for its measures.
 
 Every comparison is with the Base test of the same scenario and configuration, shared by
 every section. Cold plates are on in every run, so the Base has both cooling systems
@@ -104,13 +113,17 @@ tick and how many stopped at the per-tick cap.
 
 **Stuck runs.** A per-tick run stops at the first tick it cannot plan: either the solver found
 no schedule for that tick within the per-tick cap (a schedule may exist), or no valid schedule
-exists for it (the run names the limits that cause it). Such a run is a result, not a missing
+exists for it (the run names the limits that cause it). A 6.5 model, which plans without
+the slowdown, can also stop when a running workload falls so far behind its plan that it
+can no longer meet its deadline, or because work is left after the last tick: every tick
+then had a schedule (its row in `ticks.csv` has a normal status), and the site says *work
+left after the last tick*. Such a run is a result, not a missing
 one: it keeps `summary.json`, `ticks.csv` and `partial_schedule.csv` (the workloads started
 before the stuck tick), but has no full-day schedule. The overview and the scenario pages show
 it as stuck at its tick, with blank measures and no bars or per-server figures; *Test charts*
 says at which tick (and local time) and why it stopped, what it keeps, and charts the solve
-time of every tick up to it. A configuration with no run at all (in release 1.5.0, 10 servers
-on the heavy day, and 2 servers) shows as *not run in this release*.
+time of every tick up to it. A configuration with no run at all (in release 1.5.1, the 2-server
+fleet) shows as *not run in this release*.
 
 Most charts are interactive. Hover for values, drag to zoom, and double-click to reset.
 

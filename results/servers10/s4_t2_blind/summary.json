@@ -24,14 +24,12 @@
   },
   "provenance": {
     "schema_version": 1,
-    "thermasched_version": "1.4.0",
-    "relabelled_from": "1.3.0",
-    "relabel_note": "solved with the code of release 1.4.0 (commit below) before its version number was set",
+    "thermasched_version": "1.5.0",
     "made_with": "command line",
-    "created_utc": "2026-10-28T20:39:34Z",
-    "git_commit": "5812f4b",
+    "created_utc": "2026-11-02T13:38:09Z",
+    "git_commit": "9eb4943",
     "scenario_fingerprint": "feae62d07c18",
-    "scenario_built_with": "1.3.0",
+    "scenario_built_with": "1.5.0",
     "highspy": "1.15.1",
     "python": "3.12.3"
   },
@@ -48,7 +46,7 @@
     "H_min_C": null,
     "time_limit_s": 600.0,
     "mip_rel_gap": 0.001,
-    "cold_plates": false,
+    "cold_plates": true,
     "cold_plate_count": null,
     "baseline_cp_flow_Lmin": 0.3,
     "baseline_cp_coolant_C": 20.0,
@@ -61,27 +59,30 @@
     "ci_flat": false,
     "fan_power": false,
     "per_tick": true,
-    "tick_time_limit_s": 60.0
+    "tick_time_limit_s": 60.0,
+    "tick_no_schedule_limit_s": 300.0
   },
   "mode": "per_tick",
   "per_tick": {
     "outcome": "done",
     "n_ticks": 288,
     "tick_time_limit_s": 60.0,
+    "tick_no_schedule_limit_s": 300.0,
+    "n_ticks_extended": 0,
     "n_ticks_optimal": 288,
     "n_ticks_time_limit": 0,
     "n_ticks_no_bound": 0,
-    "total_solve_s": 4091.3394546580016,
-    "slowest_tick": 131,
-    "slowest_tick_solve_s": 57.73104118900028,
-    "max_mip_gap": 0.0009606794945517936,
+    "total_solve_s": 1793.4116210180014,
+    "slowest_tick": 114,
+    "slowest_tick_solve_s": 46.53064149800002,
+    "max_mip_gap": 0.0004692899808499211,
     "resumed_from_tick": null,
     "stuck": null,
     "ticks_file": "ticks.csv"
   },
-  "model_note": "Airflow and fan power are not modelled (fan power and airflow are zero). Cold plates are off (cold-plate heat removal and pump power are zero; run with --cold-plates to model them).",
+  "model_note": "Airflow and fan power are not modelled (fan power and airflow are zero). FLAGGED: cold-plate flow and coolant temperature carry almost no cost (pump power is at most about 1 mW per plate, and no equation charges energy for cooling the water), so the optimizer runs them wherever they remove the most heat. Where the 0.3 kW limit or the server's own heat is what limits removal, the reported flow and coolant values are arbitrary.",
   "cold_plates": {
-    "enabled": false,
+    "enabled": true,
     "plates_per_server": [
       0,
       0,
@@ -90,11 +91,11 @@
       0,
       0,
       0,
-      0,
-      0,
-      0
+      1,
+      1,
+      1
     ],
-    "count_source": "not modelled",
+    "count_source": "servers.csv",
     "flow_settings_Lmin": [
       0.1,
       0.15,
@@ -137,7 +138,7 @@
     "optimized_mode": "optimize",
     "optimized_fixed_flow_Lmin": null,
     "optimized_fixed_coolant_C": null,
-    "flag": null
+    "flag": "FLAGGED: cold-plate flow and coolant temperature carry almost no cost (pump power is at most about 1 mW per plate, and no equation charges energy for cooling the water), so the optimizer runs them wherever they remove the most heat. Where the 0.3 kW limit or the server's own heat is what limits removal, the reported flow and coolant values are arbitrary."
   },
   "airflow_modelled": false,
   "thermal_cap_C": 80.0,
@@ -146,13 +147,13 @@
     "valid": true,
     "violations": [],
     "metrics": {
-      "carbon_kg": 54.137348046521815,
+      "carbon_kg": 50.54489251668757,
       "E_IT_kWh": 63.332217424479154,
-      "E_crac_kWh": 23.670286075825672,
-      "E_cp_kWh": 0.0,
-      "Q_cp_kWh": 0.0,
+      "E_crac_kWh": 17.890371057277893,
+      "E_cp_kWh": 6.94144440270473e-05,
+      "Q_cp_kWh": 15.464740623626431,
       "E_fan_kWh": 0.0,
-      "E_total_kWh": 87.00250350030483,
+      "E_total_kWh": 81.22265789620108,
       "n_late": 0,
       "n_noncompliant": 0,
       "mean_wait_RT": 0.0,
@@ -161,9 +162,9 @@
       "max_wait_DT": 0.0,
       "n_priority_violations": 0,
       "hottest_T_C": 66.43344668736671,
-      "mean_T_C": 54.38606515489983,
+      "mean_T_C": 49.55623151710119,
       "min_headroom_C": 23.56655331263329,
-      "mean_headroom_C": 35.61393484510017,
+      "mean_headroom_C": 40.44376848289881,
       "periods_above_dvfs": 0,
       "periods_above_cap": 0,
       "n_throttled_servers": 0,
@@ -176,13 +177,13 @@
     },
     "totals": {
       "E_IT_kWh": 63.332217424479154,
-      "E_crac_kWh": 23.670286075825672,
-      "E_cp_kWh": 0.0,
+      "E_crac_kWh": 17.890371057277893,
+      "E_cp_kWh": 6.94144440270473e-05,
       "E_fan_kWh": 0.0,
-      "Q_cp_kWh": 0.0,
-      "E_total_kWh": 87.00250350030483,
-      "carbon_g": 54137.348046521816,
-      "carbon_kg": 54.137348046521815,
+      "Q_cp_kWh": 15.464740623626431,
+      "E_total_kWh": 81.22265789620108,
+      "carbon_g": 50544.89251668757,
+      "carbon_kg": 50.54489251668757,
       "n_workloads": 414,
       "n_unplaced": 0,
       "n_late": 0,
@@ -201,12 +202,12 @@
       "periods_above_cap": 0,
       "min_DPF": 1.0,
       "n_throttled_servers": 0,
-      "mean_T_C": 54.38606515489983,
-      "mean_headroom_C": 35.61393484510017,
+      "mean_T_C": 49.55623151710119,
+      "mean_headroom_C": 40.44376848289881,
       "n_priority_violations": 0,
       "E_crac_by_zone_kWh": [
-        10.889600270733666,
-        12.780685805092006
+        8.956084735992329,
+        8.934286321285565
       ]
     },
     "compliance_flags": {
@@ -229,67 +230,67 @@
     "valid": true,
     "violations": [],
     "metrics": {
-      "carbon_kg": 45.460280095316016,
-      "E_IT_kWh": 61.734638997395834,
-      "E_crac_kWh": 11.383781425972611,
-      "E_cp_kWh": 0.0,
-      "Q_cp_kWh": 0.0,
+      "carbon_kg": 43.82710605987666,
+      "E_IT_kWh": 62.48336565885416,
+      "E_crac_kWh": 8.161161549214043,
+      "E_cp_kWh": 6.94144440270473e-05,
+      "Q_cp_kWh": 18.112762548087257,
       "E_fan_kWh": 0.0,
-      "E_total_kWh": 73.11842042336843,
+      "E_total_kWh": 70.64459662251224,
       "n_late": 0,
       "n_noncompliant": 0,
-      "mean_wait_RT": 1.9435483870967742,
-      "max_wait_RT": 24.0,
-      "mean_wait_DT": 28.586206896551722,
+      "mean_wait_RT": 0.47580645161290325,
+      "max_wait_RT": 15.0,
+      "mean_wait_DT": 11.548275862068966,
       "max_wait_DT": 96.0,
       "n_priority_violations": 0,
-      "hottest_T_C": 76.2081336249289,
-      "mean_T_C": 62.55966993843068,
-      "min_headroom_C": 13.791866375071095,
-      "mean_headroom_C": 27.44033006156932,
-      "periods_above_dvfs": 133,
+      "hottest_T_C": 75.09176286784022,
+      "mean_T_C": 56.83487933725358,
+      "min_headroom_C": 14.908237132159783,
+      "mean_headroom_C": 33.16512066274641,
+      "periods_above_dvfs": 5,
       "periods_above_cap": 0,
-      "n_throttled_servers": 3,
-      "n_reassigned": 366,
-      "n_cross_zone": 230,
-      "hottest_server": 6,
-      "hottest_period": 96,
+      "n_throttled_servers": 2,
+      "n_reassigned": 341,
+      "n_cross_zone": 188,
+      "hottest_server": 3,
+      "hottest_period": 120,
       "n_unplaced": 0,
-      "min_DPF": 0.981733019591075
+      "min_DPF": 0.998612545438256
     },
     "totals": {
-      "E_IT_kWh": 61.734638997395834,
-      "E_crac_kWh": 11.383781425972611,
-      "E_cp_kWh": 0.0,
+      "E_IT_kWh": 62.48336565885416,
+      "E_crac_kWh": 8.161161549214043,
+      "E_cp_kWh": 6.94144440270473e-05,
       "E_fan_kWh": 0.0,
-      "Q_cp_kWh": 0.0,
-      "E_total_kWh": 73.11842042336843,
-      "carbon_g": 45460.28009531602,
-      "carbon_kg": 45.460280095316016,
+      "Q_cp_kWh": 18.112762548087257,
+      "E_total_kWh": 70.64459662251224,
+      "carbon_g": 43827.10605987666,
+      "carbon_kg": 43.82710605987666,
       "n_workloads": 414,
       "n_unplaced": 0,
       "n_late": 0,
       "n_wait_exceeded": 0,
       "n_work_short": 0,
       "n_noncompliant": 0,
-      "mean_wait_RT": 1.9435483870967742,
-      "max_wait_RT": 24.0,
-      "mean_wait_DT": 28.586206896551722,
+      "mean_wait_RT": 0.47580645161290325,
+      "max_wait_RT": 15.0,
+      "mean_wait_DT": 11.548275862068966,
       "max_wait_DT": 96.0,
-      "hottest_T_C": 76.2081336249289,
-      "hottest_server": 6,
-      "hottest_period": 96,
-      "min_headroom_C": 13.791866375071095,
-      "periods_above_dvfs": 133,
+      "hottest_T_C": 75.09176286784022,
+      "hottest_server": 3,
+      "hottest_period": 120,
+      "min_headroom_C": 14.908237132159783,
+      "periods_above_dvfs": 5,
       "periods_above_cap": 0,
-      "min_DPF": 0.981733019591075,
-      "n_throttled_servers": 3,
-      "mean_T_C": 62.55966993843068,
-      "mean_headroom_C": 27.44033006156932,
+      "min_DPF": 0.998612545438256,
+      "n_throttled_servers": 2,
+      "mean_T_C": 56.83487933725358,
+      "mean_headroom_C": 33.16512066274641,
       "n_priority_violations": 0,
       "E_crac_by_zone_kWh": [
-        5.614286089783187,
-        5.769495336189423
+        4.279303291181798,
+        3.8818582580322447
       ]
     },
     "compliance_flags": {
@@ -311,34 +312,34 @@
   "has_optimized_schedule": true,
   "comparison": {
     "carbon_kg": {
-      "baseline": 54.137348046521815,
-      "optimized": 45.460280095316016,
-      "diff": -8.6770679512058,
-      "pct": -16.02787773008264
+      "baseline": 50.54489251668757,
+      "optimized": 43.82710605987666,
+      "diff": -6.717786456810906,
+      "pct": -13.290732500010769
     },
     "E_IT_kWh": {
       "baseline": 63.332217424479154,
-      "optimized": 61.734638997395834,
-      "diff": -1.5975784270833202,
-      "pct": -2.5225366994111034
+      "optimized": 62.48336565885416,
+      "diff": -0.8488517656249925,
+      "pct": -1.3403158773608557
     },
     "E_crac_kWh": {
-      "baseline": 23.670286075825672,
-      "optimized": 11.383781425972611,
-      "diff": -12.286504649853061,
-      "pct": -51.90687011764171
+      "baseline": 17.890371057277893,
+      "optimized": 8.161161549214043,
+      "diff": -9.72920950806385,
+      "pct": -54.38237964385853
     },
     "E_cp_kWh": {
-      "baseline": 0.0,
-      "optimized": 0.0,
+      "baseline": 6.94144440270473e-05,
+      "optimized": 6.94144440270473e-05,
       "diff": 0.0,
-      "pct": null
+      "pct": 0.0
     },
     "Q_cp_kWh": {
-      "baseline": 0.0,
-      "optimized": 0.0,
-      "diff": 0.0,
-      "pct": null
+      "baseline": 15.464740623626431,
+      "optimized": 18.112762548087257,
+      "diff": 2.648021924460826,
+      "pct": 17.122963707618094
     },
     "E_fan_kWh": {
       "baseline": 0.0,
@@ -347,10 +348,10 @@
       "pct": null
     },
     "E_total_kWh": {
-      "baseline": 87.00250350030483,
-      "optimized": 73.11842042336843,
-      "diff": -13.884083076936392,
-      "pct": -15.95825696772938
+      "baseline": 81.22265789620108,
+      "optimized": 70.64459662251224,
+      "diff": -10.578061273688846,
+      "pct": -13.02353499340927
     },
     "n_late": {
       "baseline": 0,
@@ -366,20 +367,20 @@
     },
     "mean_wait_RT": {
       "baseline": 0.0,
-      "optimized": 1.9435483870967742,
-      "diff": 1.9435483870967742,
+      "optimized": 0.47580645161290325,
+      "diff": 0.47580645161290325,
       "pct": null
     },
     "max_wait_RT": {
       "baseline": 0.0,
-      "optimized": 24.0,
-      "diff": 24.0,
+      "optimized": 15.0,
+      "diff": 15.0,
       "pct": null
     },
     "mean_wait_DT": {
       "baseline": 0.0,
-      "optimized": 28.586206896551722,
-      "diff": 28.586206896551722,
+      "optimized": 11.548275862068966,
+      "diff": 11.548275862068966,
       "pct": null
     },
     "max_wait_DT": {
@@ -396,32 +397,32 @@
     },
     "hottest_T_C": {
       "baseline": 66.43344668736671,
-      "optimized": 76.2081336249289,
-      "diff": 9.774686937562194,
-      "pct": 14.713502648088546
+      "optimized": 75.09176286784022,
+      "diff": 8.658316180473506,
+      "pct": 13.033067847915845
     },
     "mean_T_C": {
-      "baseline": 54.38606515489983,
-      "optimized": 62.55966993843068,
-      "diff": 8.173604783530848,
-      "pct": 15.02885851412705
+      "baseline": 49.55623151710119,
+      "optimized": 56.83487933725358,
+      "diff": 7.278647820152393,
+      "pct": 14.687653998953957
     },
     "min_headroom_C": {
       "baseline": 23.56655331263329,
-      "optimized": 13.791866375071095,
-      "diff": -9.774686937562194,
-      "pct": -41.47694746826763
+      "optimized": 14.908237132159783,
+      "diff": -8.658316180473506,
+      "pct": -36.7398493348285
     },
     "mean_headroom_C": {
-      "baseline": 35.61393484510017,
-      "optimized": 27.44033006156932,
-      "diff": -8.173604783530848,
-      "pct": -22.950580493509797
+      "baseline": 40.44376848289881,
+      "optimized": 33.16512066274641,
+      "diff": -7.2786478201524005,
+      "pct": -17.99695748735703
     },
     "periods_above_dvfs": {
       "baseline": 0,
-      "optimized": 133,
-      "diff": 133,
+      "optimized": 5,
+      "diff": 5,
       "pct": null
     },
     "periods_above_cap": {
@@ -432,33 +433,33 @@
     },
     "n_throttled_servers": {
       "baseline": 0,
-      "optimized": 3,
-      "diff": 3,
+      "optimized": 2,
+      "diff": 2,
       "pct": null
     },
     "n_reassigned": {
       "baseline": 0,
-      "optimized": 366,
-      "diff": 366,
+      "optimized": 341,
+      "diff": 341,
       "pct": null
     },
     "n_cross_zone": {
       "baseline": 0,
-      "optimized": 230,
-      "diff": 230,
+      "optimized": 188,
+      "diff": 188,
       "pct": null
     }
   },
   "solver": {
     "status": "optimal",
     "solver_status_text": "per tick: 288 of 288 optimal, 0 at the tick time limit",
-    "solve_time_s": 4091.3394546580016,
-    "mip_gap": 0.0009606794945517936,
-    "objective_g": 45460.280095316,
+    "solve_time_s": 1793.4116210180014,
+    "mip_gap": 0.0004692899808499211,
+    "objective_g": 43827.10605987666,
     "best_bound_g": null,
-    "n_variables": 27189,
-    "n_binaries": 9979,
-    "n_constraints": 30851,
+    "n_variables": 35712,
+    "n_binaries": 10165,
+    "n_constraints": 30258,
     "relaxed": [],
     "has_schedule": true,
     "notes": [
@@ -478,9 +479,10 @@
       "The wait limit (28) is applied to all workloads, which includes (25). Workloads with B_i = 1 keep their original server (29).",
       "Priority (56)-(57): O_ij = 1 for a time-sensitive i and a delay-tolerant j, and for the earlier arrival of two same-type, same-deadline workloads. It is linked to the start times as: on a shared server, j may not start while i waits (A_i <= ST_j implies ST_i <= ST_j), through ST_i = sum_s (b X - sum U) and big-M rows (0 pair-server rows after dropping those that cannot bind). EDF within a type is not in the equations and is not modelled.",
       "Availability (11): every server is available in every period (AV = 1).",
-      "Cold plates are off: Q_cp and P_cp are columns fixed at zero.",
+      "Cold plates: 3 on 3 server(s). Each picks one of the flow settings [0.1, 0.15, 0.2, 0.25, 0.3] L/min per period (one-hot), so its resistance and the cubic pump power of Eq. (48) are lookups. T_prev - coolant is split into d_j <= d_max*b_j, so Q_cp <= n*sum G_j*d_j is linear (G_j = min(1/R_j, flow_j*c_pw)); Q_cp <= P_IT and Q_cp <= n*0.3 kW. T_prev is the previous period's temperature, and d_j >= 0 keeps the coolant at or below it.",
       "Per-tick re-planning: the model above is solved once per tick over a window from the tick to the end of the horizon, holding only the workloads that have arrived; running workloads keep their server and start and count only the work they have left; T0 is each server's temperature at the end of the previous tick (Eq. 30), and the supply temperatures of the previous ticks bound the ramps (35)-(36). Only the tick's own decisions are kept.",
-      "288 ticks: 288 solved to the gap, 0 stopped at the tick time limit (slowest 57.7 s, tick 131). The objective is the sum of each tick's own carbon for its period; the gap shown is the largest of any tick."
+      "Each tick starts from the previous tick's plan, with the workloads that arrived since placed by the baseline rule (arrival order, earliest start with room for cores and memory, least loaded server first); the solver may change any of it. A tick with no schedule at the tick time limit is solved again until the no-schedule limit.",
+      "288 ticks: 288 solved to the gap, 0 stopped at the tick time limit (slowest 46.5 s, tick 114). The objective is the sum of each tick's own carbon for its period; the gap shown is the largest of any tick."
     ]
   },
   "infeasibility": null,
@@ -490,9 +492,9 @@
     },
     "optimizer_objective_equals_evaluator_carbon": {
       "passed": true,
-      "optimizer_objective_g": 45460.280095316,
-      "evaluator_carbon_g": 45460.28009531602,
-      "relative_difference": 4.801526254740191e-16
+      "optimizer_objective_g": 43827.10605987666,
+      "evaluator_carbon_g": 43827.10605987666,
+      "relative_difference": 0.0
     },
     "optimized_schedule_valid_under_evaluator": {
       "passed": true,

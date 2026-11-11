@@ -1,4 +1,4 @@
-"""tools/runlist.py: the 36 per-tick runs of the six- and the ten-server fleet (docs/PLAN.md §3)."""
+"""tools/runlist.py: the 42 per-tick runs of the six- and the ten-server fleet (docs/PLAN.md §3)."""
 
 from __future__ import annotations
 
@@ -29,19 +29,19 @@ FIRST_BATCH = {"base", "s1_t1_zones", "s1_t2_same_zone", "s2_t1_crac", "s2_t2_co
 DAYS = {"servers6_light", "servers6", "servers6_heavy"}
 
 
-def test_thirty_six_runs_with_unique_ids():
-    assert len(RUNS) == 36
-    assert len({r["id"] for r in RUNS}) == 36
-    assert len({(r["scenario"], r["run_name"]) for r in RUNS}) == 36
+def test_forty_two_runs_with_unique_ids():
+    assert len(RUNS) == 42
+    assert len({r["id"] for r in RUNS}) == 42
+    assert len({(r["scenario"], r["run_name"]) for r in RUNS}) == 42
     assert {r["configuration"] for r in RUNS} == DAYS
     assert {r["run_name"] for r in RUNS} == FIRST_BATCH | {
         "s3_t1_hmin_high", "s3_t2_hmin_med", "s3_t3_hmin_low", "s4_t1_no_moves", "s4_t2_blind",
-        "s4_t3a_ci_flat", "s4_t3b_ci_swing"}
+        "s4_t3a_ci_flat", "s4_t3b_ci_swing", "s5_t1_no_wait", "s5_t2_no_dpf"}
     assert runlist.TIMING_RUN in {r["id"] for r in RUNS}
 
 
-def test_ten_server_fleet_has_the_same_thirty_six_tests():
-    assert len(RUNS10) == 36 and len({r["id"] for r in RUNS10}) == 36
+def test_ten_server_fleet_has_the_same_forty_two_tests():
+    assert len(RUNS10) == 42 and len({r["id"] for r in RUNS10}) == 42
     assert {r["configuration"] for r in RUNS10} == {"servers10_light", "servers10",
                                                      "servers10_heavy"}
     assert [(r["run_name"], r["level"]) for r in RUNS10] == \
@@ -115,9 +115,30 @@ def test_matrix_and_selection(capsys):
     timing = json.loads(capsys.readouterr().out)["include"]
     assert [e["id"] for e in timing] == ["servers10_heavy__base"]
     assert runlist.main(["--format", "matrix", "--fleet", "servers10"]) == 0
-    assert len(json.loads(capsys.readouterr().out)["include"]) == 36
+    assert len(json.loads(capsys.readouterr().out)["include"]) == 42
     with pytest.raises(SystemExit):
         runlist.main(["--only", "servers6__nope"])
+
+
+SIX_NEW = ["servers6_light__s5_t1_no_wait", "servers6__s5_t1_no_wait",
+           "servers6_heavy__s5_t1_no_wait", "servers6_light__s5_t2_no_dpf",
+           "servers6__s5_t2_no_dpf", "servers6_heavy__s5_t2_no_dpf"]
+
+
+def test_section_6_5_adds_six_runs_that_start_on_their_own(capsys):
+    new = [r for r in RUNS if r["section"] == "6.5"]
+    assert [r["id"] for r in new] == SIX_NEW and RUNS[-6:] == new
+    assert [r["tag"] for r in new] == ["Model A"] * 3 + ["Model B"] * 3
+    for r in new:
+        flags = [a for a in r["args"] if a in ("--start-at-arrival", "--no-planner-dpf")]
+        assert flags == (["--start-at-arrival", "--no-planner-dpf"] if "no_wait" in r["id"]
+                         else ["--no-planner-dpf"])
+        st, _ = parse_args(r["args"] + r["per_tick_args"])
+        st.validate()                                # planner_dpf off needs --per-tick
+    # the workflow's runs input goes to --only
+    assert runlist.main(["--format", "matrix", "--only", " ".join(SIX_NEW)]) == 0
+    assert [e["id"] for e in json.loads(capsys.readouterr().out)["include"]] == SIX_NEW
+    assert len(runlist.runs(sections=("6.5",))) == 9            # with 6.5's Base
 
 
 def test_cold_plates_are_on_in_every_run():

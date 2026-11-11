@@ -1,4 +1,4 @@
-"""One page per Chapter 6 scenario (6.1-6.4): the Base next to its tests for the configuration
+"""One page per Chapter 6 scenario (6.1-6.5): the Base next to its tests for the configuration
 picked at the top (10, 6 or 2 servers, on a light, normal or heavy day), with what the scenario
 measures, per-server figures and moved workloads; or one measure across the server counts on
 one load level, or across the load levels of one server count."""
@@ -16,9 +16,10 @@ from dashboard.views.chapter6 import (
 from scheduler import experiments as ex
 
 SHORT_TITLES = {"6.1": "Cooling zones", "6.2": "Cooling systems", "6.3": "Thermal headroom",
-                "6.4": "Reassignment"}
+                "6.4": "Reassignment", "6.5": "Ablation"}
 ICONS = {"6.1": ":material/grid_on:", "6.2": ":material/ac_unit:",
-         "6.3": ":material/thermostat:", "6.4": ":material/swap_horiz:"}
+         "6.3": ":material/thermostat:", "6.4": ":material/swap_horiz:",
+         "6.5": ":material/science:"}
 # Why a test does not apply to a configuration, by Test.needs.
 NOT_APPLICABLE = {"regroup": "it needs two servers of the same tier to regroup",
                   "cold_plates": "it needs a server with a cold plate "
@@ -111,7 +112,7 @@ def _chart(rows: pd.DataFrame, section: str) -> None:
                                          "Highest": col("T_max_C")}, pal,
                                   y_title="Server temperature (°C)", fmt=",.1f")
         title = "Predicted server temperature"
-    elif section == "6.3":
+    elif section in ("6.3", "6.5"):
         fig = charts.grouped_bars(tags, {"Waiting": col("wait_mean_min"),
                                          "Execution": col("exec_mean_min")}, pal,
                                   y_title="Average time per workload (min)", stacked=True,
@@ -145,10 +146,13 @@ def _servers(loaded: list[tuple[str, data.Run]], section: str) -> None:
         pivot.insert(0, "Model", names["model"])
     pivot.insert(0, "Server", names["name"])
     pivot = pivot.loc[first.servers["s"]].reset_index(drop=True)
-    fmt = "%d" if stat == "periods_throttled" else \
+    fmt = "%d" if stat in ("periods_throttled", "n_workloads") else \
         "%.3f" if stat in ("DPF_min", "DPF_mean", "E_IT_kWh") else "%.1f"
     st.dataframe(pivot, hide_index=True, column_config={
         tag: st.column_config.NumberColumn(tag, format=fmt) for tag, _ in loaded})
+    if stat == "n_workloads":
+        st.caption("How many of the day's workloads each server ran in each schedule, which "
+                   "shows how the work is spread over the servers.")
     zone_runs = [tag for tag, run in loaded
                  if not run.servers.set_index("s")["zone"].equals(names["zone"])]
     if zone_runs:
