@@ -37,6 +37,12 @@ def _ok(at: AppTest) -> None:
     assert not at.error, [e.value for e in at.error]
 
 
+BASE_ROW = "Base (every section; Model C in 6.5)"
+A65 = "Model A: Starts on arrival, planner without slowdown"
+B65 = "Model B: Flexible starts, planner without slowdown"
+C65 = "Model C: Base, the full model"
+
+
 def test_overview():
     at = _page("from dashboard.views import chapter6\nchapter6.render()").run()
     _ok(at)
@@ -49,9 +55,14 @@ def test_overview():
     assert grid["2 · heavy"].isin(["–", "n/a"]).all()
     # a configuration in the release: "·" (not run yet) exactly where a test has no run, as
     # for 6.5 on 10 servers; every test of 6.1 to 6.4 has its run on the heavy day
+    from dashboard.views import chapter6
+    assert chapter6.base_row() == BASE_ROW
+    assert len(grid) == len(ex.TESTS)           # the Base once: Model C is no row of its own
+    assert any("In 6.5 the Base is Model C, the full model: the same run" in c.value
+               for c in at.caption)
     for section in ex.SECTIONS:
         for tag, tid in section.tests:
-            row = "Base (every section)" if tag == "Base" else \
+            row = BASE_ROW if tid == "base" else \
                 f"{section.key} · {tag} · {ex.TEST_BY_ID[tid].name}"
             for fleet in ("servers10", "servers6"):
                 cell = grid.loc[row, f"{fleet.removeprefix('servers')} · heavy"]
@@ -60,7 +71,7 @@ def test_overview():
     # stuck runs say at which tick, and why, in the grid and in a note
     assert grid.loc["6.3 · Test 1 · High safety margin, 19 °C", "6 · heavy"] == \
         "⛔ stuck at tick 122, no schedule in cap"
-    assert grid.loc["Base (every section)", "6 · heavy"].startswith("⏱ 29 at cap")
+    assert grid.loc[BASE_ROW, "6 · heavy"].startswith("⏱ 29 at cap")
     assert grid.loc["6.4 · Test 1 · No reassignment (r_is = 0)", "6 · heavy"] == "✅ every tick"
     assert grid.loc["6.4 · Test 1 · No reassignment (r_is = 0)", "10 · heavy"] == \
         "⛔ stuck at tick 71, no valid schedule"
@@ -205,7 +216,7 @@ def test_test_charts_6_servers(section, test, topic):
         return
     toggle = at.toggle(key="detail_base")
     base_stuck = any("has no full-day schedule" in c.value for c in at.caption)
-    assert toggle.disabled == (test == "Base" or base_stuck)
+    assert toggle.disabled == (test == ex.SECTION_BY_KEY[section].reference or base_stuck)
 
 
 @pytest.mark.parametrize("config", ["servers6", "servers2"])
@@ -302,7 +313,8 @@ def test_a_configuration_not_run_in_this_release(key):
     if key == "6.2":                        # no cold plate on 2 servers: 6.2 does not apply
         assert "does not apply" in at.info[0].value
     else:
-        assert "2 servers · heavy day is not run in this release" in at.info[0].value
+        assert any("2 servers · heavy day is not run in this release" in i.value
+                   for i in at.info)
     at = _charts("servers2", key, "Base", level="heavy")
     _ok(at)
     assert "not run in this release" in at.info[0].value
@@ -327,12 +339,11 @@ def test_ablation_page_without_its_runs():
     at.run()
     _ok(at)
     table = at.dataframe[0].value.set_index("Measure")
-    a, b = ("Model A: Starts on arrival, planner without slowdown",
-            "Model B: Flexible starts, planner without slowdown")
-    assert list(table.columns) == ["Base", a, b]
+    a, b = A65, B65
+    assert list(table.columns) == [a, b, C65]
     assert table.loc["Solver status", a] == table.loc["Solver status", b] == data.NOT_RUN_YET
     assert (table.loc["Total carbon emissions (kg CO2)", [a, b]] == "–").all()
-    assert table.loc["Total carbon emissions (kg CO2)", "Base"] != "–"
+    assert table.loc["Total carbon emissions (kg CO2)", C65] != "–"
     assert any("Model A: not run yet · Model B: not run yet" in c.value for c in at.caption)
     # the per-server table opens on the workloads each server ran
     assert at.selectbox(key="server-stat-6.5").value == "n_workloads"
@@ -380,10 +391,10 @@ def test_ablation_page_with_its_runs(tmp_path, monkeypatch):
     at.run()
     _ok(at)
     table = at.dataframe[0].value.set_index("Measure")
-    a, b = ("Model A: Starts on arrival, planner without slowdown",
-            "Model B: Flexible starts, planner without slowdown")
+    a, b = A65, B65
     carbon = "Total carbon emissions (kg CO2)"
-    assert table.loc[carbon, a] == table.loc[carbon, "Base"] != "–"
+    assert list(table.columns) == [a, b, C65]
+    assert table.loc[carbon, a] == table.loc[carbon, C65] != "–"
     assert table.loc[carbon, b] == "–"                   # stuck: no full-day figures
     assert table.loc["Solver status", b] == \
         "Stuck at tick 288: work left after the last tick (deadlines)"
@@ -392,11 +403,13 @@ def test_ablation_page_with_its_runs(tmp_path, monkeypatch):
     assert "*Work left after the last tick* means every tick had a schedule" in note
     assert any("Left out of the chart and the tables below" in c.value and "Model B" in c.value
                for c in at.caption)
-    # per server: the workloads each server ran, for the Base and Model A
+    # per server: the workloads each server ran, for Model A and Model C (the Base)
     servers = at.dataframe[1].value
-    assert list(servers.columns[-2:]) == ["Base", "Model A"]
-    assert servers["Base"].sum() == servers["Model A"].sum() == 91
-    assert at.get("plotly_chart")                        # completion time, Base and Model A
+    assert list(servers.columns[-2:]) == ["Model A", "Model C"]
+    assert servers["Model C"].sum() == servers["Model A"].sum() == 91
+    assert at.get("plotly_chart")                        # completion time, Models A and C
+    assert any("Model A has the same optimized schedule as Model C, the Base" in c.value
+               for c in at.caption)
 
     at = _charts("servers6", "6.5", "Model B", level="light")
     _ok(at)
@@ -424,3 +437,53 @@ def test_ablation_page_with_its_runs(tmp_path, monkeypatch):
     at.session_state["level"] = "light"
     at.run()
     _ok(at)
+
+
+@pytest.mark.parametrize("level", LEVELS)
+def test_ablation_page_shows_models_a_b_c_with_c_the_base(level):
+    """6.5 shows Model A, Model B and Model C in that order, and says Model C is the Base; the
+    changes are against Model C. The other sections keep "Base", first."""
+    at = _section("6.5")
+    at.session_state["config"] = "servers6"
+    at.session_state["level"] = level
+    at.run()
+    _ok(at)
+    note = next(i.value for i in at.info if "Model C is the Base" in i.value)
+    assert "the same run as the Base of 6.1 to 6.4, not a separate run" in note
+    assert "taken against Model C" in note
+    assert at.toggle(key="changes-6.5").label == "Show change against Model C, the Base (%)"
+    table = at.dataframe[0].value
+    assert list(table.columns) == ["Measure", A65, B65, C65]
+    at.toggle(key="changes-6.5").set_value(True).run()
+    table = at.dataframe[0].value.set_index("Measure")
+    carbon = "Total carbon emissions (kg CO2)"
+    assert "%" not in table.loc[carbon, C65]               # the reference has no change
+    assert table.loc[carbon, A65] == "–" or "%" in table.loc[carbon, A65]
+    if level != "heavy":                                   # Model B is stuck on the heavy day
+        servers = at.dataframe[1].value
+        assert list(servers.columns[-3:]) == ["Model A", "Model B", "Model C"]
+
+
+@pytest.mark.parametrize("key", ["6.1", "6.2", "6.3", "6.4"])
+def test_other_sections_still_show_the_base_first(key):
+    at = _section(key)
+    at.session_state["config"] = "servers6"
+    at.session_state["level"] = "normal"
+    at.run()
+    _ok(at)
+    assert list(at.dataframe[0].value.columns)[:2] == ["Measure", "Base"]
+    assert not any("Model C" in i.value for i in at.info)
+    assert at.toggle(key=f"changes-{key}").label == "Show change against the Base (%)"
+
+
+def test_test_charts_offer_models_a_b_c_for_the_ablation():
+    at = _charts("servers6", "6.5", "Model C")
+    _ok(at)
+    assert at.segmented_control(key="test-detail").options == ["Model A", "Model B", "Model C"]
+    assert at.subheader[0].value == "6.5 Model C: Base, the full model"
+    assert any("Model C is the Base" in c.value for c in at.caption)
+    assert at.toggle(key="detail_base").disabled               # Model C is the Base itself
+    at = _charts("servers6", "6.5", "Model A")
+    assert any("Model C is drawn dashed, as the Base" in c.value for c in at.caption)
+    assert _charts("servers6", "6.1", "Base").segmented_control(key="test-detail").options[0] \
+        == "Base"

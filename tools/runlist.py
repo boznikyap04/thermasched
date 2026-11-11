@@ -3,7 +3,7 @@
     uv run python tools/runlist.py                    # the 42 runs, one per line
     uv run python tools/runlist.py --fleet servers10  # the 42 runs of the 10-server fleet
     uv run python tools/runlist.py --sections 6.1,6.2 # 15 runs (6.1 and 6.2)
-    uv run python tools/runlist.py --sections 6.5     # 9 runs: 6.5's Base, Model A and Model B
+    uv run python tools/runlist.py --sections 6.5     # 9 runs: 6.5's Models A, B and C (the Base)
     uv run python tools/runlist.py --format json      # the same, with every field
     uv run python tools/runlist.py --format matrix    # {"include": [...]} for the Actions matrix
     uv run python tools/runlist.py --only servers6_heavy__base --format matrix

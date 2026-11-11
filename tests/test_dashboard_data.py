@@ -418,9 +418,10 @@ def test_run_titles():
         "6.1 · Test 1 · Same-type servers regrouped into one zone"
     assert data.run_long_title(infos[ref.key], ref).startswith("10 servers · normal day · 6.1 · Test 1")
     base = BY_KEY["servers10/base"]
-    assert data.run_title(infos[base.key], base) == "Base"
+    assert data.run_title(infos[base.key], base) == "Base (also 6.5 Model C)"
     row = data.compare_runs([base]).iloc[0]
-    assert (row["configuration"], row["test"]) == ("10 servers · normal day", "Base")
+    assert (row["configuration"], row["test"]) == ("10 servers · normal day",
+                                                   "Base (also 6.5 Model C)")
 
 
 @needs_site_runs
@@ -437,6 +438,10 @@ def test_chapter6_table_rows_and_columns():
     # One base run is the reference (first row) of every section.
     firsts = ten.groupby("section", sort=False)["run"].first()
     assert firsts["6.1"] == firsts["6.2"] == firsts["6.3"] == firsts["6.4"] == "base"
+    # in 6.5 the reference is tagged Model C, and it is the same base run
+    c = ten[(ten["section"] == "6.5") & (ten["tag"] == "Model C")]
+    assert c.index[0] == ten[ten["section"] == "6.5"].index[0]
+    assert c["label"].tolist() == ["Base"] and c["run"].tolist() == [firsts["6.1"]]
     for _, row in table.iterrows():
         if row["run"] is None or pd.isna(row["run"]):
             assert row["status"] in data.NO_RUN
@@ -544,7 +549,8 @@ def test_chapter6_uses_the_newest_matching_run(tmp_path):
     table = data.chapter6_table(runs, configs=["servers6"])
     from scheduler import experiments as ex
     # the Base is the reference of every section (6.1 to 6.5): one row each, one run
-    assert table.loc[table["tag"] == "Base", "run"].tolist() == ["new"] * len(ex.SECTIONS)
+    assert table.loc[table["label"] == "Base", "run"].tolist() == ["new"] * len(ex.SECTIONS)
+    assert table.loc[table["label"] == "Base", "tag"].tolist() == ["Base"] * 4 + ["Model C"]
     groups = data.config_runs(runs)
     assert [r.name for r in groups["servers6"]] == ["new", "old"]   # used first, then older
 

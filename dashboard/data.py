@@ -1187,7 +1187,8 @@ def chapter6_table(runs: list[RunRef], infos: dict[str, RunInfo] | None = None,
                    configs: list[str] | None = None) -> pd.DataFrame:
     """One row per configuration, section and test, in that order, with the columns of
     CHAPTER6_COLUMNS. The base run appears in every section, so every test sits right
-    below its section's reference. A test without a run says why in *status*."""
+    below its section's reference (tagged "Base", or "Model C" in 6.5, with "Base" under
+    *label*). A test without a run says why in *status*."""
     infos = infos if infos is not None else run_infos(runs)
     cat = catalogue(runs, infos)
     in_release = configs_with_runs(cat)

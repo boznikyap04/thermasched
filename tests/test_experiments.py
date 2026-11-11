@@ -65,18 +65,24 @@ def test_a_scenario_name_gives_the_load_level():
 
 def test_sections_list_known_tests_with_the_reference_first():
     for section in ex.SECTIONS:
-        assert section.tests[0][0] == "Base"
+        # the reference is the shared base run: tagged "Base", or "Model C" in 6.5
+        assert section.tests[0][1] == "base"
+        assert section.reference == ("Model C" if section.key == "6.5" else "Base")
         assert all(tid in ex.TEST_BY_ID for _, tid in section.tests)
+        assert sorted(section.shown) == sorted(section.tests)
+        assert section.shown == section.tests or section.key == "6.5"
     used = {tid for s in ex.SECTIONS for _, tid in s.tests}
     assert used == set(ex.TEST_BY_ID)
     assert [s.key for s, _ in ex.sections_of("base")] == ["6.1", "6.2", "6.3", "6.4", "6.5"]
 
 
-def test_section_6_5_compares_the_base_with_models_a_and_b():
+def test_section_6_5_shows_models_a_b_and_c_the_base():
     section = ex.SECTION_BY_KEY["6.5"]
-    assert section.tests == (("Base", "base"), ("Model A", "s5_t1_no_wait"),
+    # Model C is the Base run: the reference, shown last
+    assert section.tests == (("Model C", "base"), ("Model A", "s5_t1_no_wait"),
                              ("Model B", "s5_t2_no_dpf"))
-    assert "Model C" in section.note
+    assert [tag for tag, _ in section.shown] == ["Model A", "Model B", "Model C"]
+    assert "Model C is the full model: it is the Base" in section.note
     assert dict(ex.TEST_BY_ID["s5_t1_no_wait"].switches) == {"start_at_arrival": True,
                                                              "planner_dpf": False}
     assert dict(ex.TEST_BY_ID["s5_t2_no_dpf"].switches) == {"planner_dpf": False}
@@ -142,7 +148,7 @@ def test_a_not_applicable_test_never_matches():
 def test_titles(test):
     title = ex.title_of(test)
     if test.id == "base":
-        assert title == "Base"
+        assert title == "Base (also 6.5 Model C)"
     else:
         section, tag = ex.sections_of(test.id)[0]
         assert title == f"{section.key} · {tag} · {test.name}"

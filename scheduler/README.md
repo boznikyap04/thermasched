@@ -218,7 +218,7 @@ level (`--scenario servers6_light`, `servers6`, `servers6_heavy`, and the same f
 | S2 base / T1 / T2 | default, the shared base (both optimized) / `--cp-mode fixed` (CRAC optimized) / `--supply-temp-mode fixed` (cold plates optimized). Cold plates are on in every run; airflow is not modelled |
 | S3 | `--h-min <value>` |
 | S4 base / T1 / T2 / T3 | default / `--reassignment none` / `--thermal-blind` / `--ci-flat` or `--carbon-file <csv>` |
-| 6.5 base (Model C) / Model A / Model B | default / `--start-at-arrival --no-planner-dpf` / `--no-planner-dpf`, per tick |
+| 6.5 Model A / Model B / Model C | `--start-at-arrival --no-planner-dpf` / `--no-planner-dpf`, per tick / none: Model C, the full model, is the shared base run, not a separate run |
 
 Since 1.1.0 every Chapter 6 run is solved with `--time-limit 1800`
 (`logs/runs/v1.1.0/runlist.txt`). With `--thermal-blind`, if no schedule on the servers chosen

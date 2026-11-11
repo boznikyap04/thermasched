@@ -156,7 +156,7 @@ TESTS: tuple[Test, ...] = (
     Test("s4_t3a_ci_flat", "Flat carbon intensity", (("ci_amplitude", 0.0),)),
     Test("s4_t3b_ci_swing", "Deeper daily carbon swing (amplitude 0.50)",
          (("ci_amplitude", 0.5),)),
-    # 6.5 ablation; Model C is the Base itself
+    # 6.5 ablation, Models A and B; Model C, the full model, is the Base itself
     Test("s5_t1_no_wait", "Starts on arrival, planner without slowdown",
          (("start_at_arrival", True), ("planner_dpf", False))),
     Test("s5_t2_no_dpf", "Flexible starts, planner without slowdown",
@@ -173,6 +173,19 @@ class Section:
     goal: str
     tests: tuple[tuple[str, str], ...]      # (tag, test id): the first is the reference
     note: str = ""
+    # Show the reference after the other tests. 6.5 names its models A, B and C, and Model C,
+    # the full model, is the Base itself: shown last, still the reference of every change.
+    reference_last: bool = False
+
+    @property
+    def shown(self) -> tuple[tuple[str, str], ...]:
+        """The tests in the order the site shows them."""
+        return self.tests[1:] + self.tests[:1] if self.reference_last else self.tests
+
+    @property
+    def reference(self) -> str:
+        """The tag of the reference: 'Base', or 6.5's 'Model C'."""
+        return self.tests[0][0]
 
 
 SECTIONS: tuple[Section, ...] = (
@@ -220,14 +233,15 @@ SECTIONS: tuple[Section, ...] = (
             "add to the results?",
             "Compare stripped-down models with the full model to show what each part "
             "contributes.",
-            (("Base", "base"), ("Model A", "s5_t1_no_wait"), ("Model B", "s5_t2_no_dpf")),
-            "The Base is the full model (Model C). Model A starts every workload when it "
-            "arrives and plans as if servers never slow down when hot; it still chooses the "
-            "server. Model B keeps the flexible start times but also plans without the "
-            "slowdown. Cooling, the temperature cap, priority and carbon are as in the Base. "
-            "The day is played out with the real slowdown, so a workload in A or B can do less "
-            "work than planned; if it can then no longer meet its deadline, the run stops at "
-            "that tick."),
+            (("Model C", "base"), ("Model A", "s5_t1_no_wait"), ("Model B", "s5_t2_no_dpf")),
+            "Model C is the full model: it is the Base, the same run as the Base of 6.1 to "
+            "6.4, not a separate run. Model A starts every workload when it arrives and plans "
+            "as if servers never slow down when hot; it still chooses the server. Model B "
+            "keeps the flexible start times but also plans without the slowdown. Cooling, the "
+            "temperature cap, priority and carbon are as in Model C. The day is played out "
+            "with the real slowdown, so a workload in A or B can do less work than planned; if "
+            "it can then no longer meet its deadline, the run stops at that tick.",
+            reference_last=True),
 )
 SECTION_BY_KEY = {s.key: s for s in SECTIONS}
 
@@ -238,9 +252,13 @@ def sections_of(test_id: str) -> list[tuple[Section, str]]:
 
 
 def title_of(test: Test) -> str:
-    """'6.1 · Test 1 · Same-type servers regrouped into one zone'; the shared base is 'Base'."""
+    """'6.1 · Test 1 · Same-type servers regrouped into one zone'; the shared base is
+    'Base (also 6.5 Model C)', naming the sections that give it a tag of its own."""
     where = sections_of(test.id)
-    if test.id == "base" or not where:
+    if test.id == "base":
+        own = [f"{s.key} {tag}" for s, tag in where if tag != test.name]
+        return f"{test.name} (also {', '.join(own)})" if own else test.name
+    if not where:
         return test.name
     section, tag = where[0]
     return f"{section.key} · {tag} · {test.name}"

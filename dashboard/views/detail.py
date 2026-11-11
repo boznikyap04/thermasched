@@ -12,7 +12,7 @@ import pandas as pd
 import streamlit as st
 
 from dashboard import charts, data, state
-from dashboard.views.section import NOT_APPLICABLE, SHORT_TITLES, _heading
+from dashboard.views.section import NOT_APPLICABLE, SHORT_TITLES, _heading, reference_note
 from scheduler import experiments as ex
 
 PAGE = "detail"
@@ -403,7 +403,7 @@ def _pick() -> tuple[ex.Configuration, ex.Section, str]:
     key = state.pick_kept("section", "Scenario", [s.key for s in ex.SECTIONS], PAGE,
                           format_func=lambda k: f"{k} {SHORT_TITLES[k]}")
     section = ex.SECTION_BY_KEY[key]
-    tag = state.pick_kept("test", "Test", [t for t, _ in section.tests], PAGE)
+    tag = state.pick_kept("test", "Test", [t for t, _ in section.shown], PAGE)
     return config, section, tag
 
 
@@ -416,6 +416,10 @@ def render() -> None:
     test = ex.TEST_BY_ID[tests[tag]]
     base_tag, base_id = section.tests[0]
     st.subheader(f"{section.key} {_heading(tag, test.name)}")
+    if reference_note(section):
+        st.caption(reference_note(section)
+                   + (f" {section.reference} is drawn dashed, as the Base."
+                      if tag != section.reference else ""))
     if not ex.applicable(test, config):
         st.info(f"{section.key} {tag} does not apply to {config.label}: "
                 f"{NOT_APPLICABLE[test.needs]}.")

@@ -23,6 +23,9 @@ FORMATS = {
     "n_ticks": "%d", "n_ticks_at_cap": "%d", "tick_time_limit_s": "%d", "stuck_tick": "%d",
 }
 PINNED = ("configuration", "section", "tag", "label")
+# The shared base run's test name: its rows say "Base" under Run, also where a section gives it
+# a tag of its own (6.5's Model C).
+BASE = ex.TEST_BY_ID["base"].name
 COUNTS = [k for k in FORMATS if k.startswith("n_")] + ["stuck_tick"]
 # Above this MIP gap, a run stopped at its time limit may be far from its best schedule; for a
 # per-tick run, a tick stopped at the cap may be far from the best decision for what it saw.
@@ -154,11 +157,17 @@ def stuck_notice(table: pd.DataFrame, where: str = "", each: bool = False) -> No
             icon=":material/block:")
 
 
+def base_row() -> str:
+    """'Base (every section; Model C in 6.5)': the grid's one row for the shared base run."""
+    own = [f"; {s.reference} in {s.key}" for s in ex.SECTIONS if s.reference != BASE]
+    return f"{BASE} (every section{''.join(own)})"
+
+
 def _status_grid(table: pd.DataFrame) -> pd.DataFrame:
     """One row per test (the base once), one column per configuration: servers · load level."""
     rows = {}
     for r in table.itertuples():
-        test = f"{r.section} · {r.tag} · {r.label}" if r.tag != "Base" else "Base (every section)"
+        test = f"{r.section} · {r.tag} · {r.label}" if r.label != BASE else base_row()
         ticks = row_ticks(r) if r.status not in data.NO_RUN else None
         if r.status in data.NO_RUN:
             icon = {data.NOT_RUN_YET: "·", data.NOT_APPLICABLE: "n/a",
@@ -185,6 +194,12 @@ def _status_grid(table: pd.DataFrame) -> pd.DataFrame:
     grid = pd.DataFrame.from_dict(rows, orient="index")
     grid.index.name = "Test"
     return grid.reset_index()
+
+
+def _base_names() -> str:
+    """'In 6.5 the Base is Model C, the full model: the same run, not a separate one.'"""
+    return " ".join(f"In {s.key} the {BASE} is {s.reference}, the full model: the same run, "
+                    "not a separate one." for s in ex.SECTIONS if s.reference != BASE)
 
 
 def _counts(cat) -> tuple[int, int]:
@@ -245,7 +260,7 @@ def render() -> None:
                "❌ no valid schedule · **·** not run yet · **–** not run in this release · "
                "**n/a** not applicable: 6.1 Test 1 needs two "
                "servers of the same tier, 6.2 needs a server with a cold plate "
-               f"({data.cold_plate_server_text()}).")
+               f"({data.cold_plate_server_text()}). " + _base_names())
 
     st.subheader("All results")
     with st.container(horizontal=True, gap="medium", vertical_alignment="bottom"):
@@ -254,7 +269,8 @@ def render() -> None:
                                 default=with_runs, key="ch6_configs", width=520)
         changes = st.toggle("Change against each section's Base (%)", key="ch6_changes",
                             help="Each result against the Base of its configuration and "
-                                 "section. Blank where either has no value or the Base is 0.")
+                                 "section. Blank where either has no value or the Base is 0. "
+                                 + _base_names())
     shown_all = data.chapter6_changes(table) if changes else table
     shown = status_words(shown_all[shown_all["configuration"].isin(picked)])
     config = {}

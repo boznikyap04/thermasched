@@ -230,8 +230,9 @@ unattended, on Colab or a laptop.
   to the thesis set: every test of 6.1 to 6.5 (the switches of
   [section 5 of the solver guide](../scheduler/README.md#5-thesis-scenarios-ch-6)) on
   `servers6_light`, `servers6` and `servers6_heavy`, labelled as on the site: 42 runs, each
-  re-planned every period by default (up to about five hours each at 60 s per tick). The two
-  6.5 models plan without the thermal slowdown and always run per tick.
+  re-planned every period by default (up to about five hours each at 60 s per tick). 6.5's
+  Models A and B plan without the thermal slowdown and always run per tick; Model C, the full
+  model, is the 6.1 Base run, not a separate entry.
   `DEFAULTS` applies switches to every run, for example a longer time limit.
 - **Plan first:** section 1 validates every entry, checks that its scenario exists and that no
   two entries are the same run, and prints the plan with an upper bound on the time, before

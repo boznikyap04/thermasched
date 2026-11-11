@@ -9,8 +9,8 @@ Per-tick runs, R840 + C6320 fleet, solved on GitHub Actions with a 60 s cap per 
 whole-day results of earlier releases are in `archive/results_2026-10-25_whole_day/`.
 
 **6 servers, 6.5 (ablation): release 1.5.2** (commit 12a8e6f): Model A (`s5_t1_no_wait`) and
-Model B (`s5_t2_no_dpf`) on the light, normal and heavy day, six runs; their Base is `base`
-of the 1.5.0 re-run below. They were solved on a Mac (Apple M4, four runs at a time, then
+Model B (`s5_t2_no_dpf`) on the light, normal and heavy day, six runs. Model C, the full
+model, is the Base: `base` of the 1.5.0 re-run below, not a separate run. They were solved on a Mac (Apple M4, four runs at a time, then
 two), not on GitHub Actions, with the same 60 s cap per tick. A tick that stops at the cap
 keeps the best schedule found by then, which depends on the machine, so the capped ticks of
 these runs and of their Base were solved on different hardware. Their `summary.json` says

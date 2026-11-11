@@ -14,6 +14,19 @@ run.
   section 4 shows which scenarios differ from before), then solve again. The site warns when
   a run was solved on a different scenario build than the one it holds.
 
+## 1.5.3 (2026-11-11)
+
+**Re-run:** nothing. Only the site, the notebooks' text and the documentation changed; every
+run stays valid.
+
+- **6.5 shows Model A, Model B and Model C.** Section 6.5 now names its three models as the
+  write-up does, in that order. Model C is the full model: it is the Base, the same run as the
+  Base of 6.1 to 6.4, not a separate run, and the 6.5 page says so. Every difference and
+  change (%) on that page is taken against Model C.
+- Elsewhere on the site the shared run reads *Base (also 6.5 Model C)*, and the overview keeps
+  one row for it, so its figures are not repeated as a fourth run. 6.1 to 6.4 are unchanged.
+- No new run and no new run id: a fleet's run list still has 42 runs.
+
 ## 1.5.2 (2026-11-11)
 
 **Re-run:** nothing. The two new settings are off unless a run asks for them, so every earlier

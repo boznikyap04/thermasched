@@ -93,9 +93,13 @@ view. *Test charts* keeps its scenario, test and topic the same way
 6.2 needs a server with a cold plate (a fast server: a C6320 at 2.6 GHz), so it does not
 apply to 2 servers. When several runs match one test, the newest is used.
 
-6.5 (ablation) puts Model A (starts on arrival, planner without the thermal slowdown) and
-Model B (flexible starts, planner without the slowdown) next to the Base, which is the full
-model (Model C). Its measures are carbon; electricity, total and by component; average and
+6.5 (ablation) shows Model A (starts on arrival, planner without the thermal slowdown),
+Model B (flexible starts, planner without the slowdown) and Model C, in that order. Model C
+is the full model: it is the Base, the same run as the Base of 6.1 to 6.4, not a separate
+run, and the page says so in a note. Changes on the page are against Model C. Elsewhere the
+site names that run "Base", noting that it is Model C in 6.5: the overview has one row for it,
+*Base (every section; Model C in 6.5)*, and the run picker calls it *Base (also 6.5 Model C)*.
+6.5's measures are carbon; electricity, total and by component; average and
 longest completion time, waiting and execution time; missed deadlines; the highest
 temperature, the server periods above the 75 °C slowdown onset and above the thermal cap,
 and the lowest DPF. Its per-server table opens on the workloads each server ran. A test
@@ -122,7 +126,7 @@ one: it keeps `summary.json`, `ticks.csv` and `partial_schedule.csv` (the worklo
 before the stuck tick), but has no full-day schedule. The overview and the scenario pages show
 it as stuck at its tick, with blank measures and no bars or per-server figures; *Test charts*
 says at which tick (and local time) and why it stopped, what it keeps, and charts the solve
-time of every tick up to it. A configuration with no run at all (in release 1.5.2, the 2-server
+time of every tick up to it. A configuration with no run at all (in release 1.5.3, the 2-server
 fleet) shows as *not run in this release*.
 
 Most charts are interactive. Hover for values, drag to zoom, and double-click to reset.

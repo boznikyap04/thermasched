@@ -12,7 +12,7 @@ import streamlit as st
 
 from dashboard import charts, data, state
 from dashboard.views.chapter6 import (
-    FORMATS, NOTES, csv_bytes, fmt_value, gap_warning, status_cell, stuck_notice)
+    BASE, FORMATS, NOTES, csv_bytes, fmt_value, gap_warning, status_cell, stuck_notice)
 from scheduler import experiments as ex
 
 SHORT_TITLES = {"6.1": "Cooling zones", "6.2": "Cooling systems", "6.3": "Thermal headroom",
@@ -32,8 +32,35 @@ MOVES = {"6.1", "6.4"}
 
 
 def _heading(tag: str, name: str) -> str:
-    """'Test 1: Same-type servers ...'; the Base is just 'Base'."""
-    return tag if name == "Base" else f"{tag}: {name}"
+    """'Test 1: Same-type servers ...'; the Base is just 'Base', and where it has a tag of its
+    own (6.5's Model C), 'Model C: Base, the full model'."""
+    if name != BASE:
+        return f"{tag}: {name}"
+    return tag if tag == BASE else f"{tag}: {BASE}, the full model"
+
+
+def reference_text(section: ex.Section) -> str:
+    """How the page names its reference: 'the Base', or 'Model C, the Base' in 6.5."""
+    return "the Base" if section.reference == BASE else f"{section.reference}, the Base"
+
+
+def reference_note(section: ex.Section) -> str:
+    """For a section whose Base has a tag of its own (6.5's Model C): that it is the Base, not
+    a run of its own. Empty for the others."""
+    if section.reference == BASE:
+        return ""
+    others = [s.key for s in ex.SECTIONS if s.reference == BASE]
+    tag = section.reference
+    return (f"**{tag} is the Base.** {tag} is the full model: the same run as the Base of "
+            f"{others[0]} to {others[-1]}, not a separate run. Every difference and change (%) "
+            f"on this page is taken against {tag}.")
+
+
+def _shown(rows: pd.DataFrame, section: ex.Section) -> pd.DataFrame:
+    """The section's rows in the order the page shows them (6.5: Model A, B, then C); the
+    index stays that of the table, where row 0 is the reference."""
+    order = {tag: i for i, (tag, _) in enumerate(section.shown)}
+    return rows.sort_values("tag", key=lambda tags: tags.map(order), kind="stable")
 
 
 def _rows(table: pd.DataFrame, config: ex.Configuration, section: str) -> pd.DataFrame:
@@ -41,12 +68,13 @@ def _rows(table: pd.DataFrame, config: ex.Configuration, section: str) -> pd.Dat
     return rows.reset_index(drop=True)
 
 
-def _comparison(rows: pd.DataFrame, section: str, changes: bool) -> pd.DataFrame:
-    """Measures down, tests across (Base first), as display text."""
-    measures = data.SECTION_MEASURES[section]
+def _comparison(rows: pd.DataFrame, section: ex.Section, changes: bool) -> pd.DataFrame:
+    """Measures down, tests across (Base first; in 6.5 Models A, B, then C, the Base), as
+    display text. Changes are against the reference, row 0."""
+    measures = data.SECTION_MEASURES[section.key]
     pct = data.chapter6_changes(rows) if changes else None
     out = {"Measure": [data.CHAPTER6_COLUMNS[k] for k in measures] + list(RUN_ROWS.values())}
-    for i, r in rows.iterrows():
+    for i, r in _shown(rows, section).iterrows():
         col = _heading(r["tag"], r["label"])
         ran = data.has_result(rows.iloc[[i]]).iloc[0]
         values = []
@@ -77,8 +105,8 @@ def _loaded(rows: pd.DataFrame, cat, config: ex.Configuration, section: ex.Secti
 
 def _same_schedules(loaded: list[tuple[str, data.Run]], section: ex.Section) -> None:
     """Say which tests have the Base's optimized schedule, so equal figures do not look like a
-    mistake."""
-    if not loaded or loaded[0][0] != section.tests[0][0]:
+    mistake. ``loaded`` is in test order, the reference first."""
+    if not loaded or loaded[0][0] != section.reference:
         return
     base = loaded[0][1]
     same = [tag for tag, run in loaded[1:] if data.same_schedule(run, base)]
@@ -86,8 +114,9 @@ def _same_schedules(loaded: list[tuple[str, data.Run]], section: ex.Section) -> 
         return
     names = " and ".join([", ".join(same[:-1]), same[-1]] if len(same) > 1 else same)
     st.caption(f"**{names} {'has' if len(same) == 1 else 'have'} the same optimized schedule "
-               "as the Base:** every workload on the same server, starting in the same "
-               "period. Their figures differ from the Base's only where the test changes "
+               f"as {reference_text(section)}:** every workload on the same server, starting "
+               "in the same period. Their figures differ from the Base's only where the test "
+               "changes "
                "cooling, zones or carbon intensity. *Test charts* shows each test against the "
                "Base.")
 
@@ -209,16 +238,18 @@ def _this_configuration(table, cat, config: ex.Configuration, section: ex.Sectio
                 icon=":material/do_not_disturb_on:")
         return
     rows = _rows(table, config, section.key)
-    changes = st.toggle("Show change against the Base (%)", key=f"changes-{section.key}")
-    st.dataframe(_comparison(rows, section.key, changes), hide_index=True,
+    shown = _shown(rows, section)
+    changes = st.toggle(f"Show change against {reference_text(section)} (%)",
+                        key=f"changes-{section.key}")
+    st.dataframe(_comparison(rows, section, changes), hide_index=True,
                  column_config={"Measure": st.column_config.TextColumn(pinned=True)})
-    missing = rows[~data.has_result(rows)]
+    missing = shown[~data.has_result(shown)]
     if not missing.empty:
         st.caption(" · ".join(f"{r.tag}: {r.status}" for r in missing.itertuples()) + ".")
-    gap_warning(rows)
-    stuck_notice(rows, each=True)
+    gap_warning(shown)
+    stuck_notice(shown, each=True)
     st.download_button("Download this comparison (CSV)",
-                       csv_bytes(rows, data.CHAPTER6_COLUMNS),
+                       csv_bytes(shown, data.CHAPTER6_COLUMNS),
                        file_name=f"chapter6_{section.key}_{config.key}.csv", mime="text/csv",
                        icon=":material/download:", key=f"dl-section-{section.key}",
                        help="Every column of the results table for these runs, full precision.")
@@ -228,6 +259,8 @@ def _this_configuration(table, cat, config: ex.Configuration, section: ex.Sectio
         st.info(f"No run of {section.key} for {config.label} yet.")
         return
     _same_schedules(loaded, section)
+    order = [tag for tag, _ in section.shown]
+    loaded = sorted(loaded, key=lambda pair: order.index(pair[0]))
     # a stuck run has no full-day schedule: no bars, nothing per server or per workload
     scheduled = [(tag, run) for tag, run in loaded if run.has_optimized]
     if not scheduled:
@@ -238,7 +271,7 @@ def _this_configuration(table, cat, config: ex.Configuration, section: ex.Sectio
     if left_out:
         st.caption(f"Left out of the chart and the tables below, with no full-day schedule: "
                    f"{', '.join(left_out)}.")
-    _chart(rows, section.key)
+    _chart(shown, section.key)
     _servers(scheduled, section.key)
     if section.key in MOVES:
         _moves(scheduled, section.key)
@@ -265,7 +298,7 @@ def _across(table: pd.DataFrame, section: ex.Section, scope: state.Scope) -> Non
                            key=f"across-measure-{section.key}", width=420)
     grid = (rows.assign(value=pd.to_numeric(rows[measure], errors="coerce"))
             .pivot_table(index=by, columns="tag", values="value", sort=False, dropna=False))
-    order = [t for t, _ in section.tests]
+    order = [t for t, _ in section.shown]
     grid = grid.reindex(columns=order)
     grid = grid.dropna(how="all")
     if grid.empty:
@@ -273,9 +306,10 @@ def _across(table: pd.DataFrame, section: ex.Section, scope: state.Scope) -> Non
         return
     shown = grid.map(lambda v: fmt_value(measure, v)).reset_index()
     st.dataframe(shown.rename(columns={by: header}), hide_index=True)
-    names = dict(section.tests)
-    st.caption(" · ".join(f"**{tag}** {ex.TEST_BY_ID[names[tag]].name}" for tag in order
-                          if ex.TEST_BY_ID[names[tag]].name != "Base"))
+    names = {tag: ex.TEST_BY_ID[tid].name for tag, tid in section.tests}
+    st.caption(" · ".join(f"**{tag}** " + (names[tag] if names[tag] != BASE
+                                           else f"the {BASE}, the full model")
+                          for tag in order if tag != BASE))
     fmt = ",.0f" if FORMATS.get(measure) == "%d" else ",.3f"
     fig = charts.grouped_bars(list(grid.index), {t: grid[t].tolist() for t in grid.columns},
                               state.pal(), y_title=data.CHAPTER6_COLUMNS[measure], fmt=fmt)
@@ -295,6 +329,8 @@ def page(key: str) -> Callable[[], None]:
         st.title(f"{section.key} {section.title}")
         st.markdown(f"*{section.question}*")
         st.caption(f"**Goal:** {section.goal} {section.note}")
+        if reference_note(section):
+            st.info(reference_note(section), icon=":material/info:")
         table, cat = state.chapter6()
         scope = state.pick_scope(key, across=True)
         config = scope.config
